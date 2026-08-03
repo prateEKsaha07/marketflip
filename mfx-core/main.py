@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from auth.routes import router as auth_router
 from requests.routes import router as requests_router
+from bids.routes import router as bids_routes
 import os
 import logging
 from dotenv import load_dotenv
@@ -24,9 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(auth_router)
-app.include_router(requests_router)
+# Startup event to check Supabase connection
 @app.on_event("startup")
 async def startup_event():
     """Check Supabase connection on startup"""
@@ -35,19 +34,25 @@ async def startup_event():
         
         # Test connection with ANON key
         test_anon = supabase_anon.table("profiles").select("count").limit(1).execute()
-        logger.info("✅ Supabase ANON connection successful")
+        logger.info("Supabase ANON connection successful")
         
         # Test connection with SERVICE ROLE key
         test_admin = supabase_admin.table("profiles").select("count").limit(1).execute()
-        logger.info("✅ Supabase SERVICE ROLE connection successful")
+        logger.info("Supabase SERVICE ROLE connection successful")
         
     except Exception as e:
-        logger.error(f"❌ Supabase connection failed: {str(e)}")
+        logger.error(f"Supabase connection failed: {str(e)}")
         logger.error("Please check environment variables")
 
 @app.get("/")
 async def root():
     return {"message": "Auth API is running"}
+
+
+# all routers
+app.include_router(auth_router)
+app.include_router(requests_router)
+app.include_router(bids_routes)
 
 if __name__ == "__main__":
     import uvicorn
