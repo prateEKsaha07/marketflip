@@ -1,0 +1,139 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Optional, List
+from uuid import UUID
+import logging
+
+from auth.dependencies import get_current_user
+from requests.schemas import (
+    RequestCreate, 
+    RequestResponse, 
+    RequestDetailResponse,
+    RequestQueryParams
+)
+from requests.services import RequestService
+from auth.dependencies import supabase_anon, supabase_admin
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/requests", tags=["requests"])
+
+# Initialize service
+request_service = RequestService(supabase_admin, supabase_anon)
+
+# ----- Routes -----
+
+@router.post("/", response_model=RequestResponse, status_code=201)
+async def create_request(
+    request_data: RequestCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Create a new request.
+    Only buyers can create requests.
+    """
+    # Check role
+    if current_user.get("role") != "buyer":
+        raise HTTPException(status_code=403, detail="Only buyers can create requests")
+    
+    try:
+        # Create request - pass buyer_id and request_data as dict
+        result = request_service.create_request(
+            buyer_id=current_user["id"],
+            request_data=request_data.model_dump()  # Use model_dump() instead of dict()
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Create request error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/", response_model=List[RequestResponse])
+async def get_requests(
+    pincode: Optional[str] = Query(None, min_length=6, max_length=6),
+    category: Optional[str] = None,
+    status: str = Query("open", regex="^(open|purchased|deleted|expired)$"),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get requests with filters.
+    All authenticated users can view open requests.
+    """
+    try:
+        # Validate pincode
+        if pincode and not pincode.isdigit():
+            raise HTTPException(status_code=400, detail="Pincode must contain only digits")
+        
+        # Get requests
+        requests = request_service.get_requests(
+            pincode=pincode,
+            category=category,
+            status=status,
+            limit=limit,
+            offset=offset
+        )
+        
+        return requests
+        
+    except Exception as e:
+        logger.error(f"Get requests error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{request_id}", response_model=RequestDetailResponse)
+async def get_request_detail(
+    request_id: UUID,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get request details with bids.
+    Bids are only shown if the current user is the buyer.
+    """
+    try:
+        # Get request with bids
+        result = request_service.get_request_by_id(
+            request_id=str(request_id),
+            current_user_id=current_user["id"]
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Get request detail error: {str(e)}")
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail="Request not found")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/{request_id}", status_code=204)
+async def delete_request(
+    request_id: UUID,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Delete a request (soft delete - sets status to 'deleted').
+    Only the buyer who created the request can delete it.
+    """
+    # Check role
+    if current_user.get("role") != "buyer":
+        raise HTTPException(status_code=403, detail="Only buyers can delete requests")
+    
+    try:
+        # Soft delete request
+        success = request_service.delete_request(
+            request_id=str(request_id),
+            current_user_id=current_user["id"]
+        )
+        
+        if success:
+            return None  # 204 No Content
+        
+    except Exception as e:
+        logger.error(f"Delete request error: {str(e)}")
+        if "permission" in str(e).lower():
+            raise HTTPException(status_code=403, detail=str(e))
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail="Request not found")
+        raise HTTPException(status_code=400, detail=str(e))

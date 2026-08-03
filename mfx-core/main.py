@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from auth.routes import router as auth_router
+from requests.routes import router as requests_router
 import os
 import logging
 from dotenv import load_dotenv
@@ -25,7 +26,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router)
-
+app.include_router(requests_router)
 @app.on_event("startup")
 async def startup_event():
     """Check Supabase connection on startup"""
