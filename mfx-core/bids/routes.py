@@ -15,12 +15,19 @@ from bids.services import BidService
 from auth.dependencies import supabase_anon, supabase_admin
 
 logger = logging.getLogger(__name__)
+
+# Two routers - one for /requests prefix, one for /bids prefix
 router = APIRouter(prefix="/requests", tags=["bids"])
+bid_router = APIRouter(prefix="/bids", tags=["bids"])
 
 # Initialize service
 bid_service = BidService(supabase_admin, supabase_anon)
 
-# ----- POST/Update/Delete Routes -----
+# ----- POST/Update/Delete Routes (with /requests prefix) -----
+
+@bid_router.get("/test")
+async def test_bids_route():
+    return {"message": "Bids router is working!"}
 
 @router.post("/{request_id}/bids", response_model=BidResponse, status_code=201)
 async def create_bid(
@@ -50,8 +57,90 @@ async def create_bid(
             raise HTTPException(status_code=400, detail="You already have a pending bid on this request")
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/{request_id}/bids")
+async def get_bids_for_request(
+    request_id: UUID,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all bids for a specific request."""
+    try:
+        # Use supabase_admin to bypass RLS for bid queries
+        request_check = supabase_admin.table("requests") \
+            .select("id, buyer_id") \
+            .eq("id", str(request_id)) \
+            .execute()
+        
+        if not request_check.data:
+            raise HTTPException(status_code=404, detail="Request not found")
+        
+        request = request_check.data[0]
+        
+        is_buyer = str(request["buyer_id"]) == current_user["id"]
+        is_shop_owner = current_user.get("role") == "shop_owner"
+        
+        query = supabase_admin.table("bids") \
+            .select("*, profiles!shop_id(shop_name, phone, address)") \
+            .eq("request_id", str(request_id)) \
+            .order("created_at", desc=True)
+        
+        if is_shop_owner and not is_buyer:
+            query = query.eq("shop_id", current_user["id"])
+        
+        response = query.execute()
+        return response.data if response.data else []
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get bids for request error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
 
-@router.patch("/bids/{bid_id}", response_model=BidResponse)
+
+# ----- All /bids endpoints (with /bids prefix) -----
+
+
+@bid_router.get("/")
+async def get_bids(
+    request_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get bids based on user role."""
+    try:
+        if current_user.get("role") == "shop_owner":
+            # Use supabase_admin to bypass RLS
+            query = supabase_admin.table("bids") \
+                .select("*, requests!inner(*, profiles!buyer_id(phone))") \
+                .eq("shop_id", current_user["id"]) \
+                .order("created_at", desc=True)
+            
+            if request_id:
+                query = query.eq("request_id", request_id)
+            
+            response = query.execute()
+            return response.data if response.data else []
+            
+        elif current_user.get("role") == "buyer":
+            # Use supabase_admin to bypass RLS
+            query = supabase_admin.table("bids") \
+                .select("*, requests!inner(*), profiles!shop_id(shop_name, phone, address)") \
+                .eq("requests.buyer_id", current_user["id"]) \
+                .order("created_at", desc=True)
+            
+            if request_id:
+                query = query.eq("request_id", request_id)
+            
+            response = query.execute()
+            return response.data if response.data else []
+            
+        else:
+            raise HTTPException(status_code=403, detail="Unauthorized role")
+            
+    except Exception as e:
+        logger.error(f"Get bids error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@bid_router.patch("/{bid_id}", response_model=BidResponse)
 async def update_bid(
     bid_id: UUID,
     bid_data: BidUpdate,
@@ -80,7 +169,7 @@ async def update_bid(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/bids/{bid_id}", status_code=204)
+@bid_router.delete("/{bid_id}", status_code=204)
 async def delete_bid(
     bid_id: UUID,
     current_user: dict = Depends(get_current_user)
@@ -107,12 +196,16 @@ async def delete_bid(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.patch("/bids/{bid_id}/select", response_model=BidSelectionResponse)
+@bid_router.patch("/{bid_id}/select", response_model=BidSelectionResponse)
 async def select_bid(
     bid_id: UUID,
     current_user: dict = Depends(get_current_user)
 ):
     """Select a bid. Buyers only."""
+    print(f"=== SELECT BID ROUTE HIT ===")
+    print(f"Bid ID: {bid_id}")
+    print(f"User: {current_user}")
+    
     if current_user.get("role") != "buyer":
         raise HTTPException(status_code=403, detail="Only buyers can select bids")
     
@@ -132,97 +225,4 @@ async def select_bid(
             raise HTTPException(status_code=400, detail="Request is not open for selection")
         if "Cannot select a bid that is not pending" in str(e):
             raise HTTPException(status_code=400, detail="Bid is no longer pending")
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-# ----- GET Routes -----
-
-@router.get("/bids")
-async def get_bids(
-    request_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Get bids based on user role:
-    - Shop owners: Get their own bids
-    - Buyers: Get bids on their requests
-    """
-    try:
-        if current_user.get("role") == "shop_owner":
-            # Shop owner sees their own bids
-            query = supabase_anon.table("bids") \
-                .select("*, requests!inner(*, profiles!buyer_id(phone))") \
-                .eq("shop_id", current_user["id"]) \
-                .order("created_at", desc=True)
-            
-            if request_id:
-                query = query.eq("request_id", request_id)
-            
-            response = query.execute()
-            return response.data if response.data else []
-            
-        elif current_user.get("role") == "buyer":
-            # Buyer sees bids on their requests
-            query = supabase_anon.table("bids") \
-                .select("*, requests!inner(*), profiles!shop_id(shop_name, phone, address)") \
-                .eq("requests.buyer_id", current_user["id"]) \
-                .order("created_at", desc=True)
-            
-            if request_id:
-                query = query.eq("request_id", request_id)
-            
-            response = query.execute()
-            return response.data if response.data else []
-            
-        else:
-            raise HTTPException(status_code=403, detail="Unauthorized role")
-            
-    except Exception as e:
-        logger.error(f"Get bids error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/{request_id}/bids")
-async def get_bids_for_request(
-    request_id: UUID,
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Get all bids for a specific request.
-    - Shop owners: Can only see their own bids
-    - Buyers: Can see all bids on their own requests
-    """
-    try:
-        # Check request exists
-        request_check = supabase_anon.table("requests") \
-            .select("id, buyer_id") \
-            .eq("id", str(request_id)) \
-            .execute()
-        
-        if not request_check.data:
-            raise HTTPException(status_code=404, detail="Request not found")
-        
-        request = request_check.data[0]
-        
-        # Check permissions
-        is_buyer = str(request["buyer_id"]) == current_user["id"]
-        is_shop_owner = current_user.get("role") == "shop_owner"
-        
-        query = supabase_anon.table("bids") \
-            .select("*, profiles!shop_id(shop_name, phone, address)") \
-            .eq("request_id", str(request_id)) \
-            .order("created_at", desc=True)
-        
-        # If shop owner, only show their own bids
-        if is_shop_owner and not is_buyer:
-            query = query.eq("shop_id", current_user["id"])
-        
-        response = query.execute()
-        
-        return response.data if response.data else []
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Get bids for request error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))

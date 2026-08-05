@@ -3,12 +3,10 @@ from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 
-# ----- Bid Schemas -----
-
 class BidCreate(BaseModel):
     """Schema for creating a new bid"""
-    price: int = Field(..., gt=0, description="Bid price")
-    note: Optional[str] = Field(None, description="Additional notes for the bid")
+    price: int = Field(..., gt=0)
+    note: Optional[str] = None
     
     @field_validator('price')
     @classmethod
@@ -19,8 +17,8 @@ class BidCreate(BaseModel):
 
 class BidUpdate(BaseModel):
     """Schema for updating a bid"""
-    price: Optional[int] = Field(None, gt=0, description="Updated bid price")
-    note: Optional[str] = Field(None, description="Updated notes")
+    price: Optional[int] = Field(None, gt=0)
+    note: Optional[str] = None
     
     @field_validator('price')
     @classmethod
@@ -49,18 +47,10 @@ class BidDetailResponse(BidResponse):
     shop_phone: Optional[str] = None
     shop_address: Optional[str] = None
 
-# ----- Selection Response -----
-
 class BidSelectionResponse(BaseModel):
     """Schema for response after selecting a bid"""
     bid_id: UUID
     request_id: UUID
     status: str
     selected_bid: BidDetailResponse
-    shop_contact: dict = Field(..., description="Shop owner contact information")
-    
-class ShopContactInfo(BaseModel):
-    """Schema for shop contact information"""
-    shop_name: Optional[str] = None
-    phone: str
-    address: str
+    shop_contact: dict

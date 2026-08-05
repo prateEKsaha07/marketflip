@@ -107,6 +107,38 @@ async def get_request_detail(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# @router.delete("/{request_id}", status_code=204)
+# async def delete_request(
+#     request_id: UUID,
+#     current_user: dict = Depends(get_current_user)
+# ):
+#     """
+#     Delete a request (soft delete - sets status to 'deleted').
+#     Only the buyer who created the request can delete it.
+#     """
+#     # Check role
+#     if current_user.get("role") != "buyer":
+#         raise HTTPException(status_code=403, detail="Only buyers can delete requests")
+    
+#     try:
+#         # Soft delete request
+#         success = request_service.delete_request(
+#             request_id=str(request_id),
+#             current_user_id=current_user["id"]
+#         )
+        
+#         if success:
+#             return None  # 204 No Content
+        
+#     except Exception as e:
+#         logger.error(f"Delete request error: {str(e)}")
+#         if "permission" in str(e).lower():
+#             raise HTTPException(status_code=403, detail=str(e))
+#         if "not found" in str(e).lower():
+#             raise HTTPException(status_code=404, detail="Request not found")
+#         raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.delete("/{request_id}", status_code=204)
 async def delete_request(
     request_id: UUID,
@@ -121,19 +153,45 @@ async def delete_request(
         raise HTTPException(status_code=403, detail="Only buyers can delete requests")
     
     try:
-        # Soft delete request
-        success = request_service.delete_request(
-            request_id=str(request_id),
-            current_user_id=current_user["id"]
-        )
+        print(f"=== DELETE REQUEST ===")
+        print(f"Request ID: {request_id}")
+        print(f"User ID: {current_user['id']}")
+        print(f"User Role: {current_user.get('role')}")
         
-        if success:
-            return None  # 204 No Content
+        # Check ownership using supabase_admin
+        check_response = supabase_admin.table("requests") \
+            .select("buyer_id, status") \
+            .eq("id", str(request_id)) \
+            .execute()
         
+        print(f"Check response: {check_response.data}")
+        
+        if not check_response.data:
+            raise HTTPException(status_code=404, detail="Request not found")
+        
+        request = check_response.data[0]
+        
+        if str(request["buyer_id"]) != current_user["id"]:
+            raise HTTPException(status_code=403, detail="You don't have permission to delete this request")
+        
+        if request["status"] == "deleted":
+            raise HTTPException(status_code=400, detail="Request is already deleted")
+        
+        # Soft delete - update status
+        response = supabase_admin.table("requests") \
+            .update({"status": "deleted"}) \
+            .eq("id", str(request_id)) \
+            .execute()
+        
+        print(f"Update response: {response.data}")
+        
+        if not response.data:
+            raise HTTPException(status_code=400, detail="Failed to delete request")
+        
+        return None  # 204 No Content
+        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Delete request error: {str(e)}")
-        if "permission" in str(e).lower():
-            raise HTTPException(status_code=403, detail=str(e))
-        if "not found" in str(e).lower():
-            raise HTTPException(status_code=404, detail="Request not found")
         raise HTTPException(status_code=400, detail=str(e))

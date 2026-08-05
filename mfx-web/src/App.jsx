@@ -1,14 +1,102 @@
-import { useState } from 'react'
-import './App.css'
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import Landing from './pages/Landing';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import BuyerDashboard from './pages/buyer/Dashboard';
+import PostRequest from './pages/buyer/PostRequest';
+import RequestDetail from './pages/buyer/RequestDetail';
+import ShopDashboard from './pages/shop/Dashboard';
+import BrowseRequests from './pages/shop/BrowseRequests';
+import MyBids from './pages/shop/MyBids';
+
+const ProtectedRoute = ({ children, requiredRole }) => {
+  const { isAuthenticated, user } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (requiredRole && user?.role !== requiredRole) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+};
+
+const AppRoutes = () => {
+  return (
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+      
+      {/* Buyer Routes */}
+      <Route 
+        path="/buyer/dashboard" 
+        element={
+          <ProtectedRoute requiredRole="buyer">
+            <BuyerDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/buyer/post-request" 
+        element={
+          <ProtectedRoute requiredRole="buyer">
+            <PostRequest />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/buyer/request/:id" 
+        element={
+          <ProtectedRoute requiredRole="buyer">
+            <RequestDetail />
+          </ProtectedRoute>
+        } 
+      />
+      
+      {/* Shop Routes */}
+      <Route 
+        path="/shop/dashboard" 
+        element={
+          <ProtectedRoute requiredRole="shop_owner">
+            <ShopDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/shop/browse" 
+        element={
+          <ProtectedRoute requiredRole="shop_owner">
+            <BrowseRequests />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/shop/my-bids" 
+        element={
+          <ProtectedRoute requiredRole="shop_owner">
+            <MyBids />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+};
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <h1>frontend online !</h1>
-    </>
-  )
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </AuthProvider>
+  );
 }
 
-export default App
+export default App;

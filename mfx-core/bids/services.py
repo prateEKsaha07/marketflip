@@ -15,7 +15,7 @@ class BidService:
         """Create a new bid on a request"""
         try:
             # Check if request exists and is open
-            request_check = self.supabase_anon.table("requests") \
+            request_check = self.supabase_admin.table("requests") \
                 .select("id, status") \
                 .eq("id", request_id) \
                 .execute()
@@ -27,7 +27,7 @@ class BidService:
                 raise Exception("Cannot bid on a request that is not open")
             
             # Check if shop already has a pending bid on this request
-            existing_bid = self.supabase_anon.table("bids") \
+            existing_bid = self.supabase_admin.table("bids") \
                 .select("id, status") \
                 .eq("request_id", request_id) \
                 .eq("shop_id", shop_id) \
@@ -61,7 +61,7 @@ class BidService:
         """Update a bid (only if pending)"""
         try:
             # Check bid exists and belongs to shop
-            bid_check = self.supabase_anon.table("bids") \
+            bid_check = self.supabase_admin.table("bids") \
                 .select("id, shop_id, status") \
                 .eq("id", bid_id) \
                 .execute()
@@ -105,7 +105,7 @@ class BidService:
         """Delete/withdraw a bid (only if pending)"""
         try:
             # Check bid exists and belongs to shop
-            bid_check = self.supabase_anon.table("bids") \
+            bid_check = self.supabase_admin.table("bids") \
                 .select("id, shop_id, status") \
                 .eq("id", bid_id) \
                 .execute()
@@ -139,67 +139,84 @@ class BidService:
     def select_bid(self, bid_id: str, buyer_id: str) -> Dict[str, Any]:
         """Select a bid (buyer only)"""
         try:
-            # Get bid with request info
-            bid_response = self.supabase_anon.table("bids") \
-                .select("*, requests!inner(buyer_id, id, status)") \
+            print(f"=== SELECT BID SERVICE ===")
+            print(f"Bid ID: {bid_id}")
+            print(f"Buyer ID: {buyer_id}")
+            
+            # Step 1: Get the bid
+            bid_response = self.supabase_admin.table("bids") \
+                .select("*") \
                 .eq("id", bid_id) \
                 .execute()
+            
+            print(f"Bid response: {bid_response.data}")
             
             if not bid_response.data:
                 raise Exception("Bid not found")
             
             bid = bid_response.data[0]
-            request = bid.get("requests", {})
+            request_id = bid["request_id"]
             
-            # Check buyer owns the request
-            if str(request.get("buyer_id")) != buyer_id:
+            # Step 2: Get the request
+            request_response = self.supabase_admin.table("requests") \
+                .select("id, buyer_id, status") \
+                .eq("id", request_id) \
+                .execute()
+            
+            print(f"Request response: {request_response.data}")
+            
+            if not request_response.data:
+                raise Exception("Request not found")
+            
+            request = request_response.data[0]
+            
+            # Step 3: Check permissions
+            if str(request["buyer_id"]) != buyer_id:
                 raise Exception("You don't have permission to select this bid")
             
-            if request.get("status") != "open":
+            if request["status"] != "open":
                 raise Exception("Cannot select a bid on a request that is not open")
             
             if bid["status"] != "pending":
                 raise Exception("Cannot select a bid that is not pending")
             
-            # Start transaction: select this bid, reject others, update request
-            request_id = request["id"]
-            
-            # 1. Update selected bid to 'selected'
+            # Step 4: Update selected bid to 'selected'
             selected_response = self.supabase_admin.table("bids") \
                 .update({"status": "selected"}) \
                 .eq("id", bid_id) \
                 .execute()
             
+            print(f"Selected response: {selected_response.data}")
+            
             if not selected_response.data:
                 raise Exception("Failed to select bid")
             
-            # 2. Update all other pending bids to 'rejected'
-            rejected_response = self.supabase_admin.table("bids") \
+            # Step 5: Update all other pending bids to 'rejected'
+            self.supabase_admin.table("bids") \
                 .update({"status": "rejected"}) \
                 .eq("request_id", request_id) \
                 .eq("status", "pending") \
                 .neq("id", bid_id) \
                 .execute()
             
-            # 3. Update request status to 'purchased'
-            request_response = self.supabase_admin.table("requests") \
+            # Step 6: Update request status to 'purchased'
+            self.supabase_admin.table("requests") \
                 .update({"status": "purchased"}) \
                 .eq("id", request_id) \
                 .execute()
             
-            # 4. Get shop contact info
-            shop_response = self.supabase_anon.table("profiles") \
+            # Step 7: Get shop contact info
+            shop_response = self.supabase_admin.table("profiles") \
                 .select("shop_name, phone, address") \
                 .eq("id", bid["shop_id"]) \
                 .execute()
             
             shop_info = shop_response.data[0] if shop_response.data else {}
             
-            # 5. Get selected bid details
+            # Step 8: Build response
             selected_bid = selected_response.data[0]
             
-            # Add shop info to response
-            result = {
+            return {
                 "bid_id": bid_id,
                 "request_id": request_id,
                 "status": "selected",
@@ -216,8 +233,7 @@ class BidService:
                 }
             }
             
-            return result
-            
         except Exception as e:
+            print(f"Error in select_bid: {str(e)}")
             logger.error(f"Error selecting bid: {str(e)}")
             raise
