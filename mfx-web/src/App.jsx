@@ -12,7 +12,12 @@ import BrowseRequests from './pages/shop/BrowseRequests';
 import MyBids from './pages/shop/MyBids';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
+
+  // Show loading while checking auth
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

@@ -4,9 +4,14 @@ import { useAuth } from '../context/AuthContext';
 
 const Landing = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
 
-  // If already logged in, redirect to appropriate dashboard
+  // Show loading while checking auth
+  if (loading) {
+    return <div style={{ textAlign: 'center', marginTop: '100px' }}>Loading...</div>;
+  }
+
+  // If already logged in, redirect to dashboard
   if (isAuthenticated) {
     if (user?.role === 'buyer') {
       navigate('/buyer/dashboard');
