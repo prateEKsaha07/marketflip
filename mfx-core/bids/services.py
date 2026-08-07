@@ -135,6 +135,11 @@ class BidService:
         except Exception as e:
             logger.error(f"Error deleting bid: {str(e)}")
             raise
+
+
+
+
+
     
     def select_bid(self, bid_id: str, buyer_id: str) -> Dict[str, Any]:
         """Select a bid (buyer only)"""
@@ -143,34 +148,30 @@ class BidService:
             print(f"Bid ID: {bid_id}")
             print(f"Buyer ID: {buyer_id}")
             
-            # Step 1: Get the bid
+            # Get the bid
             bid_response = self.supabase_admin.table("bids") \
                 .select("*") \
                 .eq("id", bid_id) \
-                .execute()
-            
-            print(f"Bid response: {bid_response.data}")
-            
+                .execute()       
+            print(f"Bid response: {bid_response.data}")         
             if not bid_response.data:
                 raise Exception("Bid not found")
             
             bid = bid_response.data[0]
             request_id = bid["request_id"]
+            shop_id = bid["shop_id"]
             
-            # Step 2: Get the request
+            # Get the request
             request_response = self.supabase_admin.table("requests") \
-                .select("id, buyer_id, status") \
+                .select("id, buyer_id, status, item_name, description, budget_min, budget_max, pincode, category, created_at") \
                 .eq("id", request_id) \
                 .execute()
-            
             print(f"Request response: {request_response.data}")
-            
             if not request_response.data:
                 raise Exception("Request not found")
-            
             request = request_response.data[0]
             
-            # Step 3: Check permissions
+            # Check permissions
             if str(request["buyer_id"]) != buyer_id:
                 raise Exception("You don't have permission to select this bid")
             
@@ -179,58 +180,96 @@ class BidService:
             
             if bid["status"] != "pending":
                 raise Exception("Cannot select a bid that is not pending")
+
+            # get buyer profile info
+            buyer_response = self.supabase_admin.table("profiles") \
+                .select('shop_name, phone, address')\
+                .eq('id', buyer_id) \
+                .execute()
+            buyer_info = buyer_response.data[0] if buyer_response.data else {}
+
+            # get shop profile info
+            shop_response = self.supabase_admin.table("profiles") \
+                            .select('shop_name, phone, address')\
+                            .eq('id', shop_id) \
+                            .execute()
+            shop_info = shop_response.data[0] if shop_response.data else {}
             
-            # Step 4: Update selected bid to 'selected'
+            # Update selected bid to 'selected'
             selected_response = self.supabase_admin.table("bids") \
-                .update({"status": "selected"}) \
+                .update(
+                    {
+                        "status": "selected",
+                        "selected_at": datetime.now().isoformat()
+                    }
+                ) \
                 .eq("id", bid_id) \
                 .execute()
-            
             print(f"Selected response: {selected_response.data}")
             
             if not selected_response.data:
                 raise Exception("Failed to select bid")
             
-            # Step 5: Update all other pending bids to 'rejected'
+            # Update all other pending bids to 'rejected'
             self.supabase_admin.table("bids") \
-                .update({"status": "rejected"}) \
+                .update(
+                    {
+                        "status": "rejected",
+                        "rejected_at" : datetime.now().isoformat()
+                    }
+                ) \
                 .eq("request_id", request_id) \
                 .eq("status", "pending") \
                 .neq("id", bid_id) \
                 .execute()
+            print("all other bids are auto selected rejected")
             
-            # Step 6: Update request status to 'purchased'
+            # Update request status to 'purchased'
             self.supabase_admin.table("requests") \
-                .update({"status": "purchased"}) \
+                .update(
+                    {
+                        "status": "purchased",
+                        "purchased_at": datetime.now().isoformat(),
+                        "selected_bid_id": bid_id
+                    }
+                ) \
                 .eq("id", request_id) \
                 .execute()
-            
-            # Step 7: Get shop contact info
-            shop_response = self.supabase_admin.table("profiles") \
-                .select("shop_name, phone, address") \
-                .eq("id", bid["shop_id"]) \
-                .execute()
-            
-            shop_info = shop_response.data[0] if shop_response.data else {}
-            
-            # Step 8: Build response
+            print("changed purchased status and updated purchages at and selected bid id")
+    
+            # Build response
             selected_bid = selected_response.data[0]
-            
             return {
-                "bid_id": bid_id,
-                "request_id": request_id,
                 "status": "selected",
+                "request_status": "purchased",
+                "bid_id" : bid_id,
+                "request_id": request_id, 
                 "selected_bid": {
                     **selected_bid,
-                    "shop_name": shop_info.get("shop_name"),
-                    "shop_phone": shop_info.get("phone"),
-                    "shop_address": shop_info.get("address")
+                    "shop_name": shop_info.get('shop_name'),
+                    "phone": shop_info.get('phone'),
+                    "shop_address": shop_info.get('address')
                 },
-                "shop_contact": {
-                    "shop_name": shop_info.get("shop_name"),
-                    "phone": shop_info.get("phone"),
-                    "address": shop_info.get("address")
-                }
+                "shop_contact":{
+                    "name": shop_info.get('shop_name'),
+                    "phone": shop_info.get('phone'),
+                    "address": shop_info.get('address')
+                },
+                "buyer_contact":{
+                    "name": buyer_info.get("shop_name")or "buyer",
+                    "phone":buyer_info.get('phone'),
+                    "address":buyer_info.get('address')
+                },
+                "request_details":{
+                    "item_name":request.get('item_name'),
+                    "description": request.get('description'),
+                    "budget_min": request.get('budget_min'),
+                    "budget_max": request.get('budget_max'),
+                    "pincode": request.get('pincode'),
+                    "category": request.get('category'),
+                    "created_at": request.get('created_at')
+                },
+                "message":"Bid selected successfully! The request is now purchased"
             }
             
         except Exception as e:

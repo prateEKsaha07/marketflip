@@ -38,25 +38,38 @@ const BrowseRequests = () => {
   };
 
   const fetchRequests = async () => {
+    setLoading(true);
     try {
       const params = new URLSearchParams();
+      
+      // Always include status - default to 'open'
+      params.append('status', filters.status || 'open');
+      
       if (filters.pincode) params.append('pincode', filters.pincode);
       if (filters.category) params.append('category', filters.category);
-      if (filters.status) params.append('status', filters.status);
+      
+      console.log('Fetching requests with params:', params.toString());
       
       const response = await api.get(`/requests?${params.toString()}`);
-      console.log('Requests:', response.data);
-      setRequests(response.data);
+      console.log('Requests response:', response.data);
+      
+      // Filter out requests that are already purchased or deleted
+      const filteredRequests = response.data.filter(req => 
+        req.status === 'open' || req.status === 'open'
+      );
+      
+      setRequests(filteredRequests);
     } catch (err) {
-      setError('Failed to fetch requests');
-      console.error(err);
+      console.error('Fetch requests error:', err);
+      setError('Failed to fetch requests: ' + (err.response?.data?.detail || err.message));
     } finally {
       setLoading(false);
     }
   };
 
   const handleFilterChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
   };
 
   const handleBidChange = (e, requestId) => {
@@ -95,8 +108,8 @@ const BrowseRequests = () => {
       });
       
       // Refresh data
-      fetchMyBids();
-      fetchRequests();
+      await fetchMyBids();
+      await fetchRequests();
       
     } catch (err) {
       const errorMsg = err.response?.data?.detail || 'Unknown error';
@@ -115,6 +128,15 @@ const BrowseRequests = () => {
   const getMyBidStatus = (requestId) => {
     const bid = myBids.find(b => b.request_id === requestId);
     return bid ? bid.status : null;
+  };
+
+  // Clear filters
+  const clearFilters = () => {
+    setFilters({
+      pincode: '',
+      category: '',
+      status: 'open'
+    });
   };
 
   if (loading) return <div>Loading...</div>;
@@ -149,10 +171,11 @@ const BrowseRequests = () => {
         padding: '15px', 
         border: '1px solid #ccc', 
         borderRadius: '4px',
-        flexWrap: 'wrap'
+        flexWrap: 'wrap',
+        alignItems: 'flex-end'
       }}>
         <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Pincode</label>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Pincode</label>
           <input
             type="text"
             name="pincode"
@@ -164,7 +187,7 @@ const BrowseRequests = () => {
           />
         </div>
         <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Category</label>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Category</label>
           <select
             name="category"
             value={filters.category}
@@ -181,7 +204,7 @@ const BrowseRequests = () => {
           </select>
         </div>
         <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Status</label>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Status</label>
           <select
             name="status"
             value={filters.status}
@@ -189,10 +212,10 @@ const BrowseRequests = () => {
             style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', width: '120px' }}
           >
             <option value="open">Open</option>
-            <option value="purchased">Purchased</option>
+            <option value="all">All</option>
           </select>
         </div>
-        <div style={{ alignSelf: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
           <button 
             onClick={fetchRequests}
             style={{ 
@@ -206,6 +229,19 @@ const BrowseRequests = () => {
           >
             Apply Filters
           </button>
+          <button 
+            onClick={clearFilters}
+            style={{ 
+              padding: '8px 16px', 
+              backgroundColor: '#6c757d', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px', 
+              cursor: 'pointer' 
+            }}
+          >
+            Clear
+          </button>
         </div>
       </div>
 
@@ -213,7 +249,23 @@ const BrowseRequests = () => {
       
       <div>
         {requests.length === 0 ? (
-          <p>No open requests found matching your filters</p>
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <p>No open requests found matching your filters</p>
+            <button 
+              onClick={clearFilters}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                marginTop: '10px'
+              }}
+            >
+              Clear Filters
+            </button>
+          </div>
         ) : (
           requests.map((req) => {
             const hasBid = hasPendingBid(req.id);

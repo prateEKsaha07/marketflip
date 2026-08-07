@@ -23,11 +23,15 @@ bid_router = APIRouter(prefix="/bids", tags=["bids"])
 # Initialize service
 bid_service = BidService(supabase_admin, supabase_anon)
 
-# ----- POST/Update/Delete Routes (with /requests prefix) -----
+
+# ====== TEST ROUTE ======
 
 @bid_router.get("/test")
 async def test_bids_route():
     return {"message": "Bids router is working!"}
+
+
+# ====== /requests/... ENDPOINTS ======
 
 @router.post("/{request_id}/bids", response_model=BidResponse, status_code=201)
 async def create_bid(
@@ -57,6 +61,7 @@ async def create_bid(
             raise HTTPException(status_code=400, detail="You already have a pending bid on this request")
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @router.get("/{request_id}/bids")
 async def get_bids_for_request(
     request_id: UUID,
@@ -64,7 +69,7 @@ async def get_bids_for_request(
 ):
     """Get all bids for a specific request."""
     try:
-        # Use supabase_admin to bypass RLS for bid queries
+        # Check request exists
         request_check = supabase_admin.table("requests") \
             .select("id, buyer_id") \
             .eq("id", str(request_id)) \
@@ -78,11 +83,13 @@ async def get_bids_for_request(
         is_buyer = str(request["buyer_id"]) == current_user["id"]
         is_shop_owner = current_user.get("role") == "shop_owner"
         
+        # Use explicit relationship name to avoid ambiguity
         query = supabase_admin.table("bids") \
             .select("*, profiles!shop_id(shop_name, phone, address)") \
             .eq("request_id", str(request_id)) \
             .order("created_at", desc=True)
         
+        # If shop owner, only show their own bids
         if is_shop_owner and not is_buyer:
             query = query.eq("shop_id", current_user["id"])
         
@@ -96,8 +103,7 @@ async def get_bids_for_request(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# ----- All /bids endpoints (with /bids prefix) -----
-
+# ====== /bids/... ENDPOINTS ======
 
 @bid_router.get("/")
 async def get_bids(
@@ -107,9 +113,9 @@ async def get_bids(
     """Get bids based on user role."""
     try:
         if current_user.get("role") == "shop_owner":
-            # Use supabase_admin to bypass RLS
+            # Use explicit foreign key relationship name
             query = supabase_admin.table("bids") \
-                .select("*, requests!inner(*, profiles!buyer_id(phone))") \
+                .select("*, requests!bids_request_id_fkey(item_name, buyer_id, status)") \
                 .eq("shop_id", current_user["id"]) \
                 .order("created_at", desc=True)
             
@@ -120,10 +126,21 @@ async def get_bids(
             return response.data if response.data else []
             
         elif current_user.get("role") == "buyer":
-            # Use supabase_admin to bypass RLS
+            # First get all requests owned by buyer
+            requests_response = supabase_admin.table("requests") \
+                .select("id") \
+                .eq("buyer_id", current_user["id"]) \
+                .execute()
+            
+            request_ids = [req["id"] for req in requests_response.data] if requests_response.data else []
+            
+            if not request_ids:
+                return []
+            
+            # Get bids for those requests with explicit relationship
             query = supabase_admin.table("bids") \
-                .select("*, requests!inner(*), profiles!shop_id(shop_name, phone, address)") \
-                .eq("requests.buyer_id", current_user["id"]) \
+                .select("*, requests!bids_request_id_fkey(item_name, buyer_id, status), profiles!shop_id(shop_name, phone, address)") \
+                .in_("request_id", request_ids) \
                 .order("created_at", desc=True)
             
             if request_id:
