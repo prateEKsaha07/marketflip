@@ -132,6 +132,22 @@ const Dashboard = () => {
           >
             Logout
           </button>
+          // In pages/buyer/Dashboard.jsx - Add this button next to Post Request
+
+<button 
+  onClick={() => navigate('/buyer/purchases')}
+  style={{ 
+    marginRight: '10px', 
+    padding: '8px 16px', 
+    backgroundColor: '#17a2b8', 
+    color: 'white', 
+    border: 'none', 
+    borderRadius: '4px', 
+    cursor: 'pointer' 
+  }}
+>
+  📦 My Purchases
+</button>
         </div>
       </div>
 

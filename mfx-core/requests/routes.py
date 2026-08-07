@@ -84,40 +84,48 @@ async def get_requests(
         logger.error(f"Get requests error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     
-
-# @router.get("/", response_model=List[RequestResponse])
+# @router.get("/")
 # async def get_requests(
-#     pincode: Optional[str] = Query(None, min_length=6, max_length=6),
+#     status: Optional[str] = Query("open", regex="^(open|purchased|deleted|expired|all)$"),
+#     pincode: Optional[str] = None,
 #     category: Optional[str] = None,
-#     status: str = Query("open", regex="^(open|purchased|deleted|expired)$"),
-#     limit: int = Query(100, ge=1, le=500),
-#     offset: int = Query(0, ge=0),
+#     limit: int = 100,
+#     offset: int = 0,
 #     current_user: dict = Depends(get_current_user)
 # ):
-#     """
-#     Get requests with filters.
-#     All authenticated users can view open requests.
-#     """
+#     """Get requests with filters."""
 #     try:
-#         # Validate pincode
-#         if pincode and not pincode.isdigit():
-#             raise HTTPException(status_code=400, detail="Pincode must contain only digits")
+#         # Build query
+#         query = supabase_anon.table("requests").select("*")
         
-#         # Get requests
-#         requests = request_service.get_requests(
-#             pincode=pincode,
-#             category=category,
-#             status=status,
-#             limit=limit,
-#             offset=offset
-#         )
+#         # Only apply status filter if not 'all'
+#         if status != "all":
+#             query = query.eq("status", status)
         
-#         return requests
+#         if pincode:
+#             query = query.eq("pincode", pincode)
+        
+#         if category:
+#             query = query.eq("category", category)
+        
+#         # If user is a buyer, only show their own requests
+#         if current_user.get("role") == "buyer":
+#             query = query.eq("buyer_id", current_user["id"])
+#         # If user is a shop owner, show all open requests (for browsing)
+#         # No buyer_id filter for shop owners
+        
+#         query = query.order("created_at", desc=True)
+#         query = query.range(offset, offset + limit - 1)
+        
+#         response = query.execute()
+#         print(f"Requests found: {len(response.data) if response.data else 0}")
+#         print(f"User role: {current_user.get('role')}")
+#         print(f"User ID: {current_user.get('id')}")
+#         return response.data if response.data else []
         
 #     except Exception as e:
 #         logger.error(f"Get requests error: {str(e)}")
 #         raise HTTPException(status_code=400, detail=str(e))
-
 
 @router.get("/{request_id}", response_model=RequestDetailResponse)
 async def get_request_detail(

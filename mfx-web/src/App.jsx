@@ -7,6 +7,7 @@ import Signup from './pages/Signup';
 import BuyerDashboard from './pages/buyer/Dashboard';
 import PostRequest from './pages/buyer/PostRequest';
 import RequestDetail from './pages/buyer/RequestDetail';
+import MyPurchases from './pages/buyer/MyPurchases';  // ← Add this
 import ShopDashboard from './pages/shop/Dashboard';
 import BrowseRequests from './pages/shop/BrowseRequests';
 import MyBids from './pages/shop/MyBids';
@@ -14,7 +15,6 @@ import MyBids from './pages/shop/MyBids';
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { isAuthenticated, user, loading } = useAuth();
 
-  // Show loading while checking auth
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -59,6 +59,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute requiredRole="buyer">
             <RequestDetail />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/buyer/purchases" 
+        element={
+          <ProtectedRoute requiredRole="buyer">
+            <MyPurchases />
           </ProtectedRoute>
         } 
       />

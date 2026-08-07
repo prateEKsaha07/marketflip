@@ -3,6 +3,7 @@ from pydantic import BaseModel, EmailStr, validator
 from typing import Optional
 import logging
 from auth.dependencies import supabase_anon, supabase_admin, get_current_user
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -49,13 +50,10 @@ class LoginResponse(BaseModel):
 
 @router.post("/signup", response_model=SignupResponse, status_code=201)
 async def signup(request: SignupRequest):
-    """
-    Register a new user.
-    """
+    """Register a new user."""
     try:
         logger.info(f"Signup attempt for email: {request.email}")
         
-        # 1. Create user with Supabase Auth (using ANON key)
         auth_response = supabase_anon.auth.sign_up({
             "email": request.email,
             "password": request.password
@@ -68,7 +66,6 @@ async def signup(request: SignupRequest):
         user_id = auth_response.user.id
         logger.info(f"User created with ID: {user_id}")
         
-        # 2. Insert profile using ADMIN key (bypasses RLS)
         profile_data = {
             "id": user_id,
             "role": request.role,
@@ -86,7 +83,6 @@ async def signup(request: SignupRequest):
         
         if not profile_response.data:
             logger.error("Profile creation failed")
-            # Clean up - delete the auth user if profile creation fails
             supabase_admin.auth.admin.delete_user(user_id)
             raise HTTPException(status_code=400, detail="Profile creation failed")
         
@@ -106,13 +102,10 @@ async def signup(request: SignupRequest):
 
 @router.post("/login", response_model=LoginResponse)
 async def login(request: LoginRequest):
-    """
-    Authenticate a user.
-    """
+    """Authenticate a user."""
     try:
         logger.info(f"Login attempt for email: {request.email}")
         
-        # 1. Sign in with password (using ANON key)
         auth_response = supabase_anon.auth.sign_in_with_password({
             "email": request.email,
             "password": request.password
@@ -127,7 +120,6 @@ async def login(request: LoginRequest):
         
         logger.info(f"User logged in: {user_id}")
         
-        # 2. Fetch role from profiles (using ANON key for regular user access)
         profile_response = supabase_anon.table("profiles") \
             .select("role") \
             .eq("id", user_id) \
@@ -150,3 +142,42 @@ async def login(request: LoginRequest):
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Login failed: {str(e)}")
+
+
+@router.get("/profiles/{user_id}")
+async def get_profile(
+    user_id: UUID,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get user profile by ID"""
+    try:
+        logger.info(f"=== GET PROFILE ===")
+        logger.info(f"User ID requested: {user_id}")
+        logger.info(f"Current user: {current_user}")
+        
+        # Use supabase_admin to bypass RLS
+        response = supabase_admin.table("profiles") \
+            .select("*") \
+            .eq("id", str(user_id)) \
+            .execute()
+        
+        logger.info(f"Profile response data: {response.data}")
+        
+        if not response.data:
+            logger.error(f"Profile not found for ID: {user_id}")
+            raise HTTPException(status_code=404, detail="Profile not found")
+        
+        profile = response.data[0]
+        return {
+            "id": profile.get("id"),
+            "shop_name": profile.get("shop_name"),
+            "phone": profile.get("phone"),
+            "address": profile.get("address"),
+            "pincode": profile.get("pincode"),
+            "role": profile.get("role")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get profile error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
