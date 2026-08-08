@@ -18,6 +18,7 @@ const MyBids = () => {
   }, []);
 
   const fetchMyBids = async () => {
+    setLoading(true);
     try {
       const response = await api.get('/bids');
       console.log('My bids:', response.data);
@@ -90,6 +91,14 @@ const MyBids = () => {
     }
   };
 
+  const handleBidClick = (bid) => {
+    // Only navigate to detail if bid is selected (to see buyer details)
+    if (bid.status === 'selected') {
+      navigate(`/shop/bid/${bid.id}`);
+    }
+    // For pending bids, stay and allow edit/delete
+  };
+
   if (loading) return <div>Loading...</div>;
 
   return (
@@ -142,16 +151,30 @@ const MyBids = () => {
           </p>
         ) : (
           bids.map((bid) => (
-            <div key={bid.id} style={{ 
-              border: '1px solid #ccc', 
-              padding: '15px', 
-              margin: '10px 0', 
-              borderRadius: '4px',
-              borderLeft: `5px solid ${getStatusColor(bid.status)}`
-            }}>
+            <div 
+              key={bid.id} 
+              style={{ 
+                border: '1px solid #ccc', 
+                padding: '15px', 
+                margin: '10px 0', 
+                borderRadius: '4px',
+                borderLeft: `5px solid ${getStatusColor(bid.status)}`,
+                cursor: bid.status === 'selected' ? 'pointer' : 'default',
+                transition: 'box-shadow 0.2s'
+              }}
+              onClick={() => handleBidClick(bid)}
+              onMouseEnter={(e) => {
+                if (bid.status === 'selected') {
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
               {editing === bid.id ? (
                 // Edit mode
-                <div>
+                <div onClick={(e) => e.stopPropagation()}>
                   <h4>Edit Bid</h4>
                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     <div>
@@ -209,21 +232,25 @@ const MyBids = () => {
                 // View mode
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <h3>{bid.requests?.item_name || 'Unknown Request'}</h3>
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{ margin: '0 0 5px 0' }}>
+                        {bid.requests?.item_name || 'Unknown Request'}
+                        {bid.status === 'selected' && (
+                          <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#28a745', marginLeft: '10px' }}>
+                            🎉 Click to view buyer details
+                          </span>
+                        )}
+                      </h3>
                       <p><strong>Price:</strong> ₹{bid.price}</p>
                       <p><strong>Note:</strong> {bid.note || 'No note'}</p>
                       <p><strong>Status:</strong> <strong style={{ color: getStatusColor(bid.status) }}>{bid.status.toUpperCase()}</strong></p>
                       <p><strong>Placed:</strong> {new Date(bid.created_at).toLocaleString()}</p>
                       {bid.requests && (
-                        <p><strong>Buyer:</strong> {bid.requests.buyer_id}</p>
-                      )}
-                      {bid.requests && (
                         <p><strong>Item:</strong> {bid.requests.item_name}</p>
                       )}
                     </div>
                     {bid.status === 'pending' && (
-                      <div style={{ display: 'flex', gap: '10px' }}>
+                      <div style={{ display: 'flex', gap: '10px' }} onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => handleEditClick(bid)}
                           style={{
@@ -250,6 +277,20 @@ const MyBids = () => {
                         >
                           Withdraw
                         </button>
+                      </div>
+                    )}
+                    {bid.status === 'selected' && (
+                      <div style={{ alignSelf: 'center' }}>
+                        <span style={{
+                          padding: '6px 12px',
+                          backgroundColor: '#28a745',
+                          color: 'white',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: 'bold'
+                        }}>
+                          ✅ View Details
+                        </span>
                       </div>
                     )}
                   </div>

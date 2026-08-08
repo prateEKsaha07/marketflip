@@ -13,9 +13,7 @@ from bids.schemas import (
 )
 from bids.services import BidService
 from auth.dependencies import supabase_anon, supabase_admin
-
 logger = logging.getLogger(__name__)
-
 # Two routers - one for /requests prefix, one for /bids prefix
 router = APIRouter(prefix="/requests", tags=["bids"])
 bid_router = APIRouter(prefix="/bids", tags=["bids"])
@@ -23,13 +21,11 @@ bid_router = APIRouter(prefix="/bids", tags=["bids"])
 # Initialize service
 bid_service = BidService(supabase_admin, supabase_anon)
 
-
 # ====== TEST ROUTE ======
 
 @bid_router.get("/test")
 async def test_bids_route():
     return {"message": "Bids router is working!"}
-
 
 # ====== /requests/... ENDPOINTS ======
 
@@ -60,7 +56,6 @@ async def create_bid(
         if "You already have a pending bid" in str(e):
             raise HTTPException(status_code=400, detail="You already have a pending bid on this request")
         raise HTTPException(status_code=400, detail=str(e))
-
 
 @router.get("/{request_id}/bids")
 async def get_bids_for_request(
@@ -101,7 +96,6 @@ async def get_bids_for_request(
     except Exception as e:
         logger.error(f"Get bids for request error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
-
 
 # ====== /bids/... ENDPOINTS ======
 
@@ -156,7 +150,6 @@ async def get_bids(
         logger.error(f"Get bids error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
-
 @bid_router.patch("/{bid_id}", response_model=BidResponse)
 async def update_bid(
     bid_id: UUID,
@@ -185,7 +178,6 @@ async def update_bid(
             raise HTTPException(status_code=400, detail="Only pending bids can be updated")
         raise HTTPException(status_code=400, detail=str(e))
 
-
 @bid_router.delete("/{bid_id}", status_code=204)
 async def delete_bid(
     bid_id: UUID,
@@ -211,7 +203,6 @@ async def delete_bid(
         if "Cannot delete a bid that is not pending" in str(e):
             raise HTTPException(status_code=400, detail="Only pending bids can be deleted")
         raise HTTPException(status_code=400, detail=str(e))
-
 
 @bid_router.patch("/{bid_id}/select", response_model=BidSelectionResponse)
 async def select_bid(
@@ -243,3 +234,97 @@ async def select_bid(
         if "Cannot select a bid that is not pending" in str(e):
             raise HTTPException(status_code=400, detail="Bid is no longer pending")
         raise HTTPException(status_code=400, detail=str(e))
+
+@bid_router.get("/{bid_id}/buyer")
+async def get_buyer_details(
+    bid_id: UUID,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get buyer details for a selected bid.
+    Only the shop owner who owns the bid can view buyer details.
+    """
+    if current_user["role"] != "shop_owner":
+        raise HTTPException(status_code=403, detail="Only shop owners can access this route")
+
+    try:
+        # Get bid
+        bid_details = supabase_admin.table("bids") \
+            .select("*") \
+            .eq("id", str(bid_id)) \
+            .execute()
+
+        if not bid_details.data:
+            raise HTTPException(status_code=404, detail="Bid not found!")
+        bid = bid_details.data[0]
+        if str(bid["shop_id"]) != current_user["id"]:
+            raise HTTPException(status_code=403, detail="You don't have permission to access this data")
+        if str(bid["status"]) != "selected":
+            raise HTTPException(status_code=400, detail="Only selected bids can be shown to the shop owner")
+
+        # Get request details
+        request_details = supabase_admin.table("requests") \
+            .select("id, buyer_id, item_name, description, budget_min, budget_max, pincode, status, delivery_method, delivery_address, completed_at") \
+            .eq("id", str(bid["request_id"])) \
+            .execute()
+
+        if not request_details.data:
+            raise HTTPException(status_code=404, detail="Request not found!")
+
+        request = request_details.data[0]
+
+        # Get user profile details
+        buyer_info = supabase_admin.table("profiles") \
+            .select("shop_name, phone, pincode, address") \
+            .eq("id", str(request["buyer_id"])) \
+            .execute()
+
+        if not buyer_info.data:
+            raise HTTPException(status_code=404, detail="Buyer info not found!")
+
+        buyer_info = buyer_info.data[0]
+
+        # Update bids table as buyer contact viewed
+        supabase_admin.table("bids") \
+            .update({"buyer_contact_viewed": True}) \
+            .eq("id", str(bid_id)) \
+            .execute()
+        print("Buyer contact viewed updated in bids table")
+
+        return {
+            "bid": {
+                "id": bid["id"],
+                "price": bid["price"],
+                "note": bid["note"],
+                "status": bid["status"],
+                "created_at": bid["created_at"],
+                "selected_at": bid.get("selected_at")
+            },
+            "request": {
+                "id": request.get("id"),
+                "buyer_id": request.get("buyer_id"),
+                "item_name": request.get("item_name"),
+                "description": request.get("description"),
+                "budget_min": request.get("budget_min"),
+                "budget_max": request.get("budget_max"),
+                "pincode": request.get("pincode"),
+                "status": request.get("status"),
+                "delivery_method": request.get("delivery_method"),
+                "delivery_address": request.get("delivery_address"),
+                "completed_at": request.get("completed_at")
+            },
+            "buyer": {
+                "id": request.get("buyer_id"),
+                "phone": buyer_info.get("phone"),
+                "address": buyer_info.get("address"),
+                "pincode": buyer_info.get("pincode")
+            },
+            "message": "Buyer, bid and request has been sent to shop_owner side successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get buyer details error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+    
