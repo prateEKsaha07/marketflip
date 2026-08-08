@@ -2,13 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional, List
 from uuid import UUID
 import logging
+from datetime import datetime
 
 from auth.dependencies import get_current_user
 from requests.schemas import (
     RequestCreate, 
     RequestResponse, 
     RequestDetailResponse,
-    RequestQueryParams
+    RequestQueryParams,
+    DeliveryUpdate
 )
 from requests.services import RequestService
 from auth.dependencies import supabase_anon, supabase_admin
@@ -47,25 +49,21 @@ async def create_request(
         logger.error(f"Create request error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
-
 @router.get("/")
 async def get_requests(
-    status: Optional[str] = Query("open", regex="^(open|purchased|deleted|expired|all)$"),
+    status: Optional[str] = Query("open", regex="^(open|purchased|completed|deleted|expired|all)$"),
     pincode: Optional[str] = None,
     category: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get requests with filters. Shop owners browse all open requests."""
+    """Get requests with filters."""
     try:
-        # Build query - DO NOT filter by buyer_id for shop owners
         query = supabase_anon.table("requests").select("*")
         
-        # Only apply status filter if not 'all'
         if status != "all":
             query = query.eq("status", status)
-        # If status is 'all', don't apply status filter
         
         if pincode:
             query = query.eq("pincode", pincode)
@@ -73,17 +71,19 @@ async def get_requests(
         if category:
             query = query.eq("category", category)
         
+        if current_user.get("role") == "buyer":
+            query = query.eq("buyer_id", current_user["id"])
+        
         query = query.order("created_at", desc=True)
         query = query.range(offset, offset + limit - 1)
         
         response = query.execute()
-        print(f"Requests found: {len(response.data) if response.data else 0}")
         return response.data if response.data else []
         
     except Exception as e:
         logger.error(f"Get requests error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
-    
+
 # @router.get("/")
 # async def get_requests(
 #     status: Optional[str] = Query("open", regex="^(open|purchased|deleted|expired|all)$"),
@@ -93,14 +93,15 @@ async def get_requests(
 #     offset: int = 0,
 #     current_user: dict = Depends(get_current_user)
 # ):
-#     """Get requests with filters."""
+#     """Get requests with filters. Shop owners browse all open requests."""
 #     try:
-#         # Build query
+#         # Build query - DO NOT filter by buyer_id for shop owners
 #         query = supabase_anon.table("requests").select("*")
         
 #         # Only apply status filter if not 'all'
 #         if status != "all":
 #             query = query.eq("status", status)
+#         # If status is 'all', don't apply status filter
         
 #         if pincode:
 #             query = query.eq("pincode", pincode)
@@ -108,19 +109,11 @@ async def get_requests(
 #         if category:
 #             query = query.eq("category", category)
         
-#         # If user is a buyer, only show their own requests
-#         if current_user.get("role") == "buyer":
-#             query = query.eq("buyer_id", current_user["id"])
-#         # If user is a shop owner, show all open requests (for browsing)
-#         # No buyer_id filter for shop owners
-        
 #         query = query.order("created_at", desc=True)
 #         query = query.range(offset, offset + limit - 1)
         
 #         response = query.execute()
 #         print(f"Requests found: {len(response.data) if response.data else 0}")
-#         print(f"User role: {current_user.get('role')}")
-#         print(f"User ID: {current_user.get('id')}")
 #         return response.data if response.data else []
         
 #     except Exception as e:
@@ -150,38 +143,6 @@ async def get_request_detail(
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail="Request not found")
         raise HTTPException(status_code=400, detail=str(e))
-
-
-# @router.delete("/{request_id}", status_code=204)
-# async def delete_request(
-#     request_id: UUID,
-#     current_user: dict = Depends(get_current_user)
-# ):
-#     """
-#     Delete a request (soft delete - sets status to 'deleted').
-#     Only the buyer who created the request can delete it.
-#     """
-#     # Check role
-#     if current_user.get("role") != "buyer":
-#         raise HTTPException(status_code=403, detail="Only buyers can delete requests")
-    
-#     try:
-#         # Soft delete request
-#         success = request_service.delete_request(
-#             request_id=str(request_id),
-#             current_user_id=current_user["id"]
-#         )
-        
-#         if success:
-#             return None  # 204 No Content
-        
-#     except Exception as e:
-#         logger.error(f"Delete request error: {str(e)}")
-#         if "permission" in str(e).lower():
-#             raise HTTPException(status_code=403, detail=str(e))
-#         if "not found" in str(e).lower():
-#             raise HTTPException(status_code=404, detail="Request not found")
-#         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/{request_id}", status_code=204)
@@ -239,4 +200,113 @@ async def delete_request(
         raise
     except Exception as e:
         logger.error(f"Delete request error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.patch("/{request_id}/delivery")
+async def update_delivery(
+    request_id : UUID,
+    delivery_data : DeliveryUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    updates delivery method for a purchases request
+    Only the buyer who owns the request can update delivery.
+    """
+    if current_user.get("role") != "buyer":
+        raise HTTPException(status_code=403, details= "only buyers can update delivery")
+
+    try:
+        if delivery_data.delivery_method not in ['home_delivery','pickup']:
+            raise HTTPException(status_code=400, detail='invail delivery method must be home_delivery or pickup')
+
+        check_response = supabase_admin.table("requests") \
+            .select('buyer_id, status') \
+            .eq('id', str(request_id)) \
+            .execute()
+
+        if not check_response.data:
+            raise HTTPException(status_code=404, detail="request not found")
+
+        request = check_response.data[0]
+
+        if str(request["buyer_id"]) != current_user["id"]:
+            raise HTTPException(status_code=403, detail="ypu dont have permission to update this request")
+
+        if request["status"] != 'purchased':
+            raise HTTPException(status_code=403, details = "delivery can only be set on purchased request")
+        update_data = {
+            "delivery_method" : delivery_data.delivery_method
+        }
+        
+        if delivery_data.delivery_address:
+            update_data["delivery_address"] = delivery_data.delivery_address
+
+            response = supabase_admin.table("requests") \
+                .update(update_data) \
+                .eq("id", str(request_id)) \
+                .execute()
+
+            if not response.data:
+                raise HTTPException(status_code=400, detail="failed to update delivery")
+
+            return {
+                "message": "delivery method updated successfully",
+                "request_id": str(request_id),
+                "delivery_method" : delivery_data.delivery_method,
+                "delivery_address" : delivery_data.delivery_address
+            }
+    except HTTPException:
+        raise
+    except Exception as e :
+        logger.error(f"update delivery error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.patch("/{request_id}/verify")
+async def verify_transaction(
+    request_id: UUID,
+    current_user: dict = Depends(get_current_user)
+):
+    """Verify transaction completion. Buyers only."""
+    if current_user.get("role") != "buyer":
+        raise HTTPException(status_code=403, detail="Only buyers can verify transactions")
+    
+    try:
+        check_response = supabase_admin.table("requests") \
+            .select("buyer_id, status") \
+            .eq("id", str(request_id)) \
+            .execute()
+        
+        if not check_response.data:
+            raise HTTPException(status_code=404, detail="Request not found")
+        
+        request = check_response.data[0]
+        
+        if str(request["buyer_id"]) != current_user["id"]:
+            raise HTTPException(status_code=403, detail="Permission denied")
+        
+        if request["status"] != "purchased":
+            raise HTTPException(status_code=400, detail="Only purchased requests can be verified")
+        
+        response = supabase_admin.table("requests") \
+            .update({
+                "status": "completed",
+                "completed_at": datetime.now().isoformat()
+            }) \
+            .eq("id", str(request_id)) \
+            .execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=400, detail="Failed to verify transaction")
+        
+        return {
+            "message": "Transaction verified successfully!",
+            "request_id": str(request_id),
+            "status": "completed",
+            "completed_at": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Verify transaction error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))

@@ -85,3 +85,8 @@ class RequestQueryParams(BaseModel):
         if v and not v.isdigit():
             raise ValueError('pincode must contain only digits')
         return v
+
+class DeliveryUpdate(BaseModel):
+    delivery_method: str
+    delivery_address: Optional[str] = None
+

@@ -14,14 +14,14 @@ const Dashboard = () => {
   // Fetch data when component mounts
   useEffect(() => {
     fetchAllRequests();
-  }, []); // Empty array = runs once on mount
+  }, []);
 
   const fetchAllRequests = async () => {
     setLoading(true);
     setError('');
     try {
-      // Fetch all requests with different statuses
-      const statuses = ['open', 'purchased', 'expired', 'deleted'];
+      // Fetch only open, expired, and deleted requests (removed purchased)
+      const statuses = ['open', 'expired', 'deleted'];
       const promises = statuses.map(status => 
         api.get(`/requests?status=${status}`).catch(() => ({ data: [] }))
       );
@@ -53,14 +53,12 @@ const Dashboard = () => {
   const counts = {
     all: allRequests.length,
     open: allRequests.filter(r => r.status === 'open').length,
-    purchased: allRequests.filter(r => r.status === 'purchased').length,
     expired: allRequests.filter(r => r.status === 'expired').length,
     deleted: allRequests.filter(r => r.status === 'deleted').length,
   };
 
   const tabs = [
     { id: 'open', label: 'Open', icon: '📋', count: counts.open },
-    { id: 'purchased', label: 'Completed', icon: '✅', count: counts.purchased },
     { id: 'expired', label: 'Expired', icon: '⏰', count: counts.expired },
     { id: 'deleted', label: 'Deleted', icon: '🗑️', count: counts.deleted },
   ];
@@ -187,19 +185,20 @@ const Dashboard = () => {
           </p>
         ) : (
           filteredRequests.map((req) => {
-            const isPurchased = req.status === 'purchased';
+            const isDeleted = req.status === 'deleted';
+            const isExpired = req.status === 'expired';
             
             return (
               <div 
                 key={req.id} 
                 style={{ 
-                  border: `1px solid ${isPurchased ? '#28a745' : '#e0e0e0'}`,
+                  border: `1px solid ${isDeleted ? '#6c757d' : isExpired ? '#dc3545' : '#e0e0e0'}`,
                   padding: '15px', 
                   margin: '10px 0', 
                   borderRadius: '4px',
                   cursor: 'pointer',
                   transition: 'box-shadow 0.2s',
-                  backgroundColor: isPurchased ? '#f8fff8' : 'white'
+                  backgroundColor: isDeleted ? '#f8f9fa' : isExpired ? '#fff5f5' : 'white'
                 }}
                 onClick={() => navigate(`/buyer/request/${req.id}`)}
                 onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'}
@@ -208,7 +207,7 @@ const Dashboard = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ margin: '0 0 5px 0' }}>{req.item_name}</h3>
                   <span style={{ 
-                    backgroundColor: isPurchased ? '#28a745' : '#6c757d',
+                    backgroundColor: isDeleted ? '#6c757d' : isExpired ? '#dc3545' : '#28a745',
                     color: 'white',
                     padding: '4px 12px',
                     borderRadius: '20px',
@@ -226,22 +225,36 @@ const Dashboard = () => {
                   <span>📅 {new Date(req.created_at).toLocaleDateString()}</span>
                 </div>
                 
-                {isPurchased && (
+                {isExpired && (
                   <div style={{
                     marginTop: '10px',
                     padding: '10px',
-                    backgroundColor: '#d4edda',
+                    backgroundColor: '#f8d7da',
                     borderRadius: '4px',
-                    border: '1px solid #28a745'
+                    border: '1px solid #dc3545'
                   }}>
-                    <p style={{ margin: '0', fontSize: '14px' }}>
-                      <strong>✅ Purchase Finalized</strong>
+                    <p style={{ margin: '0', fontSize: '14px', color: '#721c24' }}>
+                      ⏰ This request has expired
+                    </p>
+                  </div>
+                )}
+                
+                {isDeleted && (
+                  <div style={{
+                    marginTop: '10px',
+                    padding: '10px',
+                    backgroundColor: '#e9ecef',
+                    borderRadius: '4px',
+                    border: '1px solid #6c757d'
+                  }}>
+                    <p style={{ margin: '0', fontSize: '14px', color: '#495057' }}>
+                      🗑️ This request has been deleted
                     </p>
                   </div>
                 )}
                 
                 <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>
-                  {isPurchased ? 'Click to view purchase details' : 'Click to view details and bids'}
+                  Click to view details
                 </p>
               </div>
             );
