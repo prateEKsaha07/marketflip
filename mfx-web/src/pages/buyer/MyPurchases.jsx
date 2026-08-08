@@ -15,9 +15,10 @@ const MyPurchases = () => {
   const [showVerifyButton, setShowVerifyButton] = useState(false);
   const [transactionVerified, setTransactionVerified] = useState(false);
 
+  // Fetch purchases when component mounts
   useEffect(() => {
     fetchPurchases();
-  }, []); // Empty dependency array = runs once on mount
+  }, []);
 
   const fetchPurchases = async () => {
     setLoading(true);
@@ -49,6 +50,7 @@ const MyPurchases = () => {
                 // Try to fetch shop profile
                 const shopResponse = await api.get(`/auth/profiles/${selectedBid.shop_id}`);
                 shopDetails = shopResponse.data;
+                console.log('Shop details fetched:', shopDetails);
               } catch (err) {
                 console.error(`Failed to fetch shop details for ${selectedBid.shop_id}:`, err);
                 // Fallback: use profiles from bid response
@@ -90,6 +92,7 @@ const MyPurchases = () => {
     if (!window.confirm('Have you received the product and completed the transaction?')) return;
     
     try {
+      // Update request status to 'completed'
       await api.patch(`/requests/${selectedPurchase.id}`, {
         status: 'completed',
         completed_at: new Date().toISOString(),
@@ -129,7 +132,19 @@ const MyPurchases = () => {
     setTransactionVerified(false);
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) {
+    return (
+      <div style={{ 
+        padding: '20px', 
+        maxWidth: '900px', 
+        margin: '0 auto',
+        textAlign: 'center',
+        paddingTop: '50px'
+      }}>
+        <h2>Loading your purchases...</h2>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
@@ -166,7 +181,17 @@ const MyPurchases = () => {
         </div>
       </div>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && (
+        <div style={{ 
+          color: 'red', 
+          marginBottom: '20px', 
+          padding: '10px', 
+          border: '1px solid red', 
+          borderRadius: '4px' 
+        }}>
+          {error}
+        </div>
+      )}
 
       {purchases.length === 0 && !error && (
         <div style={{ 

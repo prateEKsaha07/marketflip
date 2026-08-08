@@ -11,48 +11,32 @@ const Dashboard = () => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('open');
 
+  // Fetch data when component mounts
   useEffect(() => {
     fetchAllRequests();
-  }, []);
+  }, []); // Empty array = runs once on mount
 
   const fetchAllRequests = async () => {
+    setLoading(true);
+    setError('');
     try {
-      console.log('Fetching requests for user:', user?.user_id);
+      // Fetch all requests with different statuses
+      const statuses = ['open', 'purchased', 'expired', 'deleted'];
+      const promises = statuses.map(status => 
+        api.get(`/requests?status=${status}`).catch(() => ({ data: [] }))
+      );
       
-      // Try without any status filter first
-      const response = await api.get('/requests?status=open');
-      console.log('Open requests response:', response.data);
+      const responses = await Promise.all(promises);
+      const allData = responses.flatMap(res => res.data || []);
       
-      // If open requests work, fetch all statuses
-      if (response.data) {
-        const statuses = ['open', 'purchased', 'expired', 'deleted'];
-        const allData = [];
-        
-        for (const status of statuses) {
-          try {
-            const res = await api.get(`/requests?status=${status}`);
-            if (res.data && res.data.length > 0) {
-              allData.push(...res.data);
-            }
-          } catch (e) {
-            console.log(`No ${status} requests found`);
-          }
-        }
-        
-        console.log('All requests combined:', allData);
-        setAllRequests(allData);
-      }
+      console.log('All requests:', allData);
+      setAllRequests(allData);
     } catch (err) {
-      console.error('Failed to fetch requests:', err);
-      setError('Failed to fetch requests: ' + (err.response?.data?.detail || err.message));
+      setError('Failed to fetch requests');
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
   };
 
   // Filter requests by status
@@ -81,14 +65,9 @@ const Dashboard = () => {
     { id: 'deleted', label: 'Deleted', icon: '🗑️', count: counts.deleted },
   ];
 
-  const getStatusBadgeStyle = (status) => {
-    switch(status) {
-      case 'open': return { backgroundColor: '#28a745', color: 'white' };
-      case 'purchased': return { backgroundColor: '#17a2b8', color: 'white' };
-      case 'expired': return { backgroundColor: '#dc3545', color: 'white' };
-      case 'deleted': return { backgroundColor: '#6c757d', color: 'white' };
-      default: return { backgroundColor: '#6c757d', color: 'white' };
-    }
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   if (loading) return <div>Loading...</div>;
@@ -120,6 +99,20 @@ const Dashboard = () => {
             + Post Request
           </button>
           <button 
+            onClick={() => navigate('/buyer/purchases')}
+            style={{ 
+              marginRight: '10px', 
+              padding: '8px 16px', 
+              backgroundColor: '#17a2b8', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px', 
+              cursor: 'pointer' 
+            }}
+          >
+            📦 My Purchases
+          </button>
+          <button 
             onClick={handleLogout} 
             style={{ 
               padding: '8px 16px', 
@@ -132,22 +125,6 @@ const Dashboard = () => {
           >
             Logout
           </button>
-          // In pages/buyer/Dashboard.jsx - Add this button next to Post Request
-
-<button 
-  onClick={() => navigate('/buyer/purchases')}
-  style={{ 
-    marginRight: '10px', 
-    padding: '8px 16px', 
-    backgroundColor: '#17a2b8', 
-    color: 'white', 
-    border: 'none', 
-    borderRadius: '4px', 
-    cursor: 'pointer' 
-  }}
->
-  📦 My Purchases
-</button>
         </div>
       </div>
 
@@ -231,8 +208,8 @@ const Dashboard = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ margin: '0 0 5px 0' }}>{req.item_name}</h3>
                   <span style={{ 
-                    backgroundColor: getStatusBadgeStyle(req.status).backgroundColor,
-                    color: getStatusBadgeStyle(req.status).color,
+                    backgroundColor: isPurchased ? '#28a745' : '#6c757d',
+                    color: 'white',
                     padding: '4px 12px',
                     borderRadius: '20px',
                     fontSize: '12px',
