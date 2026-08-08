@@ -327,4 +327,47 @@ async def get_buyer_details(
         logger.error(f"Get buyer details error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
+@bid_router.get("/stats")
+async def get_bid_stats(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get bid statistics for the shop owner.
+    Returns counts of bids by status.
+    """
+    # Check role
+    if current_user.get("role") != "shop_owner":
+        raise HTTPException(status_code=403, detail="Only shop owners can view bid statistics")
+    
+    try:
+        # Get all bids for the shop owner
+        response = supabase_admin.table("bids") \
+            .select("status") \
+            .eq("shop_id", current_user["id"]) \
+            .execute()
+        
+        bids = response.data if response.data else []
+        
+        # Count by status
+        stats = {
+            "pending": 0,
+            "selected": 0,
+            "rejected": 0,
+            "completed": 0
+        }
+        
+        for bid in bids:
+            status = bid.get("status", "pending")
+            if status in stats:
+                stats[status] += 1
+        
+        # Add total
+        stats["total"] = len(bids)
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Get bid stats error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
     

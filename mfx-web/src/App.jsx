@@ -12,6 +12,7 @@ import ShopDashboard from './pages/shop/Dashboard';
 import BrowseRequests from './pages/shop/BrowseRequests';
 import MyBids from './pages/shop/MyBids';
 import BidDetail from './pages/shop/BidDetail';
+import CompletedTransactions from './pages/shop/CompletedTransactions';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -106,7 +107,15 @@ const AppRoutes = () => {
         } 
       />
 
-      
+      <Route 
+        path="/shop/completed" 
+        element={
+        <ProtectedRoute requiredRole="shop_owner">
+          <CompletedTransactions />
+        </ProtectedRoute>
+        } 
+      />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

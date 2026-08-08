@@ -49,6 +49,41 @@ async def create_request(
         logger.error(f"Create request error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
+# @router.get("/")
+# async def get_requests(
+#     status: Optional[str] = Query("open", regex="^(open|purchased|completed|deleted|expired|all)$"),
+#     pincode: Optional[str] = None,
+#     category: Optional[str] = None,
+#     limit: int = 100,
+#     offset: int = 0,
+#     current_user: dict = Depends(get_current_user)
+# ):
+#     """Get requests with filters."""
+#     try:
+#         query = supabase_anon.table("requests").select("*")
+        
+#         if status != "all":
+#             query = query.eq("status", status)
+        
+#         if pincode:
+#             query = query.eq("pincode", pincode)
+        
+#         if category:
+#             query = query.eq("category", category)
+        
+#         if current_user.get("role") == "buyer":
+#             query = query.eq("buyer_id", current_user["id"])
+        
+#         query = query.order("created_at", desc=True)
+#         query = query.range(offset, offset + limit - 1)
+        
+#         response = query.execute()
+#         return response.data if response.data else []
+        
+#     except Exception as e:
+#         logger.error(f"Get requests error: {str(e)}")
+#         raise HTTPException(status_code=400, detail=str(e))
+
 @router.get("/")
 async def get_requests(
     status: Optional[str] = Query("open", regex="^(open|purchased|completed|deleted|expired|all)$"),
@@ -60,9 +95,16 @@ async def get_requests(
 ):
     """Get requests with filters."""
     try:
-        query = supabase_anon.table("requests").select("*")
+        print(f"=== GET REQUESTS ===")
+        print(f"Status: {status}")
+        print(f"User Role: {current_user.get('role')}")
+        print(f"User ID: {current_user.get('id')}")
+        
+        # Use supabase_admin to bypass RLS
+        query = supabase_admin.table("requests").select("*")
         
         if status != "all":
+            print(f"Filtering by status: {status}")
             query = query.eq("status", status)
         
         if pincode:
@@ -71,54 +113,22 @@ async def get_requests(
         if category:
             query = query.eq("category", category)
         
+        # For buyers, only show their own requests
         if current_user.get("role") == "buyer":
+            print("Filtering by buyer_id for buyer")
             query = query.eq("buyer_id", current_user["id"])
+        # For shop owners, show ALL requests (no filter)
         
         query = query.order("created_at", desc=True)
         query = query.range(offset, offset + limit - 1)
         
         response = query.execute()
+        print(f"Found: {len(response.data) if response.data else 0} requests")
         return response.data if response.data else []
         
     except Exception as e:
         logger.error(f"Get requests error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
-
-# @router.get("/")
-# async def get_requests(
-#     status: Optional[str] = Query("open", regex="^(open|purchased|deleted|expired|all)$"),
-#     pincode: Optional[str] = None,
-#     category: Optional[str] = None,
-#     limit: int = 100,
-#     offset: int = 0,
-#     current_user: dict = Depends(get_current_user)
-# ):
-#     """Get requests with filters. Shop owners browse all open requests."""
-#     try:
-#         # Build query - DO NOT filter by buyer_id for shop owners
-#         query = supabase_anon.table("requests").select("*")
-        
-#         # Only apply status filter if not 'all'
-#         if status != "all":
-#             query = query.eq("status", status)
-#         # If status is 'all', don't apply status filter
-        
-#         if pincode:
-#             query = query.eq("pincode", pincode)
-        
-#         if category:
-#             query = query.eq("category", category)
-        
-#         query = query.order("created_at", desc=True)
-#         query = query.range(offset, offset + limit - 1)
-        
-#         response = query.execute()
-#         print(f"Requests found: {len(response.data) if response.data else 0}")
-#         return response.data if response.data else []
-        
-#     except Exception as e:
-#         logger.error(f"Get requests error: {str(e)}")
-#         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/{request_id}", response_model=RequestDetailResponse)
 async def get_request_detail(
@@ -310,3 +320,30 @@ async def verify_transaction(
     except Exception as e:
         logger.error(f"Verify transaction error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/test-completed")
+async def test_completed(
+    current_user: dict = Depends(get_current_user)
+):
+    """Test endpoint to debug completed status"""
+    try:
+        # Use supabase_admin to bypass RLS
+        response = supabase_admin.table("requests").select("*").execute()
+        
+        # Count statuses
+        statuses = {}
+        for req in response.data:
+            s = req.get("status", "unknown")
+            statuses[s] = statuses.get(s, 0) + 1
+        
+        # Get completed requests
+        completed = [r for r in response.data if r.get("status") == "completed"]
+        
+        return {
+            "total": len(response.data),
+            "status_counts": statuses,
+            "completed_count": len(completed),
+            "completed_requests": completed
+        }
+    except Exception as e:
+        return {"error": str(e)}

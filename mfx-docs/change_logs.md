@@ -55,6 +55,8 @@ None
 2. **Verify endpoint** (`PATCH /requests/{id}/verify`) - Fixed datetime import
 3. **Database** - Added `'completed'` to status check constraint
 4. **Status regex** - Added `'completed'` to GET `/requests` query validation
+5. **GET /bids/{id}/buyer** - New endpoint for shop owners to view buyer details on selected bids
+6. **GET /bids/stats** - New endpoint for bid statistics (pending/selected/rejected/completed/total)
 
 ### Frontend - Buyer
 1. **MyPurchases** - Three-section flow (Selected → Verification → Completed)
@@ -63,16 +65,29 @@ None
 4. **Delivery selection** - Functional with address prompt
 5. **Verify transaction** - Functional with confirmation
 
+### Frontend - Shop
+1. **BidDetail page** - View buyer contact, request details, delivery info for selected bids
+2. **MyBids** - Clickable selected bids → navigate to BidDetail
+3. **Dashboard stats cards** - KPI cards showing Total, Pending, Selected, Rejected, Completed
+4. **CompletedTransactions page** - View all completed transactions with buyer details
+
 ---
 
 ## Files Modified
+- `bids/routes.py`
 - `requests/routes.py`
 - `pages/buyer/Dashboard.jsx`
 - `pages/buyer/MyPurchases.jsx`
+- `pages/shop/Dashboard.jsx`
+- `pages/shop/MyBids.jsx`
+- `pages/shop/BidDetail.jsx` (new)
+- `pages/shop/CompletedTransactions.jsx` (new)
+- `App.jsx`
 
 ---
 
 ## Status
 - ✅ Buyer flow complete
-- ⬜ Shop BidDetail pending
-- ⬜ Shop CompletedTransactions pending
+- ✅ Shop BidDetail complete
+- ✅ Shop CompletedTransactions complete
+- ✅ POC Core Flow Complete
