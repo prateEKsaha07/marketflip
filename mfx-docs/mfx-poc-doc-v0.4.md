@@ -5,11 +5,11 @@
 |---|---|
 | **Product** | MarketFlip |
 | **Repository** | `mfx-core` (backend) · `mfx-web` (frontend) · `mfx-docs` (documentation) |
-| **Status** | POC Complete — Core Flow + Transaction Completion |
+| **Status** | POC Complete — Full Flow (Core + Delivery + Verification) |
 | **Category (v1)** | Electronics |
 | **Owner** | Prateek |
-| **Version** | 0.3 |
-| **Last Updated** | August 07, 2026 |
+| **Version** | 0.4 |
+| **Last Updated** | August 08, 2026 |
 
 ---
 
@@ -48,12 +48,14 @@ flowchart TD
     K --> M[Shop Contact Revealed to Buyer]
 
     L --> N[Buyer: My Purchases]
-    N --> O[Select Delivery Method - UI only]
-    N --> P[Verify Transaction - UI only]
-    P --> Q[Request: status = completed - planned]
+    N --> O[Select Delivery Method]
+    O --> P[Verify Transaction]
+    P --> Q[Request: status = completed]
+    K --> R[Shop: BidDetail - buyer contact]
+    Q --> S[Shop: CompletedTransactions]
 ```
 
-### 2.2 Request Lifecycle (State Diagram — extended)
+### 2.2 Request Lifecycle (State Diagram — final)
 
 ```mermaid
 stateDiagram-v2
@@ -61,14 +63,12 @@ stateDiagram-v2
     open --> purchased : buyer selects a bid
     open --> deleted : buyer deletes manually
     open --> expired : 7 days pass, no action
-    purchased --> completed : buyer verifies transaction (planned)
+    purchased --> completed : buyer verifies transaction
     purchased --> [*]
     completed --> [*]
     deleted --> [*]
     expired --> [*]
 ```
-
-> **Note:** `completed` status and the verify step are planned/UI-scaffolded, not yet backend-functional. See Section 6 (Known Gaps).
 
 ---
 
@@ -76,8 +76,8 @@ stateDiagram-v2
 
 | Role | Can do |
 |---|---|
-| **Buyer** | Post request, view own requests (Open/Completed/Expired/Deleted tabs), view bids, select a bid, delete a request, view purchases with shop contact, (planned) set delivery method, (planned) verify transaction |
-| **Shop Owner** | Register with address, browse open requests, place bid, edit/withdraw pending bid, view own bids with status, (planned) view buyer contact on selected bid, (planned) view completed transactions |
+| **Buyer** | Post request, view own requests (Open/Expired/Deleted tabs), view bids, select a bid, delete a request, My Purchases (Selected → Verification → Completed), set delivery method, verify transaction |
+| **Shop Owner** | Register with address, browse open requests, place bid, edit/withdraw pending bid, view own bids with status, view buyer contact on selected bid (BidDetail), view completed transactions, view bid stats (KPI cards) |
 
 ---
 
@@ -85,15 +85,17 @@ stateDiagram-v2
 
 1. `Landing.jsx`
 2. `Login.jsx` / `Signup.jsx`
-3. `buyer/Dashboard.jsx` — tabs: Open, Completed, Expired, Deleted
+3. `buyer/Dashboard.jsx` — tabs: Open, Expired, Deleted
 4. `buyer/PostRequest.jsx`
 5. `buyer/RequestDetail.jsx` — bid list + select action + success card
-6. `buyer/MyPurchases.jsx` — shop contact, delivery options (UI only), verify button (UI only)
-7. `shop/Dashboard.jsx` — bid stats, nav buttons
+6. `buyer/MyPurchases.jsx` — Selected → Verification → Completed flow, functional delivery + verify, persists on refresh
+7. `shop/Dashboard.jsx` — KPI stat cards (Total/Pending/Selected/Rejected/Completed), nav buttons
 8. `shop/BrowseRequests.jsx` — filters, clear filters, bid placement
-9. `shop/MyBids.jsx` — bid list with status
+9. `shop/MyBids.jsx` — bid list with status, clickable selected bids → BidDetail
+10. `shop/BidDetail.jsx` — buyer contact, request + delivery details
+11. `shop/CompletedTransactions.jsx` — completed transactions with buyer details
 
-**Planned, not yet built:** `shop/BidDetail.jsx`, `shop/CompletedTransactions.jsx`
+All screens built and functional, including delivery/verify/completed flow end-to-end. No remaining planned screens.
 
 ---
 
@@ -108,20 +110,20 @@ Auth: Bearer token (Supabase JWT) in `Authorization` header for all routes excep
 | POST | `/auth/login` | Login user | ❌ | ✅ Built |
 | GET | `/auth/profiles/{id}` | Get user profile | ✅ | ✅ Built |
 | POST | `/requests` | Create request | ✅ Buyer | ✅ Built |
-| GET | `/requests?pincode=&category=&status=` | List requests (supports `status=all`) | ✅ All | ✅ Built |
+| GET | `/requests?pincode=&category=&status=` | List requests (supports `status=all`, `completed`) | ✅ All | ✅ Built |
 | GET | `/requests/{id}` | Get request detail + bids | ✅ All | ✅ Built |
 | DELETE | `/requests/{id}` | Soft-delete request | ✅ Buyer | ✅ Built |
-| PATCH | `/requests/{id}` | Update request | ✅ Buyer | ⬜ Planned |
-| PATCH | `/requests/{id}/delivery` | Update delivery method | ✅ Buyer | ⬜ Planned |
-| PATCH | `/requests/{id}/verify` | Verify transaction → `completed` | ✅ Buyer | ⬜ Planned |
+| PATCH | `/requests/{id}` | Update request | ✅ Buyer | ⬜ Not built (unused) |
+| PATCH | `/requests/{id}/delivery` | Update delivery method | ✅ Buyer | ✅ Built |
+| PATCH | `/requests/{id}/verify` | Verify transaction → `completed` | ✅ Buyer | ✅ Built |
 | POST | `/requests/{id}/bids` | Place bid | ✅ Shop | ✅ Built |
 | GET | `/requests/{id}/bids` | Get bids for a request | ✅ All | ✅ Built |
 | GET | `/bids?request_id=` | Get all bids (role-scoped) | ✅ All | ✅ Built |
 | PATCH | `/bids/{id}` | Update pending bid | ✅ Shop | ✅ Built |
 | DELETE | `/bids/{id}` | Withdraw pending bid | ✅ Shop | ✅ Built |
 | PATCH | `/bids/{id}/select` | Select bid, reveal contact | ✅ Buyer | ✅ Built (enhanced) |
-| GET | `/bids/{id}/buyer` | Get buyer details for selected bid | ✅ Shop | ⬜ Planned |
-| GET | `/bids/stats` | Bid statistics for shop owner | ✅ Shop | ⬜ Planned |
+| GET | `/bids/{id}/buyer` | Get buyer details for selected bid | ✅ Shop | ✅ Built |
+| GET | `/bids/stats` | Bid statistics for shop owner | ✅ Shop | ✅ Built |
 
 ### Sample: `PATCH /bids/{id}/select` (enhanced response, as built)
 ```json
@@ -238,13 +240,13 @@ mfx-web/src/
 │   │   ├── Dashboard.jsx        ✅
 │   │   ├── PostRequest.jsx      ✅
 │   │   ├── RequestDetail.jsx    ✅
-│   │   └── MyPurchases.jsx      ⚠️ UI complete, backend pending
+│   │   └── MyPurchases.jsx      ✅
 │   └── shop/
 │       ├── Dashboard.jsx        ✅
 │       ├── BrowseRequests.jsx   ✅
 │       ├── MyBids.jsx           ✅
-│       ├── BidDetail.jsx        ❌ not built
-│       └── CompletedTransactions.jsx ❌ not built
+│       ├── BidDetail.jsx        ✅
+│       └── CompletedTransactions.jsx ✅
 ├── App.jsx
 └── main.jsx
 ```
@@ -265,21 +267,15 @@ mfx-web/src/
 
 ## 9. Known Gaps / Next Steps
 
+Full buyer + shop flow (post → bid → select → deliver → verify → complete) is done. Remaining items are non-blocking polish:
+
 | Priority | Task |
 |---|---|
-| 🔴 High | DB migrations for delivery/completed fields (already written, run if not applied) |
-| 🔴 High | `PATCH /requests/{id}/delivery` |
-| 🔴 High | `PATCH /requests/{id}/verify` |
-| 🔴 High | Make `MyPurchases.jsx` functional (currently UI-only) |
-| 🟡 Medium | `GET /bids/{id}/buyer` |
-| 🟡 Medium | `shop/BidDetail.jsx` |
-| 🟡 Medium | `shop/Dashboard.jsx` stats cards |
-| 🟢 Low | `shop/CompletedTransactions.jsx` |
+| 🟡 Medium | Auto-expire cron job |
+| 🟡 Medium | Pincode-based filtering on browse feed |
+| 🟡 Medium | Bid count badge on buyer's request card |
+| 🟡 Medium | "Closed" message to non-selected bidders |
 | 🟢 Low | Tailwind CSS integration + styling pass |
-| 🟢 Low | Pincode-based filtering on browse feed |
-| 🟢 Low | Bid count badge on buyer's request card |
-| 🟢 Low | "Closed" message to non-selected bidders |
-| 🟢 Low | Auto-expire cron job |
 
 ---
 
@@ -320,7 +316,7 @@ npm run dev
 
 ---
 
-## 13. Suggested Build Order (updated)
+## 13. Build Order (final)
 1. ✅ DB schema
 2. ✅ Auth + role redirect
 3. ✅ Landing/Login/Signup
@@ -328,7 +324,8 @@ npm run dev
 5. ✅ Browse + bid (shop owner)
 6. ✅ Review + select bid (buyer)
 7. ✅ Contact reveal
-8. ⬜ Delivery + verify + completed status
-9. ⬜ Shop-side buyer contact + BidDetail + CompletedTransactions
+8. ✅ Delivery + verify + completed status
+9. ✅ Shop-side buyer contact + BidDetail + CompletedTransactions
 10. ⬜ Auto-expire cron
-11. ⬜ Tailwind + polish (badges, pincode filter, closed message)
+11. ⬜ Pincode filter, bid badge, closed message
+12. ⬜ Tailwind + visual design pass
