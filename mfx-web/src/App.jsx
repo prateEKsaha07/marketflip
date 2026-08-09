@@ -13,6 +13,7 @@ import BrowseRequests from './pages/shop/BrowseRequests';
 import MyBids from './pages/shop/MyBids';
 import BidDetail from './pages/shop/BidDetail';
 import CompletedTransactions from './pages/shop/CompletedTransactions';
+import EditRequest from './pages/buyer/EditRequest';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -62,6 +63,14 @@ const AppRoutes = () => {
           <ProtectedRoute requiredRole="buyer">
             <RequestDetail />
           </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/buyer/edit-request/:id" 
+        element={
+        <ProtectedRoute requiredRole="buyer">
+          <EditRequest />
+        </ProtectedRoute>
         } 
       />
       <Route 

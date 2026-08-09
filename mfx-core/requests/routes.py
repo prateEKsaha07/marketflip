@@ -10,7 +10,8 @@ from requests.schemas import (
     RequestResponse, 
     RequestDetailResponse,
     RequestQueryParams,
-    DeliveryUpdate
+    DeliveryUpdate,
+    RequestUpdate
 )
 from requests.services import RequestService
 from auth.dependencies import supabase_anon, supabase_admin
@@ -328,3 +329,80 @@ async def test_completed(
         }
     except Exception as e:
         return {"error": str(e)}
+
+@router.patch("/{request_id}")
+async def update_request(
+    request_id: UUID,
+    update_data: RequestUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Update a request.
+    Only the buyer who created the request can update it.
+    """
+    # Check role
+    if current_user.get("role") != "buyer":
+        raise HTTPException(status_code=403, detail="Only buyers can update requests")
+    
+    try:
+        # Check request exists and belongs to buyer
+        check_response = supabase_admin.table("requests") \
+            .select("buyer_id, status") \
+            .eq("id", str(request_id)) \
+            .execute()
+        
+        if not check_response.data:
+            raise HTTPException(status_code=404, detail="Request not found")
+        
+        request = check_response.data[0]
+        
+        if str(request["buyer_id"]) != current_user["id"]:
+            raise HTTPException(status_code=403, detail="You don't have permission to update this request")
+        
+        # Only allow updates if status is 'open'
+        if request["status"] != "open":
+            raise HTTPException(status_code=400, detail="Only open requests can be updated")
+        
+        # Build update data (only include fields that are provided)
+        update_dict = {}
+        if update_data.item_name is not None:
+            update_dict["item_name"] = update_data.item_name
+        if update_data.description is not None:
+            update_dict["description"] = update_data.description
+        if update_data.budget_min is not None:
+            update_dict["budget_min"] = update_data.budget_min
+        if update_data.budget_max is not None:
+            update_dict["budget_max"] = update_data.budget_max
+        if update_data.pincode is not None:
+            if len(update_data.pincode) != 6 or not update_data.pincode.isdigit():
+                raise HTTPException(status_code=400, detail="Pincode must be 6 digits")
+            update_dict["pincode"] = update_data.pincode
+        if update_data.category is not None:
+            update_dict["category"] = update_data.category
+        if update_data.reference_url is not None:
+            update_dict["reference_url"] = update_data.reference_url
+        if update_data.reference_image is not None:
+            update_dict["reference_image"] = update_data.reference_image
+        
+        if not update_dict:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        # Update the request
+        response = supabase_admin.table("requests") \
+            .update(update_dict) \
+            .eq("id", str(request_id)) \
+            .execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=400, detail="Failed to update request")
+        
+        return {
+            "message": "Request updated successfully",
+            "request": response.data[0]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update request error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))

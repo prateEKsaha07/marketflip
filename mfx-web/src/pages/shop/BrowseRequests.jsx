@@ -295,6 +295,36 @@ const BrowseRequests = () => {
                   <span>📅 {new Date(req.created_at).toLocaleDateString()}</span>
                 </div>
                 
+                {/* ✅ CLOSED MESSAGE - For purchased or completed requests */}
+                {req.status === 'purchased' && (
+                  <div style={{
+                    marginTop: '15px',
+                    padding: '10px',
+                    backgroundColor: '#fff3cd',
+                    borderRadius: '4px',
+                    border: '1px solid #ffc107'
+                  }}>
+                    <p style={{ margin: 0, color: '#856404' }}>
+                      🔒 This request has been purchased and is no longer accepting bids
+                    </p>
+                  </div>
+                )}
+
+                {req.status === 'completed' && (
+                  <div style={{
+                    marginTop: '15px',
+                    padding: '10px',
+                    backgroundColor: '#d4edda',
+                    borderRadius: '4px',
+                    border: '1px solid #28a745'
+                  }}>
+                    <p style={{ margin: 0, color: '#155724' }}>
+                      ✅ This transaction has been completed
+                    </p>
+                  </div>
+                )}
+                
+                {/* Bid Form - Only for open requests */}
                 {req.status === 'open' && (
                   <div style={{ marginTop: '15px' }}>
                     {hasBid ? (

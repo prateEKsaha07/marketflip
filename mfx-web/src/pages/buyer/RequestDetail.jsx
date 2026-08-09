@@ -157,17 +157,38 @@ const RequestDetail = () => {
 
   const isOwner = request.buyer_id === user?.user_id;
   const isPurchased = request.status === 'purchased' || showSuccessCard;
+  const isOpen = request.status === 'open' && !showSuccessCard;
 
   return (
     <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h1>Request Details</h1>
-        <button 
-          onClick={() => navigate('/buyer/dashboard')}
-          style={{ padding: '8px 16px', cursor: 'pointer' }}
-        >
-          Back to Dashboard
-        </button>
+        <div>
+          {/* ✅ Edit Button - Only for owner and open requests */}
+          {isOwner && isOpen && (
+            <button
+              onClick={() => navigate(`/buyer/edit-request/${id}`)}
+              style={{
+                marginRight: '10px',
+                padding: '8px 16px',
+                backgroundColor: '#ffc107',
+                color: 'black',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              ✏️ Edit Request
+            </button>
+          )}
+          <button 
+            onClick={() => navigate('/buyer/dashboard')}
+            style={{ padding: '8px 16px', cursor: 'pointer' }}
+          >
+            Back to Dashboard
+          </button>
+        </div>
       </div>
 
       {/* Success Card */}
@@ -215,7 +236,7 @@ const RequestDetail = () => {
         <p><strong>Created:</strong> {new Date(request.created_at).toLocaleDateString()}</p>
         <p><strong>Expires:</strong> {new Date(request.expires_at).toLocaleDateString()}</p>
 
-        {isOwner && request.status === 'open' && !showSuccessCard && (
+        {isOwner && isOpen && (
           <button
             onClick={handleDeleteRequest}
             disabled={deleting}
@@ -276,7 +297,7 @@ const RequestDetail = () => {
                 }}>{bid.status.toUpperCase()}</strong></p>
                 <p><strong>Placed:</strong> {new Date(bid.created_at).toLocaleDateString()}</p>
               </div>
-              {request.status === 'open' && bid.status === 'pending' && !showSuccessCard && (
+              {isOpen && bid.status === 'pending' && (
                 <button
                   onClick={() => handleSelectBid(bid.id)}
                   disabled={selecting}

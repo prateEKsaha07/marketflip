@@ -90,3 +90,12 @@ class DeliveryUpdate(BaseModel):
     delivery_method: str
     delivery_address: Optional[str] = None
 
+class RequestUpdate(BaseModel):
+    item_name: Optional[str] = None
+    description: Optional[str] = None
+    budget_min: Optional[int] = None
+    budget_max: Optional[int] = None
+    pincode: Optional[str] = None
+    category: Optional[str] = None
+    reference_url: Optional[str] = None
+    reference_image: Optional[str] = None
