@@ -5,11 +5,11 @@
 |---|---|
 | **Product** | MarketFlip |
 | **Repository** | `mfx-core` (backend) · `mfx-web` (frontend) · `mfx-docs` (documentation) |
-| **Status** | POC Complete — Full Flow (Core + Delivery + Verification) |
+| **Status** | POC Feature Complete — Ready for Deployment |
 | **Category (v1)** | Electronics |
 | **Owner** | Prateek |
-| **Version** | 0.4 |
-| **Last Updated** | August 08, 2026 |
+| **Version** | 0.5 |
+| **Last Updated** | August 09, 2026 |
 
 ---
 
@@ -89,11 +89,12 @@ stateDiagram-v2
 4. `buyer/PostRequest.jsx`
 5. `buyer/RequestDetail.jsx` — bid list + select action + success card
 6. `buyer/MyPurchases.jsx` — Selected → Verification → Completed flow, functional delivery + verify, persists on refresh
-7. `shop/Dashboard.jsx` — KPI stat cards (Total/Pending/Selected/Rejected/Completed), nav buttons
-8. `shop/BrowseRequests.jsx` — filters, clear filters, bid placement
-9. `shop/MyBids.jsx` — bid list with status, clickable selected bids → BidDetail
-10. `shop/BidDetail.jsx` — buyer contact, request + delivery details
-11. `shop/CompletedTransactions.jsx` — completed transactions with buyer details
+7. `buyer/EditRequest.jsx` — edit open request (item_name, description, budget, pincode, category, reference)
+8. `shop/Dashboard.jsx` — KPI stat cards (Total/Pending/Selected/Rejected/Completed), nav buttons
+9. `shop/BrowseRequests.jsx` — debounced pincode filters, closed-request indicators (purchased/completed), bid placement
+10. `shop/MyBids.jsx` — bid list with status, clickable selected bids → BidDetail
+11. `shop/BidDetail.jsx` — buyer contact, request + delivery details
+12. `shop/CompletedTransactions.jsx` — completed transactions with buyer details
 
 All screens built and functional, including delivery/verify/completed flow end-to-end. No remaining planned screens.
 
@@ -113,7 +114,7 @@ Auth: Bearer token (Supabase JWT) in `Authorization` header for all routes excep
 | GET | `/requests?pincode=&category=&status=` | List requests (supports `status=all`, `completed`) | ✅ All | ✅ Built |
 | GET | `/requests/{id}` | Get request detail + bids | ✅ All | ✅ Built |
 | DELETE | `/requests/{id}` | Soft-delete request | ✅ Buyer | ✅ Built |
-| PATCH | `/requests/{id}` | Update request | ✅ Buyer | ⬜ Not built (unused) |
+| PATCH | `/requests/{id}` | Update open request (buyer) | ✅ Buyer | ✅ Built |
 | PATCH | `/requests/{id}/delivery` | Update delivery method | ✅ Buyer | ✅ Built |
 | PATCH | `/requests/{id}/verify` | Verify transaction → `completed` | ✅ Buyer | ✅ Built |
 | POST | `/requests/{id}/bids` | Place bid | ✅ Shop | ✅ Built |
@@ -210,8 +211,8 @@ mfx-core/
 ├── main.py
 ├── config.py
 ├── auth/
-│   ├── routes.py          # signup, login, profiles/{id}
-│   └── dependencies.py    # get_current_user (JWT + role lookup)
+│   ├── routes.py         
+│   └── dependencies.py    
 ├── requests/
 │   ├── routes.py
 │   ├── schemas.py
@@ -220,8 +221,10 @@ mfx-core/
 │   ├── routes.py
 │   ├── schemas.py
 │   └── service.py
-├── jobs/
-│   └── expire_requests.py     # ⬜ not yet implemented
+├── supabase/
+│   ├── functions
+│   └── expire-requests
+│          └── index.ts
 └── requirements.txt
 ```
 
@@ -260,22 +263,18 @@ mfx-web/src/
 | Frontend | React + Vite → Vercel | Free |
 | Backend | FastAPI → Render | Free |
 | DB / Auth / Storage | Supabase | Free |
-| Cron | Supabase `pg_cron` / Edge Function | Free (not yet set up) |
-| Styling | None yet — Tailwind planned | — |
+| Cron | Supabase `pg_cron` + Edge Function (`expire-requests`, daily 2 AM) | Free |
+| Styling | Plain CSS — Tailwind + shadcn/ui + Framer Motion redesign planned | — |
 
 ---
 
 ## 9. Known Gaps / Next Steps
 
-Full buyer + shop flow (post → bid → select → deliver → verify → complete) is done. Remaining items are non-blocking polish:
+Full buyer + shop flow (post → bid → select → deliver → verify → complete) plus auto-expiry, filtering, badges, and edit-request are done. Only visual design/animation upgrade remains.
 
 | Priority | Task |
 |---|---|
-| 🟡 Medium | Auto-expire cron job |
-| 🟡 Medium | Pincode-based filtering on browse feed |
-| 🟡 Medium | Bid count badge on buyer's request card |
-| 🟡 Medium | "Closed" message to non-selected bidders |
-| 🟢 Low | Tailwind CSS integration + styling pass |
+| 🟢 Low | Tailwind + shadcn/ui + Framer Motion visual redesign |
 
 ---
 
@@ -326,6 +325,6 @@ npm run dev
 7. ✅ Contact reveal
 8. ✅ Delivery + verify + completed status
 9. ✅ Shop-side buyer contact + BidDetail + CompletedTransactions
-10. ⬜ Auto-expire cron
-11. ⬜ Pincode filter, bid badge, closed message
-12. ⬜ Tailwind + visual design pass
+10. ✅ Auto-expire cron
+11. ✅ Pincode filter, bid badge, closed message, edit request
+12. ⬜ Tailwind + shadcn/ui + Framer Motion visual redesign
