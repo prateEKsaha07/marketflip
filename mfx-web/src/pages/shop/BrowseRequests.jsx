@@ -15,6 +15,11 @@ const BrowseRequests = () => {
     category: '',
     status: 'open'
   });
+  const [activeFilters, setActiveFilters] = useState({
+    pincode: '',
+    category: '',
+    status: 'open'
+  });
   const [bidding, setBidding] = useState({
     requestId: null,
     price: '',
@@ -22,10 +27,11 @@ const BrowseRequests = () => {
     loading: false
   });
 
+  // Only fetch when activeFilters change
   useEffect(() => {
     fetchMyBids();
     fetchRequests();
-  }, [filters]);
+  }, [activeFilters]);
 
   const fetchMyBids = async () => {
     try {
@@ -39,26 +45,20 @@ const BrowseRequests = () => {
 
   const fetchRequests = async () => {
     setLoading(true);
+    setError('');
     try {
       const params = new URLSearchParams();
       
-      // Always include status - default to 'open'
-      params.append('status', filters.status || 'open');
+      params.append('status', activeFilters.status || 'open');
       
-      if (filters.pincode) params.append('pincode', filters.pincode);
-      if (filters.category) params.append('category', filters.category);
+      if (activeFilters.pincode) params.append('pincode', activeFilters.pincode);
+      if (activeFilters.category) params.append('category', activeFilters.category);
       
       console.log('Fetching requests with params:', params.toString());
       
       const response = await api.get(`/requests?${params.toString()}`);
       console.log('Requests response:', response.data);
-      
-      // Filter out requests that are already purchased or deleted
-      const filteredRequests = response.data.filter(req => 
-        req.status === 'open' || req.status === 'open'
-      );
-      
-      setRequests(filteredRequests);
+      setRequests(response.data);
     } catch (err) {
       console.error('Fetch requests error:', err);
       setError('Failed to fetch requests: ' + (err.response?.data?.detail || err.message));
@@ -70,6 +70,11 @@ const BrowseRequests = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Apply filters - copy filters to activeFilters
+  const applyFilters = () => {
+    setActiveFilters({ ...filters });
   };
 
   const handleBidChange = (e, requestId) => {
@@ -99,7 +104,6 @@ const BrowseRequests = () => {
       
       alert('✅ Bid placed successfully!');
       
-      // Reset bidding form
       setBidding({
         requestId: null,
         price: '',
@@ -107,7 +111,6 @@ const BrowseRequests = () => {
         loading: false
       });
       
-      // Refresh data
       await fetchMyBids();
       await fetchRequests();
       
@@ -130,9 +133,13 @@ const BrowseRequests = () => {
     return bid ? bid.status : null;
   };
 
-  // Clear filters
   const clearFilters = () => {
     setFilters({
+      pincode: '',
+      category: '',
+      status: 'open'
+    });
+    setActiveFilters({
       pincode: '',
       category: '',
       status: 'open'
@@ -217,7 +224,7 @@ const BrowseRequests = () => {
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button 
-            onClick={fetchRequests}
+            onClick={applyFilters}
             style={{ 
               padding: '8px 16px', 
               backgroundColor: '#007bff', 
@@ -250,7 +257,7 @@ const BrowseRequests = () => {
       <div>
         {requests.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0' }}>
-            <p>No open requests found matching your filters</p>
+            <p>No requests found matching your filters</p>
             <button 
               onClick={clearFilters}
               style={{
