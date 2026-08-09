@@ -11,7 +11,6 @@ const Dashboard = () => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('open');
 
-  // Fetch data when component mounts
   useEffect(() => {
     fetchAllRequests();
   }, []);
@@ -20,7 +19,6 @@ const Dashboard = () => {
     setLoading(true);
     setError('');
     try {
-      // Fetch only open, expired, and deleted requests (removed purchased)
       const statuses = ['open', 'expired', 'deleted'];
       const promises = statuses.map(status => 
         api.get(`/requests?status=${status}`).catch(() => ({ data: [] }))
@@ -29,7 +27,7 @@ const Dashboard = () => {
       const responses = await Promise.all(promises);
       const allData = responses.flatMap(res => res.data || []);
       
-      console.log('All requests:', allData);
+      console.log('All requests with bid counts:', allData);
       setAllRequests(allData);
     } catch (err) {
       setError('Failed to fetch requests');
@@ -39,7 +37,6 @@ const Dashboard = () => {
     }
   };
 
-  // Filter requests by status
   const getFilteredRequests = () => {
     if (activeTab === 'all') {
       return allRequests;
@@ -49,7 +46,6 @@ const Dashboard = () => {
 
   const filteredRequests = getFilteredRequests();
 
-  // Count requests by status
   const counts = {
     all: allRequests.length,
     open: allRequests.filter(r => r.status === 'open').length,
@@ -187,6 +183,7 @@ const Dashboard = () => {
           filteredRequests.map((req) => {
             const isDeleted = req.status === 'deleted';
             const isExpired = req.status === 'expired';
+            const bidCount = req.bid_count || 0;
             
             return (
               <div 
@@ -204,18 +201,36 @@ const Dashboard = () => {
                 onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'}
                 onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ margin: '0 0 5px 0' }}>{req.item_name}</h3>
-                  <span style={{ 
-                    backgroundColor: isDeleted ? '#6c757d' : isExpired ? '#dc3545' : '#28a745',
-                    color: 'white',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    fontSize: '12px',
-                    fontWeight: 'bold'
-                  }}>
-                    {req.status.toUpperCase()}
-                  </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: '0 5px 0 0' }}>{req.item_name}</h3>
+                    <span style={{ 
+                      backgroundColor: isDeleted ? '#6c757d' : isExpired ? '#dc3545' : '#28a745',
+                      color: 'white',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      fontSize: '12px',
+                      fontWeight: 'bold'
+                    }}>
+                      {req.status.toUpperCase()}
+                    </span>
+                    {/* ✅ Bid Count Badge */}
+                    {bidCount > 0 && (
+                      <span style={{
+                        marginLeft: '10px',
+                        padding: '2px 10px',
+                        backgroundColor: '#e9ecef',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        color: '#495057',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        💬 {bidCount} bid{bidCount !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <p style={{ margin: '5px 0', color: '#666' }}>{req.description || 'No description'}</p>
                 <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '14px' }}>
