@@ -13,10 +13,9 @@ const LandingNavbar = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
-  // Handle scroll - hide/show navbar with animation
   useEffect(() => {
     const controlNavbar = () => {
       const currentScrollY = window.scrollY;
@@ -37,7 +36,6 @@ const LandingNavbar = () => {
     };
   }, [lastScrollY]);
 
-  // Smooth scroll function
   const handleSmoothScroll = (e, targetId) => {
     e.preventDefault();
     const targetElement = document.querySelector(targetId);
@@ -51,7 +49,6 @@ const LandingNavbar = () => {
     }
   };
 
-  // Scroll to top function for Home
   const scrollToTop = (e) => {
     e.preventDefault();
     window.scrollTo({
@@ -75,7 +72,6 @@ const LandingNavbar = () => {
           className="fixed top-0 left-0 right-0 z-50 bg-transparent"
         >
           <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-            {/* Logo - Scrolls to top */}
             <a 
               href="/" 
               onClick={scrollToTop}
@@ -85,7 +81,6 @@ const LandingNavbar = () => {
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFBE91] to-[#CFEBFF]">Flip</span>
             </a>
 
-            {/* Desktop Nav */}
             <div className="hidden md:flex items-center gap-6">
               <a 
                 href="/" 
@@ -131,21 +126,22 @@ const LandingNavbar = () => {
                 </>
               ) : (
                 <>
-                  <Link to="/login">
-                    <button className="text-sm text-[#1A1A2E] hover:text-[#FFBE91] transition-colors">
-                      Login
-                    </button>
-                  </Link>
-                  <Link to="/signup">
-                    <Button className="bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E]">
-                      Sign Up
-                    </Button>
-                  </Link>
+                  <button
+                    onClick={() => navigate('/auth')}
+                    className="text-sm text-[#1A1A2E] hover:text-[#FFBE91] transition-colors"
+                  >
+                    Login
+                  </button>
+                  <Button 
+                    onClick={() => navigate('/auth')}
+                    className="bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E]"
+                  >
+                    Sign Up
+                  </Button>
                 </>
               )}
             </div>
 
-            {/* Mobile Menu Button */}
             <button
               className="md:hidden text-[#1A1A2E] text-2xl"
               onClick={() => setIsOpen(!isOpen)}
@@ -154,7 +150,6 @@ const LandingNavbar = () => {
             </button>
           </div>
 
-          {/* Mobile Nav */}
           <AnimatePresence>
             {isOpen && (
               <motion.div
@@ -165,32 +160,16 @@ const LandingNavbar = () => {
                 className="md:hidden bg-white/95 backdrop-blur-md border-b border-[#FFDDB0]/30"
               >
                 <div className="px-4 py-6 flex flex-col gap-4">
-                  <a 
-                    href="/" 
-                    onClick={scrollToTop}
-                    className="text-[#1A1A2E] hover:text-[#FFBE91]"
-                  >
+                  <a href="/" onClick={scrollToTop} className="text-[#1A1A2E] hover:text-[#FFBE91]">
                     Home
                   </a>
-                  <a 
-                    href="#features" 
-                    onClick={(e) => handleSmoothScroll(e, '#features')}
-                    className="text-[#1A1A2E] hover:text-[#FFBE91]"
-                  >
+                  <a href="#features" onClick={(e) => handleSmoothScroll(e, '#features')} className="text-[#1A1A2E] hover:text-[#FFBE91]">
                     Features
                   </a>
-                  <a 
-                    href="#how-it-works" 
-                    onClick={(e) => handleSmoothScroll(e, '#how-it-works')}
-                    className="text-[#1A1A2E] hover:text-[#FFBE91]"
-                  >
+                  <a href="#how-it-works" onClick={(e) => handleSmoothScroll(e, '#how-it-works')} className="text-[#1A1A2E] hover:text-[#FFBE91]">
                     How It Works
                   </a>
-                  <a 
-                    href="#testimonials" 
-                    onClick={(e) => handleSmoothScroll(e, '#testimonials')}
-                    className="text-[#1A1A2E] hover:text-[#FFBE91]"
-                  >
+                  <a href="#testimonials" onClick={(e) => handleSmoothScroll(e, '#testimonials')} className="text-[#1A1A2E] hover:text-[#FFBE91]">
                     Testimonials
                   </a>
                   {isAuthenticated ? (
@@ -206,14 +185,12 @@ const LandingNavbar = () => {
                     </>
                   ) : (
                     <>
-                      <Link to="/login" onClick={() => setIsOpen(false)}>
-                        <button className="w-full text-[#1A1A2E] hover:text-[#FFBE91]">Login</button>
-                      </Link>
-                      <Link to="/signup" onClick={() => setIsOpen(false)}>
-                        <Button className="w-full bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E]">
-                          Sign Up
-                        </Button>
-                      </Link>
+                      <button onClick={() => navigate('/auth')} className="w-full text-[#1A1A2E] hover:text-[#FFBE91]">
+                        Login
+                      </button>
+                      <Button onClick={() => navigate('/auth')} className="w-full bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E]">
+                        Sign Up
+                      </Button>
                     </>
                   )}
                 </div>

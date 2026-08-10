@@ -3,9 +3,9 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { AnimatePresence } from 'framer-motion';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PageTransition from './components/PageTransition';
+import './styles/auth.css'; // Import auth styles
 import Landing from './pages/Landing';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
+import Auth from './pages/Auth';
 import BuyerDashboard from './pages/buyer/Dashboard';
 import PostRequest from './pages/buyer/PostRequest';
 import RequestDetail from './pages/buyer/RequestDetail';
@@ -29,11 +29,11 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/auth" replace />;
   }
 
   if (requiredRole && user?.role !== requiredRole) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/auth" replace />;
   }
 
   return children;
@@ -50,14 +50,9 @@ const AnimatedRoutes = () => {
             <Landing />
           </PageTransition>
         } />
-        <Route path="/login" element={
+        <Route path="/auth" element={
           <PageTransition>
-            <Login />
-          </PageTransition>
-        } />
-        <Route path="/signup" element={
-          <PageTransition>
-            <Signup />
+            <Auth />
           </PageTransition>
         } />
         
