@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '@/components/ui/button';
+import { LogIn, User, Menu, X } from 'lucide-react';
 
 const LandingNavbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -113,7 +114,8 @@ const LandingNavbar = () => {
               {isAuthenticated ? (
                 <>
                   <Link to={user?.role === 'buyer' ? '/buyer/dashboard' : '/shop/dashboard'}>
-                    <Button variant="outline" className="border-[#FFBE91] text-[#1A1A2E] hover:bg-[#FFBE91]/10">
+                    <Button variant="ghost" className="text-[#1A1A2E] hover:text-[#FFBE91] hover:bg-transparent">
+                      <User size={16} className="mr-1.5" />
                       Dashboard
                     </Button>
                   </Link>
@@ -125,28 +127,21 @@ const LandingNavbar = () => {
                   </button>
                 </>
               ) : (
-                <>
-                  <button
-                    onClick={() => navigate('/auth')}
-                    className="text-sm text-[#1A1A2E] hover:text-[#FFBE91] transition-colors"
-                  >
-                    Login
-                  </button>
-                  <Button 
-                    onClick={() => navigate('/auth')}
-                    className="bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E]"
-                  >
-                    Sign Up
-                  </Button>
-                </>
+                <button
+                  onClick={() => navigate('/auth')}
+                  className="flex items-center gap-1.5 text-sm text-[#1A1A2E] hover:text-[#FFBE91] transition-colors"
+                >
+                  <LogIn size={16} />
+                  Login
+                </button>
               )}
             </div>
 
             <button
-              className="md:hidden text-[#1A1A2E] text-2xl"
+              className="md:hidden text-[#1A1A2E]"
               onClick={() => setIsOpen(!isOpen)}
             >
-              {isOpen ? '✕' : '☰'}
+              {isOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
 
@@ -157,7 +152,7 @@ const LandingNavbar = () => {
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.3 }}
-                className="md:hidden bg-white/95 backdrop-blur-md border-b border-[#FFDDB0]/30"
+                className="md:hidden bg-white/95 backdrop-blur-md"
               >
                 <div className="px-4 py-6 flex flex-col gap-4">
                   <a href="/" onClick={scrollToTop} className="text-[#1A1A2E] hover:text-[#FFBE91]">
@@ -175,23 +170,20 @@ const LandingNavbar = () => {
                   {isAuthenticated ? (
                     <>
                       <Link to={user?.role === 'buyer' ? '/buyer/dashboard' : '/shop/dashboard'}>
-                        <Button variant="outline" className="w-full border-[#FFBE91] text-[#1A1A2E] hover:bg-[#FFBE91]/10">
+                        <Button variant="ghost" className="w-full justify-start text-[#1A1A2E] hover:text-[#FFBE91] hover:bg-transparent px-0">
+                          <User size={16} className="mr-2" />
                           Dashboard
                         </Button>
                       </Link>
-                      <button onClick={handleLogout} className="text-[#1A1A2E] hover:text-[#FFBE91]">
+                      <button onClick={handleLogout} className="text-[#1A1A2E] hover:text-[#FFBE91] text-left">
                         Logout
                       </button>
                     </>
                   ) : (
-                    <>
-                      <button onClick={() => navigate('/auth')} className="w-full text-[#1A1A2E] hover:text-[#FFBE91]">
-                        Login
-                      </button>
-                      <Button onClick={() => navigate('/auth')} className="w-full bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E]">
-                        Sign Up
-                      </Button>
-                    </>
+                    <button onClick={() => navigate('/auth')} className="flex items-center gap-2 text-[#1A1A2E] hover:text-[#FFBE91] transition-colors">
+                      <LogIn size={16} />
+                      Login
+                    </button>
                   )}
                 </div>
               </motion.div>

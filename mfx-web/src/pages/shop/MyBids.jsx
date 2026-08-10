@@ -1,6 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
+import { Button } from '@/components/ui/button';
+import { 
+  ArrowLeft, 
+  Package, 
+  Search,
+  Edit, 
+  Trash2, 
+  CheckCircle, 
+  XCircle, 
+  Clock,
+  Eye,
+  ChevronRight,
+  DollarSign,
+  FileText,
+  Calendar,
+  Store,
+  AlertCircle,
+  Pencil,
+  Save,
+  Loader2
+} from 'lucide-react';
 import api from '../../api/client';
 
 const MyBids = () => {
@@ -57,12 +79,12 @@ const MyBids = () => {
       };
       
       await api.patch(`/bids/${bidId}`, payload);
-      alert('✅ Bid updated successfully!');
+      alert('Bid updated successfully');
       
       setEditing(null);
       fetchMyBids();
     } catch (err) {
-      alert('❌ Failed to update bid: ' + (err.response?.data?.detail || 'Unknown error'));
+      alert('Failed to update bid: ' + (err.response?.data?.detail || 'Unknown error'));
       console.error(err);
     } finally {
       setUpdating(false);
@@ -74,230 +96,320 @@ const MyBids = () => {
     
     try {
       await api.delete(`/bids/${bidId}`);
-      alert('✅ Bid withdrawn successfully');
+      alert('Bid withdrawn successfully');
       fetchMyBids();
     } catch (err) {
-      alert('❌ Failed to delete bid: ' + (err.response?.data?.detail || 'Unknown error'));
+      alert('Failed to delete bid: ' + (err.response?.data?.detail || 'Unknown error'));
       console.error(err);
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusConfig = (status) => {
     switch(status) {
-      case 'pending': return '#ffc107';
-      case 'selected': return '#28a745';
-      case 'rejected': return '#dc3545';
-      default: return '#6c757d';
+      case 'pending': 
+        return { 
+          color: '#D4A000', 
+          bg: 'bg-amber-500/10', 
+          text: 'text-amber-600', 
+          icon: <Clock size={12} />, 
+          label: 'Pending',
+          borderLeft: 'border-l-amber-500'
+        };
+      case 'selected': 
+        return { 
+          color: '#2D7A3A', 
+          bg: 'bg-emerald-500/10', 
+          text: 'text-emerald-600', 
+          icon: <CheckCircle size={12} />, 
+          label: 'Selected',
+          borderLeft: 'border-l-emerald-500'
+        };
+      case 'rejected': 
+        return { 
+          color: '#B33A3A', 
+          bg: 'bg-rose-500/10', 
+          text: 'text-rose-600', 
+          icon: <XCircle size={12} />, 
+          label: 'Rejected',
+          borderLeft: 'border-l-rose-500'
+        };
+      default: 
+        return { 
+          color: '#6c757d', 
+          bg: 'bg-gray-500/10', 
+          text: 'text-gray-600', 
+          icon: <AlertCircle size={12} />, 
+          label: 'Unknown',
+          borderLeft: 'border-l-gray-500'
+        };
     }
   };
 
   const handleBidClick = (bid) => {
-    // Only navigate to detail if bid is selected (to see buyer details)
     if (bid.status === 'selected') {
       navigate(`/shop/bid/${bid.id}`);
     }
-    // For pending bids, stay and allow edit/delete
   };
 
-  if (loading) return <div>Loading...</div>;
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: { staggerChildren: 0.06 }
+    }
+  };
 
-  return (
-    <div style={{ padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1>My Bids</h1>
-        <div>
-          <button
-            onClick={() => navigate('/shop/browse')}
-            style={{
-              marginRight: '10px',
-              padding: '8px 16px',
-              backgroundColor: '#17a2b8',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Browse Requests
-          </button>
-          <button
-            onClick={() => navigate('/shop/dashboard')}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Back to Dashboard
-          </button>
+  const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { duration: 0.3, ease: "easeOut" }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-6 h-6 border-2 border-[#1A1A2E] border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-[#A0A0B0]">Loading...</p>
         </div>
       </div>
+    );
+  }
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      
-      <div>
-        {bids.length === 0 ? (
-          <p>
-            You haven't placed any bids yet. 
-            <button 
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-6"
+        >
+          <div>
+            <h1 className="text-lg font-semibold text-[#1A1A2E] tracking-tight flex items-center gap-2">
+              <span className="w-7 h-7 rounded-lg bg-[#1A1A2E]/5 flex items-center justify-center">
+                <Package size={14} className="text-[#1A1A2E]" />
+              </span>
+              My Bids
+            </h1>
+            <p className="text-xs text-[#A0A0B0] mt-0.5">{bids.length} bids placed</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button 
               onClick={() => navigate('/shop/browse')}
-              style={{ marginLeft: '10px', padding: '4px 12px', cursor: 'pointer' }}
+              className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-3.5 py-1.5 shadow-sm hover:shadow transition-all h-auto"
             >
+              <Search size={13} className="mr-1.5" />
+              Browse
+            </Button>
+            <Button 
+              onClick={() => navigate('/shop/dashboard')}
+              variant="ghost"
+              className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3.5 py-1.5 h-auto"
+            >
+              <ArrowLeft size={13} className="mr-1.5" />
+              Dashboard
+            </Button>
+          </div>
+        </motion.div>
+
+        {error && (
+          <div className="bg-rose-50/80 backdrop-blur-sm rounded-lg p-3 mb-4 text-rose-700 text-xs flex items-center gap-2 border border-rose-100">
+            <AlertCircle size={14} />
+            {error}
+          </div>
+        )}
+        
+        {/* Bids List */}
+        {bids.length === 0 ? (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white/60 backdrop-blur-xl rounded-xl p-8 text-center shadow-lg shadow-[#1A1A2E]/5"
+          >
+            <div className="w-12 h-12 rounded-xl bg-[#F5F3EF] flex items-center justify-center mx-auto mb-3">
+              <Package size={20} className="text-[#A0A0B0]" />
+            </div>
+            <h3 className="text-sm font-medium text-[#1A1A2E]">No bids yet</h3>
+            <p className="text-xs text-[#A0A0B0] mt-1">Start bidding on requests to see them here</p>
+            <Button 
+              onClick={() => navigate('/shop/browse')}
+              className="mt-3 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-5 py-1.5 h-auto"
+            >
+              <Search size={13} className="mr-1.5" />
               Browse Requests
-            </button>
-          </p>
+            </Button>
+          </motion.div>
         ) : (
-          bids.map((bid) => (
-            <div 
-              key={bid.id} 
-              style={{ 
-                border: '1px solid #ccc', 
-                padding: '15px', 
-                margin: '10px 0', 
-                borderRadius: '4px',
-                borderLeft: `5px solid ${getStatusColor(bid.status)}`,
-                cursor: bid.status === 'selected' ? 'pointer' : 'default',
-                transition: 'box-shadow 0.2s'
-              }}
-              onClick={() => handleBidClick(bid)}
-              onMouseEnter={(e) => {
-                if (bid.status === 'selected') {
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              {editing === bid.id ? (
-                // Edit mode
-                <div onClick={(e) => e.stopPropagation()}>
-                  <h4>Edit Bid</h4>
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <div>
-                      <label style={{ display: 'block' }}>Price (₹)</label>
-                      <input
-                        type="number"
-                        name="price"
-                        value={editData.price}
-                        onChange={handleEditChange}
-                        style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', width: '150px' }}
-                      />
+          <motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="space-y-3"
+          >
+            {bids.map((bid) => {
+              const status = getStatusConfig(bid.status);
+              const isEditing = editing === bid.id;
+              const isSelected = bid.status === 'selected';
+              const isPending = bid.status === 'pending';
+              
+              return (
+                <motion.div
+                  key={bid.id}
+                  variants={itemVariants}
+                  onClick={() => handleBidClick(bid)}
+                  className={`
+                    group relative bg-white/80 backdrop-blur-xl rounded-xl p-4
+                    shadow-sm shadow-[#1A1A2E]/5 hover:shadow-md hover:shadow-[#1A1A2E]/10
+                    transition-all duration-300 cursor-pointer
+                    border-l-3 ${status.borderLeft}
+                    ${isSelected ? 'hover:-translate-y-0.5' : ''}
+                  `}
+                >
+                  {/* Subtle Glow */}
+                  <div className={`absolute inset-0 ${status.bg} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-xl`} />
+
+                  {isEditing ? (
+                    // Edit Mode
+                    <div className="relative z-10" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center">
+                          <Pencil size={12} className="text-amber-600" />
+                        </div>
+                        <h4 className="text-xs font-medium text-[#1A1A2E]">Edit Bid</h4>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-[10px] font-medium text-[#A0A0B0] mb-1">Price (₹)</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0] text-xs">₹</span>
+                            <input
+                              type="number"
+                              name="price"
+                              value={editData.price}
+                              onChange={handleEditChange}
+                              className="w-full pl-7 pr-3 py-1.5 text-xs bg-white/80 backdrop-blur-sm border-0 rounded-lg shadow-[inset_0_1px_3px_rgba(0,0,0,0.04)] focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-[#A0A0B0] mb-1">Note</label>
+                          <input
+                            type="text"
+                            name="note"
+                            value={editData.note}
+                            onChange={handleEditChange}
+                            className="w-full px-3 py-1.5 text-xs bg-white/80 backdrop-blur-sm border-0 rounded-lg shadow-[inset_0_1px_3px_rgba(0,0,0,0.04)] focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all"
+                            placeholder="Optional"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => handleUpdateBid(bid.id)}
+                          disabled={updating}
+                          className="px-4 py-1.5 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-50 shadow-sm hover:shadow"
+                        >
+                          {updating ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                          {updating ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => setEditing(null)}
+                          className="px-4 py-1.5 bg-[#F5F3EF] hover:bg-[#EEECE6] text-[#1A1A2E] text-xs rounded-lg transition-all"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block' }}>Note</label>
-                      <input
-                        type="text"
-                        name="note"
-                        value={editData.note}
-                        onChange={handleEditChange}
-                        style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', width: '100%' }}
-                      />
-                    </div>
-                  </div>
-                  <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
-                    <button
-                      onClick={() => handleUpdateBid(bid.id)}
-                      disabled={updating}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#28a745',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {updating ? 'Updating...' : 'Save Changes'}
-                    </button>
-                    <button
-                      onClick={() => setEditing(null)}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#6c757d',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                // View mode
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{ margin: '0 0 5px 0' }}>
-                        {bid.requests?.item_name || 'Unknown Request'}
-                        {bid.status === 'selected' && (
-                          <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#28a745', marginLeft: '10px' }}>
-                            🎉 Click to view buyer details
-                          </span>
-                        )}
-                      </h3>
-                      <p><strong>Price:</strong> ₹{bid.price}</p>
-                      <p><strong>Note:</strong> {bid.note || 'No note'}</p>
-                      <p><strong>Status:</strong> <strong style={{ color: getStatusColor(bid.status) }}>{bid.status.toUpperCase()}</strong></p>
-                      <p><strong>Placed:</strong> {new Date(bid.created_at).toLocaleString()}</p>
-                      {bid.requests && (
-                        <p><strong>Item:</strong> {bid.requests.item_name}</p>
+                  ) : (
+                    // View Mode
+                    <div className="relative z-10">
+                      <div className="flex flex-wrap justify-between items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                            <h3 className="text-sm font-medium text-[#1A1A2E] truncate">
+                              {bid.requests?.item_name || 'Unknown Request'}
+                            </h3>
+                            <span className={`
+                              inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium
+                              ${status.bg} ${status.text}
+                            `}>
+                              {status.icon}
+                              {status.label}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-[#A0A0B0]">
+                            <span className="flex items-center gap-1 font-medium text-[#1A1A2E]">
+                              <DollarSign size={12} className="text-[#A0A0B0]" />
+                              ₹{bid.price}
+                            </span>
+                            {bid.note && (
+                              <span className="flex items-center gap-1">
+                                <FileText size={11} />
+                                {bid.note}
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1">
+                              <Calendar size={11} />
+                              {new Date(bid.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {bid.requests && (
+                            <p className="text-[10px] text-[#A0A0B0] mt-1 flex items-center gap-1">
+                              <Store size={11} />
+                              Request #{bid.requests.id?.slice(0, 8)}...
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {isPending && (
+                            <>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleEditClick(bid); }}
+                                className="p-1.5 rounded-lg hover:bg-[#F5F3EF] text-[#A0A0B0] hover:text-[#1A1A2E] transition-all"
+                                title="Edit bid"
+                              >
+                                <Edit size={13} />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteBid(bid.id); }}
+                                className="p-1.5 rounded-lg hover:bg-rose-50 text-[#A0A0B0] hover:text-rose-500 transition-all"
+                                title="Withdraw bid"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </>
+                          )}
+                          {isSelected && (
+                            <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-700 rounded-lg text-[10px] font-medium transition-all group-hover:bg-emerald-500/15">
+                              <Eye size={12} />
+                              View
+                              <ChevronRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Progress indicator for pending */}
+                      {isPending && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="flex-1 h-0.5 bg-[#F5F3EF] rounded-full overflow-hidden">
+                            <div className="h-full w-1/3 bg-amber-400 rounded-full animate-pulse" />
+                          </div>
+                          <span className="text-[9px] text-[#A0A0B0]">Awaiting</span>
+                        </div>
                       )}
                     </div>
-                    {bid.status === 'pending' && (
-                      <div style={{ display: 'flex', gap: '10px' }} onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => handleEditClick(bid)}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#ffc107',
-                            color: 'black',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteBid(bid.id)}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#dc3545',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Withdraw
-                        </button>
-                      </div>
-                    )}
-                    {bid.status === 'selected' && (
-                      <div style={{ alignSelf: 'center' }}>
-                        <span style={{
-                          padding: '6px 12px',
-                          backgroundColor: '#28a745',
-                          color: 'white',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          fontWeight: 'bold'
-                        }}>
-                          ✅ View Details
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))
+                  )}
+                </motion.div>
+              );
+            })}
+          </motion.div>
         )}
       </div>
     </div>

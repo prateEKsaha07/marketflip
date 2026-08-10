@@ -7,7 +7,8 @@ import {
   Shield, 
   Clock, 
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -58,24 +59,30 @@ const features = [
 
 const Features = () => {
   return (
-    <section id="features" className="relative py-20 px-4 overflow-hidden">
+    <section id="features" className="relative py-12 md:py-16 px-4 overflow-hidden">
       {/* Section Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#FFFCE1] via-white/80 to-[#FFFCE1]" />
       
-      <div className="relative z-10 max-w-6xl mx-auto">
+      <div className="relative z-10 max-w-5xl mx-auto">
         {/* Section Header */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 15 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true, margin: "-100px" }}
-          className="text-center mb-16"
+          transition={{ duration: 0.4 }}
+          viewport={{ once: true, margin: "-60px" }}
+          className="text-center mb-8"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 mb-4 bg-[#FFBE91]/10 rounded-full border border-[#FFBE91]/20">
-            <span className="text-sm font-medium text-[#FFBE91]">✨ Features</span>
-          </div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1, duration: 0.3 }}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-3 bg-[#FFBE91]/10 rounded-full border border-[#FFBE91]/20"
+          >
+            <Zap size={10} className="text-[#FFBE91]" />
+            <span className="text-[9px] font-medium text-[#FFBE91] tracking-wide uppercase">Features</span>
+          </motion.div>
           
-          <h2 className="text-4xl md:text-5xl font-bold">
+          <h2 className="text-2xl md:text-3xl font-bold leading-tight">
             <span className="text-[#1A1A2E]">Why Choose </span>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFBE91] via-[#FFDDB0] to-[#CFEBFF]">
               MarketFlip
@@ -83,67 +90,80 @@ const Features = () => {
             <span className="text-[#1A1A2E]">?</span>
           </h2>
           
-          <p className="mt-4 text-lg text-[#4A4A5A] max-w-2xl mx-auto">
+          <p className="mt-1.5 text-xs text-[#4A4A5A] max-w-2xl mx-auto">
             Flip the way you shop. Let sellers compete for your business.
           </p>
         </motion.div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {features.map((feature, index) => (
             <motion.div
               key={index}
-              initial={{ opacity: 0, y: 40 }}
+              initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ 
-                duration: 0.6, 
+                duration: 0.4, 
                 delay: feature.delay,
                 ease: "easeOut"
               }}
-              viewport={{ once: true, margin: "-50px" }}
+              viewport={{ once: true, margin: "-30px" }}
               whileHover={{ 
-                y: -8,
-                transition: { type: 'spring', stiffness: 300 }
+                y: -4,
+                transition: { type: 'spring', stiffness: 400, damping: 25 }
               }}
-              className="group relative bg-white/60 backdrop-blur-sm p-8 rounded-2xl border border-[#FFDDB0]/50 shadow-sm hover:shadow-xl transition-all duration-300"
+              className="group relative bg-white/60 backdrop-blur-sm p-4 rounded-lg border border-[#EEECE6] shadow-sm hover:shadow-md transition-all duration-300"
             >
               {/* Icon */}
-              <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-5 shadow-md group-hover:scale-110 transition-transform duration-300`}>
-                <feature.icon className="w-7 h-7 text-[#1A1A2E]" strokeWidth={1.5} />
-              </div>
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                whileInView={{ scale: 1, opacity: 1 }}
+                transition={{ delay: feature.delay + 0.1, duration: 0.3 }}
+                className={`w-9 h-9 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform duration-300`}
+              >
+                <feature.icon className="w-4.5 h-4.5 text-[#1A1A2E]" strokeWidth={1.5} />
+              </motion.div>
 
               {/* Content */}
-              <h3 className="text-xl font-semibold text-[#1A1A2E] mb-3">
+              <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1.5">
                 {feature.title}
               </h3>
-              <p className="text-[#4A4A5A] leading-relaxed">
+              <p className="text-xs text-[#4A4A5A] leading-relaxed">
                 {feature.description}
               </p>
 
               {/* Hover Indicator */}
-              <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <div className="w-8 h-8 rounded-full bg-[#FFBE91]/10 flex items-center justify-center">
-                  <ArrowRight className="w-4 h-4 text-[#FFBE91]" />
+              <motion.div 
+                initial={{ opacity: 0, x: -4 }}
+                whileHover={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.25 }}
+                className="absolute bottom-3 right-3"
+              >
+                <div className="w-6 h-6 rounded-full bg-[#F5F3EF] flex items-center justify-center group-hover:bg-[#FFBE91]/10 transition-colors">
+                  <ArrowRight className="w-3 h-3 text-[#A0A0B0] group-hover:text-[#FFBE91] transition-colors" />
                 </div>
-              </div>
+              </motion.div>
+
+              {/* Subtle glow on hover */}
+              <div className={`absolute inset-0 rounded-lg bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none`} />
             </motion.div>
           ))}
         </div>
 
         {/* Bottom CTA */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 15 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
+          transition={{ duration: 0.4, delay: 0.5 }}
           viewport={{ once: true }}
-          className="text-center mt-16"
+          className="text-center mt-8"
         >
-          <p className="text-[#4A4A5A] mb-4">
+          <p className="text-xs text-[#4A4A5A] mb-2.5">
             Ready to flip how you buy?
           </p>
-          <Button className="bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E] px-8 py-6 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all group">
+          <Button className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white px-5 py-3.5 text-xs font-medium rounded-lg shadow-md hover:shadow-lg transition-all group">
             Get Started
-            <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight className="ml-1.5 w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
           </Button>
         </motion.div>
       </div>

@@ -1,6 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
+import { Button } from '@/components/ui/button';
+import { 
+  Plus, 
+  Package, 
+  Clock, 
+  Trash2, 
+  LogOut,
+  ShoppingBag,
+  Eye,
+  ArrowUpRight,
+  TrendingUp,
+  Calendar,
+  Sparkles,
+  Zap
+} from 'lucide-react';
 import api from '../../api/client';
 
 const Dashboard = () => {
@@ -54,227 +70,365 @@ const Dashboard = () => {
   };
 
   const tabs = [
-    { id: 'open', label: 'Open', icon: '📋', count: counts.open },
-    { id: 'expired', label: 'Expired', icon: '⏰', count: counts.expired },
-    { id: 'deleted', label: 'Deleted', icon: '🗑️', count: counts.deleted },
+    { id: 'open', label: 'Open', icon: <ShoppingBag size={14} />, count: counts.open },
+    { id: 'expired', label: 'Expired', icon: <Clock size={14} />, count: counts.expired },
+    { id: 'deleted', label: 'Deleted', icon: <Trash2 size={14} />, count: counts.deleted },
   ];
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
-  if (loading) return <div>Loading...</div>;
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'open': return { bg: 'bg-emerald-50', border: 'border-emerald-400', text: 'text-emerald-700', dot: 'bg-emerald-400', glow: 'shadow-emerald-100' };
+      case 'expired': return { bg: 'bg-rose-50', border: 'border-rose-400', text: 'text-rose-700', dot: 'bg-rose-400', glow: 'shadow-rose-100' };
+      case 'deleted': return { bg: 'bg-gray-50', border: 'border-gray-400', text: 'text-gray-700', dot: 'bg-gray-400', glow: 'shadow-gray-100' };
+      default: return { bg: 'bg-gray-50', border: 'border-gray-400', text: 'text-gray-700', dot: 'bg-gray-400', glow: 'shadow-gray-100' };
+    }
+  };
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: { staggerChildren: 0.05 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20, scale: 0.95 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      scale: 1,
+      transition: { type: "spring", stiffness: 300, damping: 25 }
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 0.9,
+      transition: { duration: 0.2 }
+    }
+  };
+
+  const tabVariants = {
+    inactive: { opacity: 0.6, scale: 0.95 },
+    active: { opacity: 1, scale: 1 }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FFFCE1]">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center gap-4"
+        >
+          <motion.div 
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="w-10 h-10 border-4 border-[#FFBE91] border-t-transparent rounded-full"
+          />
+          <motion.p 
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="text-[#FFBE91] font-medium"
+          >
+            Loading your requests...
+          </motion.p>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginBottom: '20px',
-        flexWrap: 'wrap',
-        gap: '10px'
-      }}>
-        <h1>Buyer Dashboard</h1>
-        <div>
-          <button 
-            onClick={() => navigate('/buyer/post-request')}
-            style={{ 
-              marginRight: '10px', 
-              padding: '8px 16px', 
-              backgroundColor: '#28a745', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '4px', 
-              cursor: 'pointer' 
-            }}
+    <div className="min-h-screen bg-gradient-to-br from-[#FFFCE1] via-[#FFDDB0]/5 to-[#CFEBFF]/5 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-6"
+        >
+          <div>
+            <motion.h1 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-2xl md:text-3xl font-bold text-[#1A1A2E] flex items-center gap-2"
+            >
+              Your Requests
+              <motion.span
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+              >
+                <Sparkles size={16} className="text-[#FFBE91]" />
+              </motion.span>
+            </motion.h1>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-xs text-[#4A4A5A]"
+            >
+              {counts.open} active · {counts.expired} expired · {counts.deleted} deleted
+            </motion.p>
+          </div>
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            className="flex flex-wrap gap-2"
           >
-            + Post Request
-          </button>
-          <button 
-            onClick={() => navigate('/buyer/purchases')}
-            style={{ 
-              marginRight: '10px', 
-              padding: '8px 16px', 
-              backgroundColor: '#17a2b8', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '4px', 
-              cursor: 'pointer' 
-            }}
-          >
-            📦 My Purchases
-          </button>
-          <button 
-            onClick={handleLogout} 
-            style={{ 
-              padding: '8px 16px', 
-              backgroundColor: '#dc3545', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '4px', 
-              cursor: 'pointer' 
-            }}
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-
-      <div style={{ 
-        backgroundColor: '#f8f9fa', 
-        padding: '15px', 
-        borderRadius: '4px', 
-        marginBottom: '20px' 
-      }}>
-        <p><strong>User ID:</strong> {user?.user_id}</p>
-        <p><strong>Role:</strong> {user?.role}</p>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '10px', 
-        marginBottom: '20px',
-        borderBottom: '1px solid #dee2e6',
-        flexWrap: 'wrap'
-      }}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: activeTab === tab.id ? '#007bff' : 'transparent',
-              color: activeTab === tab.id ? 'white' : '#495057',
-              border: 'none',
-              borderBottom: activeTab === tab.id ? '3px solid #007bff' : '3px solid transparent',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: activeTab === tab.id ? 'bold' : 'normal',
-              borderRadius: '4px 4px 0 0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            {tab.icon} {tab.label} ({tab.count})
-          </button>
-        ))}
-      </div>
-
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      
-      <div>
-        {filteredRequests.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#6c757d', padding: '40px 0' }}>
-            No {activeTab} requests found.
-            {activeTab === 'open' && (
-              <button 
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}>
+              <Button 
                 onClick={() => navigate('/buyer/post-request')}
-                style={{ marginLeft: '10px', padding: '4px 12px', cursor: 'pointer' }}
+                className="bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E] shadow-lg hover:shadow-xl transition-all text-sm px-4 py-2"
               >
-                Post your first request!
-              </button>
-            )}
-          </p>
-        ) : (
-          filteredRequests.map((req) => {
-            const isDeleted = req.status === 'deleted';
-            const isExpired = req.status === 'expired';
-            const bidCount = req.bid_count || 0;
-            
-            return (
-              <div 
-                key={req.id} 
-                style={{ 
-                  border: `1px solid ${isDeleted ? '#6c757d' : isExpired ? '#dc3545' : '#e0e0e0'}`,
-                  padding: '15px', 
-                  margin: '10px 0', 
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  transition: 'box-shadow 0.2s',
-                  backgroundColor: isDeleted ? '#f8f9fa' : isExpired ? '#fff5f5' : 'white'
-                }}
-                onClick={() => navigate(`/buyer/request/${req.id}`)}
-                onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'}
-                onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
+                <Plus size={16} className="mr-1.5" />
+                New Request
+              </Button>
+            </motion.div>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}>
+              <Button 
+                onClick={() => navigate('/buyer/purchases')}
+                variant="outline"
+                className="border-[#CFEBFF] text-[#1A1A2E] hover:bg-[#CFEBFF]/20 hover:border-[#CFEBFF] text-sm px-4 py-2"
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <h3 style={{ margin: '0 5px 0 0' }}>{req.item_name}</h3>
-                    <span style={{ 
-                      backgroundColor: isDeleted ? '#6c757d' : isExpired ? '#dc3545' : '#28a745',
-                      color: 'white',
-                      padding: '4px 12px',
-                      borderRadius: '20px',
-                      fontSize: '12px',
-                      fontWeight: 'bold'
-                    }}>
-                      {req.status.toUpperCase()}
-                    </span>
-                    {/* ✅ Bid Count Badge */}
-                    {bidCount > 0 && (
-                      <span style={{
-                        marginLeft: '10px',
-                        padding: '2px 10px',
-                        backgroundColor: '#e9ecef',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        color: '#495057',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        💬 {bidCount} bid{bidCount !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <p style={{ margin: '5px 0', color: '#666' }}>{req.description || 'No description'}</p>
-                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '14px' }}>
-                  <span>💰 ₹{req.budget_min} - ₹{req.budget_max}</span>
-                  <span>📍 {req.pincode}</span>
-                  <span>📂 {req.category}</span>
-                  <span>📅 {new Date(req.created_at).toLocaleDateString()}</span>
-                </div>
+                <Package size={16} className="mr-1.5" />
+                My Purchases
+              </Button>
+            </motion.div>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}>
+              <Button 
+                onClick={handleLogout}
+                variant="ghost"
+                className="text-[#4A4A5A] hover:text-rose-500 hover:bg-rose-50 text-sm px-3 py-2"
+              >
+                <LogOut size={16} />
+              </Button>
+            </motion.div>
+          </motion.div>
+        </motion.div>
+
+        {/* Tabs */}
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="flex flex-wrap gap-1 mb-6 bg-white/60 backdrop-blur-sm p-1 rounded-xl border border-[#FFDDB0]/50"
+        >
+          {tabs.map((tab) => (
+            <motion.button
+              key={tab.id}
+              variants={tabVariants}
+              animate={activeTab === tab.id ? 'active' : 'inactive'}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all text-sm font-medium
+                ${activeTab === tab.id 
+                  ? 'bg-[#FFBE91] text-[#1A1A2E] shadow-md' 
+                  : 'text-[#4A4A5A] hover:text-[#1A1A2E] hover:bg-[#FFDDB0]/30'
+                }
+              `}
+            >
+              {tab.icon}
+              {tab.label}
+              <motion.span 
+                key={tab.count}
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                className={`
+                  ml-1 px-2 py-0.5 rounded-full text-[10px]
+                  ${activeTab === tab.id 
+                    ? 'bg-[#1A1A2E]/10 text-[#1A1A2E]' 
+                    : 'bg-[#FFDDB0]/30 text-[#4A4A5A]'
+                  }
+                `}
+              >
+                {tab.count}
+              </motion.span>
+            </motion.button>
+          ))}
+        </motion.div>
+
+        <AnimatePresence mode="wait">
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="bg-rose-50 border border-rose-200 text-rose-600 px-4 py-3 rounded-xl mb-4 text-sm"
+            >
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
+        {/* Request Cards */}
+        <AnimatePresence mode="wait">
+          {filteredRequests.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white/60 backdrop-blur-sm rounded-2xl border border-[#FFDDB0]/50 p-8 md:p-12 text-center"
+            >
+              <motion.div 
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                className="text-4xl mb-3"
+              >
+                📭
+              </motion.div>
+              <p className="text-[#4A4A5A] text-base">No {activeTab} requests found.</p>
+              {activeTab === 'open' && (
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}>
+                  <Button 
+                    onClick={() => navigate('/buyer/post-request')}
+                    className="mt-3 bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E] text-sm"
+                  >
+                    <Plus size={16} className="mr-1.5" />
+                    Post your first request
+                  </Button>
+                </motion.div>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+            >
+              {filteredRequests.map((req, index) => {
+                const isDeleted = req.status === 'deleted';
+                const isExpired = req.status === 'expired';
+                const isOpen = req.status === 'open';
+                const statusStyle = getStatusColor(req.status);
+                const bidCount = req.bid_count || 0;
                 
-                {isExpired && (
-                  <div style={{
-                    marginTop: '10px',
-                    padding: '10px',
-                    backgroundColor: '#f8d7da',
-                    borderRadius: '4px',
-                    border: '1px solid #dc3545'
-                  }}>
-                    <p style={{ margin: '0', fontSize: '14px', color: '#721c24' }}>
-                      ⏰ This request has expired
-                    </p>
-                  </div>
-                )}
-                
-                {isDeleted && (
-                  <div style={{
-                    marginTop: '10px',
-                    padding: '10px',
-                    backgroundColor: '#e9ecef',
-                    borderRadius: '4px',
-                    border: '1px solid #6c757d'
-                  }}>
-                    <p style={{ margin: '0', fontSize: '14px', color: '#495057' }}>
-                      🗑️ This request has been deleted
-                    </p>
-                  </div>
-                )}
-                
-                <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>
-                  Click to view details
-                </p>
-              </div>
-            );
-          })
-        )}
+                return (
+                  <motion.div
+                    key={req.id}
+                    variants={itemVariants}
+                    layoutId={req.id}
+                    whileHover={{ y: -4, transition: { type: "spring", stiffness: 400 } }}
+                    onClick={() => navigate(`/buyer/request/${req.id}`)}
+                    className={`
+                      group relative bg-white rounded-xl border ${statusStyle.border} ${statusStyle.bg}
+                      hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden
+                    `}
+                  >
+                    {/* Top Gradient Bar */}
+                    <motion.div 
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: 1 }}
+                      transition={{ delay: index * 0.03 }}
+                      className={`h-1 w-full ${isOpen ? 'bg-emerald-400' : isExpired ? 'bg-rose-400' : 'bg-gray-400'} origin-left`}
+                    />
+
+                    <div className="p-4">
+                      {/* Header */}
+                      <div className="flex justify-between items-start gap-2 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-base font-semibold text-[#1A1A2E] truncate">
+                            {req.item_name}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            <motion.span 
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ delay: index * 0.03 + 0.1 }}
+                              className={`
+                                inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium
+                                ${statusStyle.text} ${statusStyle.bg} border ${statusStyle.border}
+                              `}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
+                              {req.status.toUpperCase()}
+                            </motion.span>
+                            {isOpen && bidCount > 0 && (
+                              <motion.span 
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: index * 0.03 + 0.15 }}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-amber-50 text-amber-700 border border-amber-200"
+                              >
+                                <TrendingUp size={10} />
+                                {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
+                              </motion.span>
+                            )}
+                          </div>
+                        </div>
+                        <motion.div 
+                          initial={{ opacity: 0 }}
+                          whileHover={{ opacity: 1 }}
+                          className="flex-shrink-0"
+                        >
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-[#4A4A5A] hover:text-[#FFBE91] hover:bg-[#FFBE91]/10 rounded-full h-8 w-8 p-0"
+                          >
+                            <Eye size={14} />
+                          </Button>
+                        </motion.div>
+                      </div>
+
+                      {/* Description */}
+                      <p className="text-[#4A4A5A] text-xs line-clamp-2 mb-2 min-h-[32px]">
+                        {req.description || 'No description provided'}
+                      </p>
+
+                      {/* Budget */}
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-[#1A1A2E] bg-white/60 rounded-lg px-2.5 py-1 mb-2">
+                        <span className="text-[#FFBE91]">₹</span>
+                        <span>{req.budget_min.toLocaleString()}</span>
+                        <span className="text-[#4A4A5A]">—</span>
+                        <span>₹{req.budget_max.toLocaleString()}</span>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="flex justify-between items-center text-[10px] text-[#4A4A5A] pt-2 border-t border-[#FFDDB0]/30">
+                        <div className="flex items-center gap-2">
+                          <span>📍 {req.pincode}</span>
+                          <span className="opacity-50">·</span>
+                          <span>📂 {req.category}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Calendar size={10} />
+                          <span>{new Date(req.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Click Arrow */}
+                    <motion.div 
+                      initial={{ opacity: 0, x: 5 }}
+                      whileHover={{ opacity: 1, x: 0 }}
+                      className="absolute bottom-2 right-2"
+                    >
+                      <ArrowUpRight size={14} className="text-[#FFBE91]" />
+                    </motion.div>
+
+                    {/* Hover Glow Effect */}
+                    <motion.div 
+                      className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                      style={{
+                        background: `radial-gradient(circle at right bottom, rgba(255,190,145,0.05) 0%, transparent 70%)`
+                      }}
+                    />
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

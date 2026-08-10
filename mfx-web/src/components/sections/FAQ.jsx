@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, HelpCircle, Sparkles } from 'lucide-react';
 
 const faqs = [
   {
@@ -29,40 +29,44 @@ const faqs = [
   },
 ];
 
-const FAQItem = ({ question, answer, isOpen, onClick }) => {
+const FAQItem = ({ question, answer, isOpen, onClick, index }) => {
   return (
     <motion.div
-      className="border-b border-[#FFDDB0] last:border-0"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
+      className="border-b border-[#EEECE6] last:border-0"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: index * 0.05 }}
     >
       <button
         onClick={onClick}
-        className="w-full py-5 flex items-center justify-between text-left group"
+        className="w-full py-3.5 flex items-center justify-between text-left group"
       >
-        <span className="text-[#1A1A2E] font-medium group-hover:text-[#FFBE91] transition-colors">
+        <span className="text-sm font-medium text-[#1A1A2E] group-hover:text-[#FFBE91] transition-colors pr-4">
           {question}
         </span>
         <motion.div
           animate={{ rotate: isOpen ? 180 : 0 }}
-          transition={{ duration: 0.3 }}
-          className={`w-8 h-8 rounded-full flex items-center justify-center ${isOpen ? 'bg-[#FFBE91]/20' : 'bg-[#FFDDB0]/20'} group-hover:bg-[#FFBE91]/30 transition-colors`}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+            isOpen 
+              ? 'bg-[#FFBE91]/20 text-[#FFBE91]' 
+              : 'bg-[#F8F6F0] text-[#A0A0B0] group-hover:bg-[#F5F3EF]'
+          }`}
         >
-          <ChevronDown className={`w-5 h-5 ${isOpen ? 'text-[#FFBE91]' : 'text-[#4A4A5A]'}`} />
+          <ChevronDown className="w-4 h-4" />
         </motion.div>
       </button>
       
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {isOpen && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <p className="pb-5 text-[#4A4A5A] leading-relaxed">
+            <p className="pb-4 text-sm text-[#4A4A5A] leading-relaxed max-w-3xl">
               {answer}
             </p>
           </motion.div>
@@ -79,52 +83,85 @@ const FAQ = () => {
     setOpenIndex(openIndex === index ? null : index);
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { 
+        duration: 0.4,
+        ease: "easeOut",
+        staggerChildren: 0.06,
+      }
+    }
+  };
+
   return (
-    <section className="relative py-20 px-4 overflow-hidden">
+    <section className="relative py-16 md:py-20 px-4 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-[#FFFCE1] via-white/80 to-[#FFFCE1]" />
       
       <div className="relative z-10 max-w-4xl mx-auto">
         {/* Section Header */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true, margin: "-100px" }}
-          className="text-center mb-12"
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          viewport={{ once: true, margin: "-60px" }}
+          className="text-center mb-10"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 mb-4 bg-[#CFEBFF]/20 rounded-full border border-[#CFEBFF]/30">
-            <span className="text-sm font-medium text-[#1A1A2E]">❓ FAQ</span>
-          </div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1, duration: 0.3 }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 mb-4 bg-[#CFEBFF]/20 rounded-full border border-[#CFEBFF]/30"
+          >
+            <HelpCircle size={12} className="text-[#1A1A2E]" />
+            <span className="text-[10px] font-medium text-[#1A1A2E] tracking-wide uppercase">FAQ</span>
+          </motion.div>
           
-          <h2 className="text-4xl md:text-5xl font-bold">
+          <h2 className="text-3xl md:text-4xl font-bold leading-tight">
             <span className="text-[#1A1A2E]">Frequently Asked </span>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFBE91] via-[#FFDDB0] to-[#CFEBFF]">
               Questions
             </span>
           </h2>
           
-          <p className="mt-4 text-lg text-[#4A4A5A] max-w-2xl mx-auto">
+          <p className="mt-2 text-sm text-[#4A4A5A] max-w-2xl mx-auto">
             Everything you need to know about MarketFlip.
           </p>
         </motion.div>
 
         {/* FAQ List */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          viewport={{ once: true }}
-          className="bg-white/60 backdrop-blur-sm rounded-2xl border border-[#FFDDB0]/50 p-6 shadow-sm"
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-30px" }}
+          className="bg-white/70 backdrop-blur-sm rounded-xl border border-[#EEECE6] p-4 md:p-6 shadow-sm"
         >
           {faqs.map((faq, index) => (
             <FAQItem
               key={index}
+              index={index}
               question={faq.question}
               answer={faq.answer}
               isOpen={openIndex === index}
               onClick={() => toggleFAQ(index)}
             />
           ))}
+        </motion.div>
+
+        {/* Bottom CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.3 }}
+          viewport={{ once: true }}
+          className="text-center mt-8"
+        >
+          <p className="text-xs text-[#4A4A5A]">
+            Still have questions? <span className="text-[#FFBE91] font-medium">Contact us</span>
+          </p>
         </motion.div>
       </div>
     </section>

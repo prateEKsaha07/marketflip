@@ -5,7 +5,8 @@ import {
   Users, 
   TrendingUp, 
   Shield,
-  ArrowRight
+  ArrowRight,
+  ListChecks
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -46,96 +47,103 @@ const steps = [
 
 const HowItWorks = () => {
   return (
-    <section id="how-it-works" className="relative py-20 px-4 overflow-hidden">
+    <section id="how-it-works" className="relative py-16 md:py-20 px-4 overflow-hidden">
       {/* Section Background */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#FFFCE1] via-white/80 to-[#FFFCE1]" />
       
       <div className="relative z-10 max-w-6xl mx-auto">
         {/* Section Header */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true, margin: "-100px" }}
-          className="text-center mb-16"
+          transition={{ duration: 0.5 }}
+          viewport={{ once: true, margin: "-80px" }}
+          className="text-center mb-12"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 mb-4 bg-[#CFEBFF]/20 rounded-full border border-[#CFEBFF]/30">
-            <span className="text-sm font-medium text-[#1A1A2E]">📋 How It Works</span>
-          </div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 mb-4 bg-[#CFEBFF]/20 rounded-full border border-[#CFEBFF]/30"
+          >
+            <ListChecks size={12} className="text-[#1A1A2E]" />
+            <span className="text-[10px] font-medium text-[#1A1A2E] tracking-wide uppercase">How It Works</span>
+          </motion.div>
           
-          <h2 className="text-4xl md:text-5xl font-bold">
+          <h2 className="text-3xl md:text-4xl font-bold leading-tight">
             <span className="text-[#1A1A2E]">Get Started in </span>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFBE91] via-[#FFDDB0] to-[#CFEBFF]">
               4 Simple Steps
             </span>
           </h2>
           
-          <p className="mt-4 text-lg text-[#4A4A5A] max-w-2xl mx-auto">
+          <p className="mt-2 text-sm text-[#4A4A5A] max-w-2xl mx-auto">
             From posting a request to completing the deal — it's that easy.
           </p>
         </motion.div>
 
         {/* Steps */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {steps.map((step, index) => (
             <motion.div
               key={index}
-              initial={{ opacity: 0, y: 40 }}
+              initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ 
-                duration: 0.6, 
+                duration: 0.5, 
                 delay: step.delay,
                 ease: "easeOut"
               }}
-              viewport={{ once: true, margin: "-50px" }}
+              viewport={{ once: true, margin: "-40px" }}
               whileHover={{ 
-                y: -8,
-                transition: { type: 'spring', stiffness: 300 }
+                y: -6,
+                transition: { type: 'spring', stiffness: 400, damping: 25 }
               }}
-              className="group relative bg-white/60 backdrop-blur-sm p-8 rounded-2xl border border-[#FFDDB0]/50 shadow-sm hover:shadow-xl transition-all duration-300"
+              className="group relative bg-white/60 backdrop-blur-sm p-6 rounded-xl border border-[#EEECE6] shadow-sm hover:shadow-lg transition-all duration-300"
             >
               {/* Step Number */}
-              <div className="text-5xl font-bold text-[#FFBE91]/20 group-hover:text-[#FFBE91]/40 transition-colors duration-300 absolute top-4 right-4">
+              <div className="text-4xl font-bold text-[#FFBE91]/20 group-hover:text-[#FFBE91]/40 transition-colors duration-300 absolute top-3 right-4">
                 {step.number}
               </div>
 
               {/* Icon */}
-              <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${step.color} flex items-center justify-center mb-5 shadow-md group-hover:scale-110 transition-transform duration-300`}>
-                <step.icon className="w-7 h-7 text-[#1A1A2E]" strokeWidth={1.5} />
-              </div>
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                whileInView={{ scale: 1, opacity: 1 }}
+                transition={{ delay: step.delay + 0.1, duration: 0.4 }}
+                className={`w-12 h-12 rounded-xl bg-gradient-to-br ${step.color} flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform duration-300`}
+              >
+                <step.icon className="w-6 h-6 text-[#1A1A2E]" strokeWidth={1.5} />
+              </motion.div>
 
               {/* Content */}
-              <h3 className="text-xl font-semibold text-[#1A1A2E] mb-3">
+              <h3 className="text-base font-semibold text-[#1A1A2E] mb-2">
                 {step.title}
               </h3>
-              <p className="text-[#4A4A5A] leading-relaxed">
+              <p className="text-sm text-[#4A4A5A] leading-relaxed">
                 {step.description}
               </p>
 
-              {/* Connector Line (except last) */}
-              {index < steps.length - 1 && (
-                <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2">
-                  <ArrowRight className="w-6 h-6 text-[#FFBE91]/30" />
-                </div>
-              )}
+              {/* Subtle glow on hover */}
+              <div className={`absolute inset-0 rounded-xl bg-gradient-to-br ${step.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none`} />
             </motion.div>
           ))}
         </div>
 
         {/* Bottom CTA */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
           viewport={{ once: true }}
-          className="text-center mt-16"
+          className="text-center mt-12"
         >
-          <p className="text-[#4A4A5A] mb-4">
+          <p className="text-sm text-[#4A4A5A] mb-3">
             Ready to flip how you buy?
           </p>
-          <Button className="bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E] px-8 py-6 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all group">
+          <Button className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white px-6 py-5 text-sm font-medium rounded-xl shadow-lg hover:shadow-xl transition-all group">
             Get Started
-            <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Button>
         </motion.div>
       </div>
