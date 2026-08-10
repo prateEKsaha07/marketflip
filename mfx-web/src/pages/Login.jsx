@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Button } from '@/components/ui/button';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -11,7 +12,7 @@ const Login = () => {
   const navigate = useNavigate();
 
   // Redirect if already authenticated
-  useEffect(() => {
+  React.useEffect(() => {
     if (!authLoading && isAuthenticated) {
       if (user?.role === 'buyer') {
         navigate('/buyer/dashboard');
@@ -21,21 +22,14 @@ const Login = () => {
     }
   }, [authLoading, isAuthenticated, user, navigate]);
 
-  // Show loading while checking auth
   if (authLoading) {
     return (
-      <div style={{ 
-        maxWidth: '400px', 
-        margin: '50px auto', 
-        padding: '20px',
-        textAlign: 'center'
-      }}>
-        <h2>Loading...</h2>
+      <div className="min-h-screen flex items-center justify-center bg-[#0A0A1A]">
+        <div className="animate-pulse text-2xl font-bold text-[#6C63FF]">Loading...</div>
       </div>
     );
   }
 
-  // If already authenticated, don't render login form
   if (isAuthenticated) {
     return null;
   }
@@ -48,7 +42,6 @@ const Login = () => {
     const result = await login(email, password);
 
     if (result.success) {
-      console.log('Login successful!', result.data);
       const role = result.data.role;
       if (role === 'buyer') {
         navigate('/buyer/dashboard');
@@ -57,149 +50,66 @@ const Login = () => {
       }
     } else {
       setError(result.error);
-      console.error('Login error:', result.error);
     }
 
     setLoading(false);
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px' }}>
-      <h2>Login</h2>
-      <p>Test credentials:</p>
-      <ul>
-        <li>Buyer: buyer_test@example.com / TestPass123!</li>
-        <li>Shop: shop_owner@example.com / TestPass123!</li>
-      </ul>
+    <div className="min-h-screen flex items-center justify-center bg-[#0A0A1A] px-4">
+      <div className="max-w-md w-full bg-[#1A1A2E] p-8 rounded-xl border border-[#2A2A4A]">
+        <h2 className="text-3xl font-bold text-center mb-2 text-white">Welcome Back</h2>
+        <p className="text-gray-400 text-center mb-6">Login to your account</p>
 
-      {error && (
-        <div style={{ color: 'red', marginBottom: '10px', padding: '10px', border: '1px solid red', borderRadius: '4px' }}>
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded-lg mb-4 text-sm">
+            {error}
+          </div>
+        )}
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter email"
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px'
-            }}
-            required
-          />
-        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email"
+              className="w-full px-4 py-3 bg-[#0A0A1A] border border-[#2A2A4A] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#6C63FF] transition-colors"
+              required
+            />
+          </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter password"
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px'
-            }}
-            required
-          />
-        </div>
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              className="w-full px-4 py-3 bg-[#0A0A1A] border border-[#2A2A4A] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#6C63FF] transition-colors"
+              required
+            />
+          </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: '100%',
-            padding: '12px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            borderRadius: '4px',
-            fontSize: '16px',
-            fontWeight: 'bold'
-          }}
-        >
-          {loading ? 'Logging in...' : 'Login'}
-        </button>
-      </form>
+          <Button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-[#6C63FF] hover:bg-[#5A52E0] text-white py-3 text-lg"
+          >
+            {loading ? 'Logging in...' : 'Login'}
+          </Button>
+        </form>
 
-      <div style={{ marginTop: '20px', textAlign: 'center' }}>
-        <p>
+        <p className="text-center text-gray-400 mt-6">
           Don't have an account?{' '}
           <button
             onClick={() => navigate('/signup')}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#007bff',
-              cursor: 'pointer',
-              textDecoration: 'underline',
-              fontSize: '14px'
-            }}
+            className="text-[#6C63FF] hover:text-[#5A52E0] transition-colors"
           >
-            Sign up here
+            Sign up
           </button>
         </p>
-      </div>
-
-      {/* Debug Section - Remove in production */}
-      <div style={{ 
-        marginTop: '20px', 
-        padding: '10px', 
-        backgroundColor: '#f0f0f0', 
-        borderRadius: '4px',
-        fontSize: '12px',
-        fontFamily: 'monospace'
-      }}>
-        <p><strong>Debug Info:</strong></p>
-        <p>Auth Status: {isAuthenticated ? '✅ Logged In' : '❌ Not Logged In'}</p>
-        <p>Loading: {authLoading ? '⏳ Checking...' : '✅ Done'}</p>
-        <button
-          onClick={() => {
-            console.log('Current user:', user);
-            console.log('LocalStorage:', {
-              token: localStorage.getItem('access_token'),
-              role: localStorage.getItem('role'),
-              user_id: localStorage.getItem('user_id')
-            });
-          }}
-          style={{ 
-            marginRight: '10px',
-            padding: '4px 12px',
-            cursor: 'pointer'
-          }}
-        >
-          Log User
-        </button>
-        <button
-          onClick={() => {
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('role');
-            localStorage.removeItem('user_id');
-            window.location.reload();
-          }}
-          style={{
-            padding: '4px 12px',
-            cursor: 'pointer',
-            backgroundColor: '#dc3545',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px'
-          }}
-        >
-          Clear Storage
-        </button>
       </div>
     </div>
   );

@@ -1,68 +1,49 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import AnimatedBackground from '../components/backgrounds/AnimatedBackground';
+import LandingNavbar from '../components/LandingNavbar';
+import Hero from '../components/sections/Hero';
+import BentoFeatures from '../components/sections/BentoFeatures';
+import HowItWorks from '../components/sections/HowItWorks';
+import AnimatedTestimonials from '../components/sections/AnimatedTestimonials';
+import FAQ from '../components/sections/FAQ';
+import AboutDev from '../components/sections/AboutDev';
+import Footer from '../components/sections/Footer';
 
 const Landing = () => {
-  const navigate = useNavigate();
   const { isAuthenticated, user, loading } = useAuth();
+  const navigate = useNavigate();
 
-  // Show loading while checking auth
-  if (loading) {
-    return <div style={{ textAlign: 'center', marginTop: '100px' }}>Loading...</div>;
-  }
-
-  // If already logged in, redirect to dashboard
-  if (isAuthenticated) {
-    if (user?.role === 'buyer') {
-      navigate('/buyer/dashboard');
-    } else if (user?.role === 'shop_owner') {
-      navigate('/shop/dashboard');
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      if (user?.role === 'buyer') {
+        navigate('/buyer/dashboard');
+      } else if (user?.role === 'shop_owner') {
+        navigate('/shop/dashboard');
+      }
     }
-    return null;
+  }, [loading, isAuthenticated, user, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FFFCE1]">
+        <div className="animate-pulse text-2xl font-bold text-[#FFBE91]">Loading...</div>
+      </div>
+    );
   }
 
   return (
-    <div style={{ 
-      maxWidth: '800px', 
-      margin: '100px auto', 
-      padding: '40px',
-      textAlign: 'center'
-    }}>
-      <h1 style={{ fontSize: '48px', marginBottom: '10px' }}>MarketFlip</h1>
-      <p style={{ fontSize: '20px', color: '#666', marginBottom: '30px' }}>
-        Find or sell products in your area
-      </p>
-      
-      <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
-        <button
-          onClick={() => navigate('/login')}
-          style={{
-            padding: '12px 40px',
-            fontSize: '16px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Login
-        </button>
-        <button
-          onClick={() => navigate('/signup')}
-          style={{
-            padding: '12px 40px',
-            fontSize: '16px',
-            backgroundColor: '#28a745',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Sign Up
-        </button>
-      </div>
+    <div className="relative min-h-screen bg-[#FFFCE1] overflow-hidden">
+      <AnimatedBackground />
+      <LandingNavbar />
+      <Hero />
+      <BentoFeatures />
+      <HowItWorks />
+      <AnimatedTestimonials />
+      <FAQ />
+      <AboutDev />
+      <Footer />
     </div>
   );
 };
