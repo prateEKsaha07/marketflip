@@ -5,11 +5,11 @@
 |---|---|
 | **Product** | MarketFlip |
 | **Repository** | `mfx-core` (backend) · `mfx-web` (frontend) · `mfx-docs` (documentation) |
-| **Status** | POC Feature Complete — Ready for Deployment |
+| **Status** | POC Complete — Full Flow + Premium UI Redesign |
 | **Category (v1)** | Electronics |
 | **Owner** | Prateek |
-| **Version** | 0.5 |
-| **Last Updated** | August 09, 2026 |
+| **Version** | 1.0 |
+| **Last Updated** | August 11, 2026 |
 
 ---
 
@@ -25,7 +25,7 @@ Buyer posts what they want to buy → Shop owners bid with their price → Buyer
 
 ---
 
-## 2. Core Flow — ✅ COMPLETE (built + tested end-to-end)
+## 2. Core Flow — COMPLETE (built + tested end-to-end)
 
 ### 2.1 User Journey (as built)
 
@@ -62,7 +62,7 @@ stateDiagram-v2
     [*] --> open : buyer posts request
     open --> purchased : buyer selects a bid
     open --> deleted : buyer deletes manually
-    open --> expired : 7 days pass, no action
+    open --> expired : cron, 7 days pass
     purchased --> completed : buyer verifies transaction
     purchased --> [*]
     completed --> [*]
@@ -76,15 +76,15 @@ stateDiagram-v2
 
 | Role | Can do |
 |---|---|
-| **Buyer** | Post request, view own requests (Open/Expired/Deleted tabs), view bids, select a bid, delete a request, My Purchases (Selected → Verification → Completed), set delivery method, verify transaction |
+| **Buyer** | Post request, view own requests (Open/Expired/Deleted tabs), view bids, select a bid, delete a request, edit open request, My Purchases (Selected → Verification → Completed), set delivery method, verify transaction |
 | **Shop Owner** | Register with address, browse open requests, place bid, edit/withdraw pending bid, view own bids with status, view buyer contact on selected bid (BidDetail), view completed transactions, view bid stats (KPI cards) |
 
 ---
 
 ## 4. Screens (as built)
 
-1. `Landing.jsx`
-2. `Login.jsx` / `Signup.jsx`
+1. `Landing.jsx` — Hero, Features, HowItWorks, Testimonials, FAQ, AboutDev, Footer sections
+2. `Auth.jsx` — combined Login/Signup with progressive 3-step signup (email/password → role/shop → contact details)
 3. `buyer/Dashboard.jsx` — tabs: Open, Expired, Deleted
 4. `buyer/PostRequest.jsx`
 5. `buyer/RequestDetail.jsx` — bid list + select action + success card
@@ -96,35 +96,35 @@ stateDiagram-v2
 11. `shop/BidDetail.jsx` — buyer contact, request + delivery details
 12. `shop/CompletedTransactions.jsx` — completed transactions with buyer details
 
-All screens built and functional, including delivery/verify/completed flow end-to-end. No remaining planned screens.
+All screens built and functional, including delivery/verify/completed flow end-to-end, styled with the shadcn/ui + Tailwind + Framer Motion redesign. No remaining planned screens.
 
 ---
 
 ## 5. API Contract (as built)
 
-Base URL: `/api/v1` (or root, per your FastAPI setup)
+Base URL: root (or `/api/v1`, per your FastAPI setup)
 Auth: Bearer token (Supabase JWT) in `Authorization` header for all routes except signup/login.
 
 | Method | Endpoint | Description | Auth | Status |
 |--------|----------|-------------|------|--------|
-| POST | `/auth/signup` | Register user | ❌ | ✅ Built |
-| POST | `/auth/login` | Login user | ❌ | ✅ Built |
-| GET | `/auth/profiles/{id}` | Get user profile | ✅ | ✅ Built |
-| POST | `/requests` | Create request | ✅ Buyer | ✅ Built |
-| GET | `/requests?pincode=&category=&status=` | List requests (supports `status=all`, `completed`) | ✅ All | ✅ Built |
-| GET | `/requests/{id}` | Get request detail + bids | ✅ All | ✅ Built |
-| DELETE | `/requests/{id}` | Soft-delete request | ✅ Buyer | ✅ Built |
-| PATCH | `/requests/{id}` | Update open request (buyer) | ✅ Buyer | ✅ Built |
-| PATCH | `/requests/{id}/delivery` | Update delivery method | ✅ Buyer | ✅ Built |
-| PATCH | `/requests/{id}/verify` | Verify transaction → `completed` | ✅ Buyer | ✅ Built |
-| POST | `/requests/{id}/bids` | Place bid | ✅ Shop | ✅ Built |
-| GET | `/requests/{id}/bids` | Get bids for a request | ✅ All | ✅ Built |
-| GET | `/bids?request_id=` | Get all bids (role-scoped) | ✅ All | ✅ Built |
-| PATCH | `/bids/{id}` | Update pending bid | ✅ Shop | ✅ Built |
-| DELETE | `/bids/{id}` | Withdraw pending bid | ✅ Shop | ✅ Built |
-| PATCH | `/bids/{id}/select` | Select bid, reveal contact | ✅ Buyer | ✅ Built (enhanced) |
-| GET | `/bids/{id}/buyer` | Get buyer details for selected bid | ✅ Shop | ✅ Built |
-| GET | `/bids/stats` | Bid statistics for shop owner | ✅ Shop | ✅ Built |
+| POST | `/auth/signup` | Register user | No | Built |
+| POST | `/auth/login` | Login user | No | Built |
+| GET | `/auth/profiles/{id}` | Get user profile | Yes | Built |
+| POST | `/requests` | Create request | Buyer | Built |
+| GET | `/requests?pincode=&category=&status=` | List requests (supports `status=all`, `completed`) | Any | Built |
+| GET | `/requests/{id}` | Get request detail + bids | Any | Built |
+| DELETE | `/requests/{id}` | Soft-delete request | Buyer | Built |
+| PATCH | `/requests/{id}` | Update open request | Buyer | Built |
+| PATCH | `/requests/{id}/delivery` | Update delivery method | Buyer | Built |
+| PATCH | `/requests/{id}/verify` | Verify transaction → `completed` | Buyer | Built |
+| POST | `/requests/{id}/bids` | Place bid | Shop | Built |
+| GET | `/requests/{id}/bids` | Get bids for a request | Any | Built |
+| GET | `/bids?request_id=` | Get all bids (role-scoped) | Any | Built |
+| PATCH | `/bids/{id}` | Update pending bid | Shop | Built |
+| DELETE | `/bids/{id}` | Withdraw pending bid | Shop | Built |
+| PATCH | `/bids/{id}/select` | Select bid, reveal contact | Buyer | Built (enhanced) |
+| GET | `/bids/{id}/buyer` | Get buyer details for selected bid | Shop | Built |
+| GET | `/bids/stats` | Bid statistics for shop owner | Shop | Built |
 
 ### Sample: `PATCH /bids/{id}/select` (enhanced response, as built)
 ```json
@@ -211,8 +211,8 @@ mfx-core/
 ├── main.py
 ├── config.py
 ├── auth/
-│   ├── routes.py         
-│   └── dependencies.py    
+│   ├── routes.py          # signup, login, profiles/{id}
+│   └── dependencies.py    # get_current_user (JWT + role lookup)
 ├── requests/
 │   ├── routes.py
 │   ├── schemas.py
@@ -222,9 +222,9 @@ mfx-core/
 │   ├── schemas.py
 │   └── service.py
 ├── supabase/
-│   ├── functions
-│   └── expire-requests
-│          └── index.ts
+│   └── functions/
+│       └── expire-requests/
+│           └── index.ts    # Edge Function, daily cron 2 AM
 └── requirements.txt
 ```
 
@@ -233,23 +233,34 @@ mfx-core/
 mfx-web/src/
 ├── api/
 │   └── client.js               # axios instance, Bearer header, 401 handling
+├── components/
+│   ├── ui/                     # shadcn/ui components (button, card, input...)
+│   ├── backgrounds/
+│   │   └── WaveBackground.jsx
+│   ├── sections/                # Hero, Features, HowItWorks, Testimonials, FAQ, AboutDev, Footer
+│   ├── LandingNavbar.jsx
+│   └── Navbar.jsx
 ├── context/
 │   └── AuthContext.jsx         # token/role/user_id, login/logout
 ├── pages/
-│   ├── Landing.jsx
-│   ├── Login.jsx
-│   ├── Signup.jsx
+│   ├── Landing.jsx              (done)
+│   ├── Auth.jsx                 (done - combined login/signup, progressive steps)
 │   ├── buyer/
-│   │   ├── Dashboard.jsx        ✅
-│   │   ├── PostRequest.jsx      ✅
-│   │   ├── RequestDetail.jsx    ✅
-│   │   └── MyPurchases.jsx      ✅
+│   │   ├── Dashboard.jsx        (done)
+│   │   ├── PostRequest.jsx      (done)
+│   │   ├── RequestDetail.jsx    (done)
+│   │   ├── MyPurchases.jsx      (done)
+│   │   └── EditRequest.jsx      (done)
 │   └── shop/
-│       ├── Dashboard.jsx        ✅
-│       ├── BrowseRequests.jsx   ✅
-│       ├── MyBids.jsx           ✅
-│       ├── BidDetail.jsx        ✅
-│       └── CompletedTransactions.jsx ✅
+│       ├── Dashboard.jsx        (done)
+│       ├── BrowseRequests.jsx   (done)
+│       ├── MyBids.jsx           (done)
+│       ├── BidDetail.jsx        (done)
+│       └── CompletedTransactions.jsx (done)
+├── styles/
+│   └── index.css                # Tailwind base + Ubuntu font
+├── lib/
+│   └── utils.js                 # cn() helper
 ├── App.jsx
 └── main.jsx
 ```
@@ -260,43 +271,74 @@ mfx-web/src/
 
 | Layer | Tool | Tier |
 |---|---|---|
-| Frontend | React + Vite → Vercel | Free |
+| Frontend | React 18 + Vite 5 → Vercel | Free |
 | Backend | FastAPI → Render | Free |
 | DB / Auth / Storage | Supabase | Free |
 | Cron | Supabase `pg_cron` + Edge Function (`expire-requests`, daily 2 AM) | Free |
-| Styling | Plain CSS — Tailwind + shadcn/ui + Framer Motion redesign planned | — |
+| Styling | Tailwind CSS + shadcn/ui | Free |
+| Animation | Framer Motion 11 | Free |
+| Icons | Lucide React | Free |
+| Forms | React Hook Form | Free |
+| HTTP | Axios (interceptors for auth token + 401 handling) | Free |
 
 ---
 
-## 9. Known Gaps / Next Steps
+## 9. Design System
 
-Full buyer + shop flow (post → bid → select → deliver → verify → complete) plus auto-expiry, filtering, badges, and edit-request are done. Only visual design/animation upgrade remains.
+### 9.1 Color Palette
 
-| Priority | Task |
-|---|---|
-| 🟢 Low | Tailwind + shadcn/ui + Framer Motion visual redesign |
+| Name | Hex | Usage |
+|---|---|---|
+| Peach | `#FFBE91` | Primary buttons, accents |
+| Cream | `#FFDDB0` | Secondary accents |
+| Soft Blue | `#CFEBFF` | Accent highlights |
+| Light Cream | `#FFFCE1` | Background |
+| Dark | `#1A1A2E` | Text |
+| Background | `#F8F6F0` | Page background |
+| Border | `#EEECE6` | Borders/dividers |
+
+**Status colors:** Pending `#D4A000` · Selected `#2D7A3A` · Rejected `#B33A3A` · Completed `#2A6B9C`
+
+### 9.2 Typography
+Font: Ubuntu (Google Fonts, fallback `-apple-system, sans-serif`). Sizes `text-xs` (12px) through `text-4xl` (36px), weights 300–700.
+
+### 9.3 Design Principles
+Glass-morphism (`backdrop-blur-xl bg-white/80`) · subtle shadows with hover lift · 4px spacing grid · vector icons only (Lucide), no emojis.
+
+### 9.4 Animation Patterns
+Global spring transition (`stiffness: 400, damping: 25`). Staggered card fade-ups, hover scale on buttons, slide-in navbar, accordion height transitions (FAQ), fade-slide page transitions.
+
+### 9.5 Responsive Breakpoints
+`sm` 640px · `md` 768px · `lg` 1024px · `xl` 1280px — mobile-first grid/typography/spacing scaling throughout.
 
 ---
 
-## 10. Explicitly Out of Scope (POC)
+## 10. Known Gaps / Next Steps
+
+Full buyer + shop flow, auto-expiry, filtering, badges, edit-request, and the shadcn/ui + Tailwind + Framer Motion redesign are all complete. No functional or visual gaps remain — POC is deployment-ready.
+
+Next discussion: **deployment**.
+
+---
+
+## 11. Explicitly Out of Scope (POC)
 Payments · In-app chat · Ratings/reviews · Shop verification · Push notifications · Multiple categories
 
 ---
 
-## 11. Risk Assessment
+## 12. Risk Assessment
 
 | Risk | Type | Notes |
 |---|---|---|
-| Scope creep | Process | Transaction-completion flow (delivery/verify) was added after original Core Flow lock — tracked here to keep it from expanding further unchecked. |
+| Scope creep | Process | Transaction-completion flow (delivery/verify) and full redesign were added after original Core Flow lock — tracked to prevent further unchecked expansion pre-deployment. |
 | Chicken-egg problem | Product | No shops → empty requests → buyers leave. Manually onboard 5–10 shops before opening to buyers. |
 | No trust/verification | Product | Buyer can't verify a shop before contact reveal. Acceptable for POC. |
 | Free-tier cold starts | Technical | Render/Supabase free tier sleeps — expect slow first load in demo. |
-| Cron job not yet built | Technical | Expired requests won't auto-transition until this exists. |
 | No training data for ML feature | Data | Price-suggestion model has nothing to learn from until real closed requests exist. |
 
 ---
 
-## 12. Setup Instructions
+## 13. Setup Instructions
 
 ### Backend (`mfx-core`)
 ```bash
@@ -309,22 +351,26 @@ uvicorn main:app --reload
 ### Frontend (`mfx-web`)
 ```bash
 npm install
+npx shadcn-ui@latest init   # if components/ui not already present
 npm run dev
-# api/client.js points to http://127.0.0.1:8000 by default
+# api/client.js / VITE_API_URL points to http://127.0.0.1:8000 by default
 ```
+
+Production build: `npm run build && npm run preview`
 
 ---
 
-## 13. Build Order (final)
-1. ✅ DB schema
-2. ✅ Auth + role redirect
-3. ✅ Landing/Login/Signup
-4. ✅ Post request (buyer)
-5. ✅ Browse + bid (shop owner)
-6. ✅ Review + select bid (buyer)
-7. ✅ Contact reveal
-8. ✅ Delivery + verify + completed status
-9. ✅ Shop-side buyer contact + BidDetail + CompletedTransactions
-10. ✅ Auto-expire cron
-11. ✅ Pincode filter, bid badge, closed message, edit request
-12. ⬜ Tailwind + shadcn/ui + Framer Motion visual redesign
+## 14. Build Order (final)
+1. Done — DB schema
+2. Done — Auth + role redirect
+3. Done — Landing/Auth (login+signup)
+4. Done — Post request (buyer)
+5. Done — Browse + bid (shop owner)
+6. Done — Review + select bid (buyer)
+7. Done — Contact reveal
+8. Done — Delivery + verify + completed status
+9. Done — Shop-side buyer contact + BidDetail + CompletedTransactions
+10. Done — Auto-expire cron
+11. Done — Pincode filter, bid badge, closed message, edit request
+12. Done — Tailwind + shadcn/ui + Framer Motion visual redesign
+13. Next — Deployment
