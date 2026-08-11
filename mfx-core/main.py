@@ -19,7 +19,11 @@ app = FastAPI(title="MarketFlip API", version="1.0.0")
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",          
+        "https://your-frontend.vercel.app", 
+        "https://marketflip.onrender.com",  
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
