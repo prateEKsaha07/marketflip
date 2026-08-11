@@ -1994,3 +1994,11 @@ the fundamental buyer-driven bidding model.
 **Documentation Version:** 2.0.0
 
 **Last Updated:** August 11, 2026
+
+
+## License
+
+Copyright © 2026 Prateek Saha
+
+Licensed under the Apache License, Version 2.0.
+See the [LICENSE](LICENSE) file for details.
