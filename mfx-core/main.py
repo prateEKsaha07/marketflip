@@ -21,7 +21,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",          
-        "https://your-frontend.vercel.app", 
+        "https://marketflip-mauve.vercel.app", 
         "https://marketflip.onrender.com",  
     ],
     allow_credentials=True,
