@@ -1,537 +1,417 @@
-# MarketFlip - POC Documentation
+# MarketFlip v0.1
 
----
+## POC Documentation
 
-## Table of Contents
+> **Project:** MarketFlip\
+> **Tagline:** *Flip How You Buy.*\
+> **Document Version:** 2.0.0\
+> **Project Status:** POC Complete · Live Deployment\
+> **Last Updated:** August 11, 2026
 
-1. [System Overview](#system-overview)
-2. [Authentication Flow](#authentication-flow)
-3. [Buyer Flow](#buyer-flow)
-4. [Shop Owner Flow](#shop-owner-flow)
-5. [Bid Selection Flow](#bid-selection-flow)
-6. [API Endpoints Summary](#api-endpoints-summary)
-7. [Database Schema](#database-schema)
-8. [RLS Policies](#rls-policies)
-9. [Error Handling](#error-handling)
+------------------------------------------------------------------------
 
----
+## Document Purpose
 
-## System Overview
+This document provides a complete technical and functional description
+of **MarketFlip**, including its business model, system architecture,
+technology stack, database design, API surface, frontend structure,
+authentication model, user journeys, testing strategy, security
+controls, deployment model, performance considerations, and future
+roadmap.
 
-MarketFlip is a two-sided marketplace connecting buyers and shop owners. Buyers post requests for products, and shop owners bid on those requests. The system handles the complete lifecycle from request creation to bid selection.
+The documentation is intended to be useful for:
 
-### System Architecture Flow
+-   Developers maintaining or extending the project
+-   Reviewers evaluating the system architecture
+-   Project stakeholders understanding the business workflow
+-   Students preparing project reports or demonstrations
+-   Future contributors onboarding to the codebase
 
-```mermaid
+------------------------------------------------------------------------
+
+# 1. Executive Summary
+
+## 1.1 What is MarketFlip?
+
+**MarketFlip is a reverse marketplace platform connecting buyers with
+local shop owners.**
+
+Traditional marketplaces generally follow this pattern:
+
+> **Seller → lists product → Buyer searches → Buyer purchases**
+
+MarketFlip reverses the interaction:
+
+> **Buyer → posts requirement → Shops compete → Buyer selects offer**
+
+Instead of making a buyer visit multiple stores to compare prices, the
+platform allows the buyer to publish a purchase requirement and receive
+competitive offers from participating shop owners.
+
+### Core Concept
+
+``` text
+                    TRADITIONAL MARKETPLACE
+
+        ┌──────────┐       Search       ┌────────────┐
+        │  BUYER   │ ─────────────────> │  SELLERS   │
+        └──────────┘                     └────────────┘
+             │                                  │
+             └──────────── Purchase ────────────┘
+
+
+                         MARKETFLIP
+
+        ┌──────────┐      Requirement     ┌────────────┐
+        │  BUYER   │ ───────────────────> │  MARKET    │
+        └──────────┘                       └────────────┘
+                                               │
+                                      ┌────────┼────────┐
+                                      ▼        ▼        ▼
+                                   Shop A   Shop B   Shop C
+                                      │        │        │
+                                      └─── BIDS ┴────────┘
+                                               │
+                                               ▼
+                                      ┌────────────────┐
+                                      │ Buyer compares │
+                                      │ and selects    │
+                                      │ best offer      │
+                                      └────────────────┘
+```
+
+## 1.2 Current Project Snapshot
+
+  Area                Current State
+  ------------------- -------------------------
+  Project Type        Reverse marketplace
+  Current Stage       POC complete
+  Frontend            Live
+  Backend API         Live
+  Database            Supabase PostgreSQL
+  Authentication      Supabase Auth / JWT
+  Frontend Hosting    Vercel
+  Backend Hosting     Render
+  API Documentation   FastAPI Swagger/OpenAPI
+  Primary Roles       Buyer, Shop Owner
+
+## 1.3 Production Endpoints
+
+  Resource             URL                                      Status
+  -------------------- ---------------------------------------- --------
+  Frontend             `https://marketflip-web.vercel.app`      Live
+  Backend              `https://marketflip.onrender.com`        Live
+  API Documentation    `https://marketflip.onrender.com/docs`   Live
+  Supabase Dashboard   `https://app.supabase.com`               Live
+
+------------------------------------------------------------------------
+
+# 2. Business Problem
+
+## 2.1 Problems With Traditional Local Shopping
+
+Local product discovery can require substantial effort from buyers.
+
+### Buyer-side problems
+
+-   Visiting multiple stores to compare prices
+-   Calling or messaging several sellers
+-   Difficulty determining whether a quoted price is competitive
+-   Time spent describing the same requirement repeatedly
+-   Limited visibility into available local inventory
+
+### Seller-side problems
+
+-   Difficulty discovering nearby customers with active purchase intent
+-   Reliance on walk-in traffic
+-   Limited opportunity to compete directly for a requirement
+-   Lack of a structured channel for responding to buyer demand
+
+## 2.2 MarketFlip's Solution
+
+MarketFlip changes the direction of the marketplace.
+
+  -----------------------------------------------------------------------
+  Traditional Approach                MarketFlip Approach
+  ----------------------------------- -----------------------------------
+  Buyer searches for sellers          Buyer publishes a requirement
+
+  Buyer requests prices individually  Sellers submit bids
+
+  Seller waits for customers          Seller actively competes
+
+  Price comparison happens manually   Offers are presented together
+
+  Contact details may be exchanged    Contact information is revealed
+  early                               after selection
+
+  Buyer does most of the discovery    Marketplace distributes the
+  work                                requirement
+  -----------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 3. Product Objectives
+
+The POC is designed around five primary objectives.
+
+### 3.1 Reduce Search Effort
+
+A buyer should be able to describe a requirement once rather than
+contacting multiple shops individually.
+
+### 3.2 Encourage Price Competition
+
+Multiple shop owners can submit competing offers against the same
+requirement.
+
+### 3.3 Improve Transparency
+
+The buyer can compare available bids before selecting one.
+
+### 3.4 Protect Contact Information
+
+Contact information is not intended to be exposed before a bid is
+selected.
+
+### 3.5 Create a Local Marketplace Loop
+
+``` mermaid
+flowchart LR
+    A[Buyer has requirement] --> B[Post request]
+    B --> C[Local shops discover request]
+    C --> D[Shops submit bids]
+    D --> E[Buyer compares offers]
+    E --> F[Buyer selects bid]
+    F --> G[Contact information becomes available]
+    G --> H[Transaction]
+    H --> I[Buyer verifies completion]
+    I --> J[Completed transaction]
+```
+
+------------------------------------------------------------------------
+
+# 4. Core Value Proposition
+
+``` text
+┌───────────────────────────────────────────────────────────┐
+│                    MARKETFLIP VALUE                       │
+├───────────────────────────────────────────────────────────┤
+│                                                           │
+│  TIME        → No shop-to-shop price hunting             │
+│  MONEY       → Sellers compete for the buyer              │
+│  CHOICE      → Multiple offers can be compared            │
+│  PRIVACY     → Contact information is controlled           │
+│  LOCAL       → Designed around nearby/local businesses     │
+│                                                           │
+└───────────────────────────────────────────────────────────┘
+```
+
+------------------------------------------------------------------------
+
+# 5. Functional Scope
+
+## 5.1 Buyer Capabilities
+
+A buyer can:
+
+1.  Register an account
+2.  Log in
+3.  Create a purchase request
+4.  Specify product details
+5.  Specify a minimum and maximum budget
+6.  Provide a pincode
+7.  Specify a category
+8.  Optionally provide reference URLs/images
+9.  View available requests and bids
+10. Compare bids
+11. Select a bid
+12. Manage delivery information
+13. Verify transaction completion
+14. View purchase history
+15. Edit eligible requests
+16. Delete requests
+
+## 5.2 Shop Owner Capabilities
+
+A shop owner can:
+
+1.  Register as a shop owner
+2.  Log in
+3.  Browse open purchase requests
+4.  Submit bids
+5.  Add pricing notes
+6.  Edit eligible bids
+7.  Withdraw bids
+8.  View bid statistics
+9.  View selected buyer information when permitted
+10. Manage completed transactions
+
+------------------------------------------------------------------------
+
+# 6. System Architecture
+
+## 6.1 High-Level Architecture
+
+``` mermaid
 flowchart TB
-    subgraph Frontend["Frontend (React)"]
-        A[User Interface]
-        B[Auth Context]
-        C[API Client]
+    U1[Buyer Browser]
+    U2[Shop Owner Browser]
+
+    subgraph FE[Frontend - React + Vite]
+        UI[Pages and UI Components]
+        AUTHCTX[Authentication Context]
+        API[Axios API Client]
     end
 
-    subgraph Backend["Backend (FastAPI)"]
-        D[Auth Routes]
-        E[Requests Routes]
-        F[Bids Routes]
-        G[Services Layer]
+    subgraph BE[Backend - FastAPI]
+        AUTH[Authentication Routes]
+        REQ[Request Routes]
+        BID[Bid Routes]
+        SERVICE[Business Logic / Services]
     end
 
-    subgraph Database["Database (Supabase)"]
-        H[(Profiles)]
-        I[(Requests)]
-        J[(Bids)]
-        K[(Auth Users)]
+    subgraph DB[Supabase]
+        SA[Supabase Auth]
+        PG[(PostgreSQL)]
+        RLS[Row Level Security]
     end
 
-    A --> B
-    B --> C
-    C --> D
-    C --> E
-    C --> F
-    D --> G
-    E --> G
-    F --> G
-    G --> H
-    G --> I
-    G --> J
-    G --> K
+    U1 --> FE
+    U2 --> FE
+    FE --> API
+    API --> AUTH
+    API --> REQ
+    API --> BID
+    AUTH --> SERVICE
+    REQ --> SERVICE
+    BID --> SERVICE
+    SERVICE --> SA
+    SERVICE --> PG
+    PG --> RLS
 ```
 
-### User Roles
+## 6.2 Deployment Architecture
 
-| Role | Description | Capabilities |
-|------|-------------|--------------|
-| **Buyer** | User looking to purchase products | Post requests, view bids, select bids, delete own requests |
-| **Shop Owner** | User looking to sell products | Browse requests, place bids, manage own bids |
-
-### Core Workflow
-
-```mermaid
+``` mermaid
 flowchart LR
-    A[Buyer Posts Request] --> B[Shop Owner Bids]
-    B --> C[Buyer Selects Bid]
-    C --> D[Request Marked Purchased]
-    D --> E[Other Bids Rejected]
+    B[User Browser]
+    V[Vercel<br/>React + Vite]
+    R[Render<br/>FastAPI]
+    S[Supabase<br/>Auth + PostgreSQL]
+
+    B --> V
+    V -->|HTTPS / REST API| R
+    R -->|Database + Auth| S
 ```
 
----
+## 6.3 Architecture Responsibilities
 
-## Authentication Flow
+  Layer           Responsibility
+  --------------- ------------------------------------
+  Browser         User interaction
+  React           UI rendering and client-side state
+  React Router    Route navigation
+  Axios           API communication
+  FastAPI         API and business logic
+  Pydantic        Request/response validation
+  Supabase Auth   Identity and authentication
+  PostgreSQL      Persistent application data
+  RLS             Database-level access control
+  Vercel          Frontend hosting
+  Render          Backend hosting
 
-### 1. User Registration (Signup)
+------------------------------------------------------------------------
 
-```mermaid
-flowchart TD
-    A[User visits Signup] --> B[Selects Role]
-    B --> C{Fills Form}
-    C --> D[Email & Password]
-    C --> E[Role Specific Fields]
-    D --> F[Submit]
-    E --> F
-    F --> G{Validation}
-    G -->|Success| H[Create Auth User]
-    G -->|Fail| I[Show Error]
-    H --> J[Create Profile]
-    J --> K[Auto Login]
-    K --> L[Redirect to Dashboard]
+# 7. Technology Stack
+
+## 7.1 Frontend
+
+  Category       Technology             Purpose
+  -------------- ---------------------- -------------------------------
+  UI Framework   React 18.2.0           Component-based UI
+  Build Tool     Vite 5.x               Development/build tooling
+  Styling        Tailwind CSS 3.x       Utility-first styling
+  Components     shadcn/ui              Reusable interface components
+  Animation      Framer Motion 11.x     UI animations
+  Icons          Lucide React           Iconography
+  Routing        React Router DOM 6.x   Client-side routing
+  HTTP           Axios 1.x              REST API communication
+  Hosting        Vercel                 Production frontend
+
+## 7.2 Backend
+
+  Category               Technology        Purpose
+  ---------------------- ----------------- ------------------------
+  Language               Python 3.11+      Backend implementation
+  Framework              FastAPI 0.104.0   REST API
+  Validation             Pydantic          Input validation
+  Database               PostgreSQL        Persistent storage
+  Platform               Supabase          Database/Auth platform
+  Authentication         Supabase Auth     Identity management
+  Hosting                Render            Backend deployment
+  Scheduled/Edge Layer   Supabase          Cron/edge capabilities
+
+------------------------------------------------------------------------
+
+# 8. Repository / Application Structure
+
+A logical application structure is represented below:
+
+``` text
+MarketFlip/
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── LandingNavbar.jsx
+│   │   │   └── sections/
+│   │   │       ├── Hero.jsx
+│   │   │       ├── Features.jsx
+│   │   │       ├── HowItWorks.jsx
+│   │   │       ├── Testimonials.jsx
+│   │   │       ├── FAQ.jsx
+│   │   │       ├── AboutDev.jsx
+│   │   │       └── Footer.jsx
+│   │   ├── pages/
+│   │   ├── context/
+│   │   └── api/
+│   ├── package.json
+│   └── .env
+│
+├── backend/
+│   ├── routes/
+│   │   ├── auth.py
+│   │   ├── requests.py
+│   │   └── bids.py
+│   ├── services/
+│   ├── schemas/
+│   ├── main.py
+│   └── .env
+│
+└── documentation/
+    └── MarketFlip_Professional_Documentation.md
 ```
 
-**Request Payload:**
+> The structure above represents the logical architecture documented for
+> the project. Exact repository paths should be treated as
+> implementation-dependent unless present in the source repository.
 
-```json
-{
-  "email": "buyer@example.com",
-  "password": "TestPass123!",
-  "role": "buyer",
-  "address": "123 Main Street",
-  "pincode": "110001",
-  "phone": "9876543210",
-  "shop_name": null  // Required for shop_owner
-}
-```
+------------------------------------------------------------------------
 
-**Response:**
+# 9. Database Design
 
-```json
-{
-  "user_id": "uuid_here",
-  "email": "buyer@example.com",
-  "role": "buyer",
-  "pincode": "110001"
-}
-```
+## 9.1 Entity Relationship Model
 
-**Redirect:**
-- Buyer → `/buyer/dashboard`
-- Shop Owner → `/shop/dashboard`
-
----
-
-### 2. User Login
-
-```mermaid
-flowchart TD
-    A[User visits Login] --> B[Enters Credentials]
-    B --> C[Submit]
-    C --> D{Validate with Supabase}
-    D -->|Success| E[Fetch User Role]
-    D -->|Fail| F[Show Error]
-    E --> G[Generate JWT Token]
-    G --> H[Store in localStorage]
-    H --> I[Redirect to Dashboard]
-```
-
-**Request Payload:**
-
-```json
-{
-  "email": "buyer@example.com",
-  "password": "TestPass123!"
-}
-```
-
-**Response:**
-
-```json
-{
-  "access_token": "eyJhbGciOiJFUzI1NiIs...",
-  "role": "buyer",
-  "user_id": "uuid_here"
-}
-```
-
-**Redirect:**
-- Buyer → `/buyer/dashboard`
-- Shop Owner → `/shop/dashboard`
-
----
-
-### 3. Authentication State Management
-
-```mermaid
-flowchart LR
-    A[Login Success] --> B[Store in localStorage]
-    B --> C[access_token]
-    B --> D[role]
-    B --> E[user_id]
-    
-    F[API Request] --> G{Check token}
-    G -->|Exists| H[Add Authorization Header]
-    G -->|Missing| I[Redirect to Login]
-    
-    J[API Response 401] --> K[Clear localStorage]
-    K --> L[Redirect to Login]
-```
-
----
-
-## Buyer Flow
-
-### 1. Buyer Dashboard
-
-```mermaid
-flowchart TD
-    A[Login as Buyer] --> B[Dashboard]
-    B --> C[View Open Requests]
-    B --> D[Click Request]
-    B --> E[Post Request Button]
-    D --> F[Request Detail]
-    E --> G[Post Request Form]
-```
-
-### 2. Post Request
-
-```mermaid
-flowchart TD
-    A[Click Post Request] --> B[Fill Form]
-    B --> C[Item Name]
-    B --> D[Description]
-    B --> E[Budget Min/Max]
-    B --> F[Pincode]
-    B --> G[Category]
-    C --> H[Submit]
-    D --> H
-    E --> H
-    F --> H
-    G --> H
-    H --> I{Validation}
-    I -->|Valid| J[POST /requests]
-    I -->|Invalid| K[Show Error]
-    J --> L[201 Created]
-    L --> M[Redirect to Dashboard]
-```
-
-**Request Payload:**
-
-```json
-{
-  "item_name": "iPhone 15 Pro",
-  "description": "Looking for new iPhone 15 Pro, 256GB",
-  "budget_min": 80000,
-  "budget_max": 100000,
-  "pincode": "110001",
-  "category": "electronics"
-}
-```
-
-**Response:**
-
-```json
-{
-  "id": "request_uuid",
-  "buyer_id": "buyer_uuid",
-  "item_name": "iPhone 15 Pro",
-  "budget_min": 80000,
-  "budget_max": 100000,
-  "pincode": "110001",
-  "status": "open",
-  "created_at": "2026-08-05T...",
-  "expires_at": "2026-08-12T..."
-}
-```
-
----
-
-### 3. Request Detail & Bid Selection
-
-```mermaid
-flowchart TD
-    A[Click Request] --> B[Request Detail]
-    B --> C[View Request Info]
-    B --> D[View Bids]
-    B --> E[Delete Request]
-    
-    D --> F[Select Bid]
-    F --> G{Confirm Selection?}
-    G -->|Yes| H[PATCH /bids/{id}/select]
-    G -->|No| I[Cancel]
-    
-    H --> J[Update Selected Bid → selected]
-    H --> K[Update Other Bids → rejected]
-    H --> L[Update Request → purchased]
-    J --> M[Show Shop Contact]
-    K --> M
-    L --> M
-```
-
-**Select Bid Payload:**
-
-```json
-// PATCH /bids/{bid_id}/select
-// No request body required
-```
-
-**Select Bid Response:**
-
-```json
-{
-  "bid_id": "bid_uuid",
-  "request_id": "request_uuid",
-  "status": "selected",
-  "selected_bid": {
-    "id": "bid_uuid",
-    "price": 85000,
-    "note": "Available in black",
-    "status": "selected",
-    "shop_name": "Tech Store",
-    "shop_phone": "9876543211",
-    "shop_address": "456 Market Road"
-  },
-  "shop_contact": {
-    "shop_name": "Tech Store",
-    "phone": "9876543211",
-    "address": "456 Market Road"
-  }
-}
-```
-
-**Delete Request:**
-
-```http
-DELETE /requests/{request_id}
-Authorization: Bearer {token}
-```
-
-**Delete Response:** `204 No Content`
-
----
-
-## Shop Owner Flow
-
-### 1. Shop Owner Dashboard
-
-```mermaid
-flowchart TD
-    A[Login as Shop Owner] --> B[Dashboard]
-    B --> C[View My Bids]
-    B --> D[Browse Requests]
-    B --> E[View Statistics]
-    
-    C --> F[My Bids Page]
-    D --> G[Browse Requests Page]
-    
-    F --> H[Edit Pending Bid]
-    F --> I[Withdraw Pending Bid]
-    
-    G --> J[View Open Requests]
-    G --> K[Place Bid]
-```
-
----
-
-### 2. Browse & Place Bid
-
-```mermaid
-flowchart TD
-    A[Browse Requests] --> B[Apply Filters]
-    B --> C[Pincode]
-    B --> D[Category]
-    B --> E[Status]
-    
-    C --> F[View Requests]
-    D --> F
-    E --> F
-    
-    F --> G{Has Pending Bid?}
-    G -->|Yes| H[Show Already Bid]
-    G -->|No| I[Show Bid Form]
-    
-    I --> J[Enter Price]
-    I --> K[Enter Note]
-    J --> L[Submit]
-    K --> L
-    
-    L --> M[POST /requests/{id}/bids]
-    M --> N[201 Created]
-    N --> O[Refresh View]
-```
-
-**Bid Request Payload:**
-
-```json
-// POST /requests/{request_id}/bids
-{
-  "price": 85000,
-  "note": "Available in black, 1 year warranty"
-}
-```
-
-**Bid Response:**
-
-```json
-{
-  "id": "bid_uuid",
-  "request_id": "request_uuid",
-  "shop_id": "shop_uuid",
-  "price": 85000,
-  "note": "Available in black, 1 year warranty",
-  "status": "pending",
-  "created_at": "2026-08-05T..."
-}
-```
-
----
-
-### 3. My Bids Management
-
-```mermaid
-flowchart TD
-    A[My Bids] --> B[View All Bids]
-    B --> C{Status?}
-    
-    C -->|Pending| D[Edit Bid]
-    C -->|Pending| E[Withdraw Bid]
-    C -->|Selected| F[View Only]
-    C -->|Rejected| F[View Only]
-    
-    D --> G[Update Price]
-    D --> H[Update Note]
-    G --> I[PATCH /bids/{id}]
-    H --> I
-    I --> J[200 OK]
-    
-    E --> K[DELETE /bids/{id}]
-    K --> L[204 No Content]
-```
-
-**Update Bid Payload:**
-
-```json
-// PATCH /bids/{bid_id}
-{
-  "price": 82000,
-  "note": "Updated: Available with 2 year warranty"
-}
-```
-
-**Update Bid Response:**
-
-```json
-{
-  "id": "bid_uuid",
-  "request_id": "request_uuid",
-  "shop_id": "shop_uuid",
-  "price": 82000,
-  "note": "Updated: Available with 2 year warranty",
-  "status": "pending",
-  "created_at": "2026-08-05T..."
-}
-```
-
----
-
-## Bid Selection Flow
-
-### Complete Bid Lifecycle
-
-```mermaid
-flowchart TD
-    A[Shop Owner Places Bid] --> B[Status: Pending]
-    B --> C{Decision}
-    
-    C -->|Buyer Selects| D[PATCH /bids/{id}/select]
-    D --> E[Status: Selected]
-    D --> F[Other Bids: Rejected]
-    D --> G[Request: Purchased]
-    
-    C -->|Buyer Rejects| H[Status: Rejected]
-    
-    C -->|Shop Owner Withdraws| I[DELETE /bids/{id}]
-    I --> J[Bid Removed]
-    
-    C -->|Shop Owner Updates| K[PATCH /bids/{id}]
-    K --> L[Status: Pending]
-    K --> M[Updated Price/Note]
-```
-
-### Bid Selection Transaction Flow
-
-```mermaid
-flowchart TD
-    A[Buyer Clicks Select Bid] --> B[Confirm Selection]
-    B --> C{Confirmed?}
-    C -->|No| D[Cancel]
-    C -->|Yes| E[PATCH /bids/{id}/select]
-    
-    E --> F[Update Selected Bid to 'selected']
-    E --> G[Update Other Bids to 'rejected']
-    E --> H[Update Request to 'purchased']
-    E --> I[Get Shop Contact Info]
-    
-    F --> J[Return Response]
-    G --> J
-    H --> J
-    I --> J
-    
-    J --> K[Show Shop Contact]
-    K --> L[Request Details Updated]
-```
-
----
-
-## API Endpoints Summary
-
-### Auth Endpoints
-
-| Method | Endpoint | Description | Auth | Payload |
-|--------|----------|-------------|------|---------|
-| POST | `/auth/signup` | Register new user | ❌ | `{email, password, role, address, pincode, phone, shop_name?}` |
-| POST | `/auth/login` | Login user | ❌ | `{email, password}` |
-
-### Requests Endpoints (Buyer)
-
-| Method | Endpoint | Description | Auth | Payload |
-|--------|----------|-------------|------|---------|
-| POST | `/requests` | Create new request | ✅ Buyer | `{item_name, description?, budget_min, budget_max, pincode, category?}` |
-| GET | `/requests` | List all open requests | ✅ All | Query: `?status=open&pincode=&category=` |
-| GET | `/requests/{id}` | Get request details with bids | ✅ All | - |
-| DELETE | `/requests/{id}` | Soft delete request | ✅ Buyer | - |
-
-### Bids Endpoints (Shop Owner)
-
-| Method | Endpoint | Description | Auth | Payload |
-|--------|----------|-------------|------|---------|
-| POST | `/requests/{id}/bids` | Place bid on request | ✅ Shop | `{price, note?}` |
-| GET | `/requests/{id}/bids` | Get bids for a request | ✅ All | - |
-| GET | `/bids` | Get all bids for current user | ✅ All | Query: `?request_id=` |
-| PATCH | `/bids/{id}` | Update pending bid | ✅ Shop | `{price?, note?}` |
-| DELETE | `/bids/{id}` | Withdraw bid | ✅ Shop | - |
-| PATCH | `/bids/{id}/select` | Select a bid | ✅ Buyer | - |
-
----
-
-## Database Schema
-
-### Entity Relationship Diagram
-
-```mermaid
+``` mermaid
 erDiagram
-    profiles ||--o{ requests : "creates"
-    profiles ||--o{ bids : "submits"
-    requests ||--o{ bids : "receives"
-    
-    profiles {
+    AUTH_USERS ||--|| PROFILES : owns
+    PROFILES ||--o{ REQUESTS : creates
+    PROFILES ||--o{ BIDS : places
+    REQUESTS ||--o{ BIDS : receives
+    REQUESTS ||--o| BIDS : selects
+
+    PROFILES {
         uuid id PK
         text role
         text shop_name
@@ -540,8 +420,8 @@ erDiagram
         text phone
         timestamptz created_at
     }
-    
-    requests {
+
+    REQUESTS {
         uuid id PK
         uuid buyer_id FK
         text item_name
@@ -555,9 +435,14 @@ erDiagram
         text status
         timestamptz created_at
         timestamptz expires_at
+        timestamptz purchased_at
+        timestamptz completed_at
+        uuid selected_bid_id FK
+        text delivery_method
+        text delivery_address
     }
-    
-    bids {
+
+    BIDS {
         uuid id PK
         uuid request_id FK
         uuid shop_id FK
@@ -565,179 +450,1547 @@ erDiagram
         text note
         text status
         timestamptz created_at
+        timestamptz selected_at
+        timestamptz rejected_at
+        timestamptz withdrawn_at
+        boolean buyer_contact_viewed
     }
 ```
 
-### Profiles Table
+## 9.2 Relationship Summary
 
-```sql
-profiles:
-- id: uuid (PK, references auth.users)
-- role: text (buyer/shop_owner)
-- shop_name: text (nullable, shop_owner only)
-- address: text
-- pincode: text (6 chars)
-- phone: text
-- created_at: timestamptz
+  ------------------------------------------------------------------------
+  Relationship                           Cardinality Meaning
+  --------------------- ---------------------------- ---------------------
+  User → Profile                                 1:1 Each authenticated
+                                                     user has a profile
+
+  Buyer → Requests                               1:N A buyer can create
+                                                     multiple requests
+
+  Shop → Bids                                    1:N A shop can place
+                                                     multiple bids
+
+  Request → Bids                                 1:N A request can receive
+                                                     multiple bids
+
+  Request → Selected                          1:0..1 A request may
+  Bid                                                eventually select one
+                                                     bid
+  ------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 10. Database Tables
+
+## 10.1 `profiles`
+
+  ------------------------------------------------------------------------
+  Column            Type              Constraints        Purpose
+  ----------------- ----------------- ------------------ -----------------
+  `id`              UUID              PK, FK to          User identifier
+                                      `auth.users.id`    
+
+  `role`            TEXT              Required;          User role
+                                      buyer/shop_owner   
+
+  `shop_name`       TEXT              Nullable           Shop name
+
+  `address`         TEXT              Required           Address
+
+  `pincode`         TEXT              Required; 6        Location
+                                      characters         
+
+  `phone`           TEXT              Required           Contact number
+
+  `created_at`      TIMESTAMPTZ       Required; default  Creation
+                                      `now()`            timestamp
+  ------------------------------------------------------------------------
+
+## 10.2 `requests`
+
+  -----------------------------------------------------------------------------
+  Column               Type              Constraints       Purpose
+  -------------------- ----------------- ----------------- --------------------
+  `id`                 UUID              PK; generated     Request identifier
+                                         UUID              
+
+  `buyer_id`           UUID              FK to             Request owner
+                                         `profiles.id`     
+
+  `item_name`          TEXT              Required          Product name
+
+  `description`        TEXT              Nullable          Product requirements
+
+  `budget_min`         INTEGER           Required          Minimum budget
+
+  `budget_max`         INTEGER           Required          Maximum budget
+
+  `pincode`            TEXT              Required; 6       Buyer location
+                                         characters        
+
+  `category`           TEXT              Default           Product category
+                                         `electronics`     
+
+  `reference_url`      TEXT              Nullable          Product reference
+
+  `reference_image`    TEXT              Nullable          Product image
+
+  `status`             TEXT              Required; default Lifecycle state
+                                         `open`            
+
+  `created_at`         TIMESTAMPTZ       Required          Creation timestamp
+
+  `expires_at`         TIMESTAMPTZ       Required          Expiration timestamp
+
+  `purchased_at`       TIMESTAMPTZ       Nullable          Selection/purchase
+                                                           time
+
+  `completed_at`       TIMESTAMPTZ       Nullable          Completion time
+
+  `selected_bid_id`    UUID              Nullable; FK to   Selected offer
+                                         `bids.id`         
+
+  `delivery_method`    TEXT              Nullable          Delivery option
+
+  `delivery_address`   TEXT              Nullable          Delivery destination
+  -----------------------------------------------------------------------------
+
+## 10.3 `bids`
+
+  ------------------------------------------------------------------------------
+  Column                   Type              Constraints       Purpose
+  ------------------------ ----------------- ----------------- -----------------
+  `id`                     UUID              PK; generated     Bid identifier
+                                             UUID              
+
+  `request_id`             UUID              Required FK       Target request
+
+  `shop_id`                UUID              Required FK       Shop owner
+
+  `price`                  INTEGER           Required          Offered price
+
+  `note`                   TEXT              Nullable          Additional offer
+                                                               details
+
+  `status`                 TEXT              Required; default Bid lifecycle
+                                             `pending`         
+
+  `created_at`             TIMESTAMPTZ       Required          Creation time
+
+  `selected_at`            TIMESTAMPTZ       Nullable          Selection time
+
+  `rejected_at`            TIMESTAMPTZ       Nullable          Rejection time
+
+  `withdrawn_at`           TIMESTAMPTZ       Nullable          Withdrawal time
+
+  `buyer_contact_viewed`   BOOLEAN           Default `FALSE`   Contact-view
+                                                               state
+  ------------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 11. State Management and Lifecycles
+
+## 11.1 Request Lifecycle
+
+``` mermaid
+stateDiagram-v2
+    [*] --> open: Buyer creates request
+    open --> purchased: Buyer selects bid
+    purchased --> completed: Buyer verifies transaction
+    open --> deleted: Buyer deletes request
+    open --> expired: Expiry reached
+    completed --> [*]
+    deleted --> [*]
+    expired --> [*]
 ```
 
-### Requests Table
+### Request States
 
-```sql
-requests:
-- id: uuid (PK)
-- buyer_id: uuid (FK → profiles.id)
-- item_name: text
-- description: text (nullable)
-- budget_min: integer
-- budget_max: integer
-- pincode: text (6 chars)
-- category: text (default: electronics)
-- reference_url: text (nullable)
-- reference_image: text (nullable)
-- status: text (open/purchased/deleted/expired)
-- created_at: timestamptz
-- expires_at: timestamptz (default: now() + 7 days)
+  State         Meaning
+  ------------- -------------------------------
+  `open`        Request is accepting bids
+  `purchased`   Buyer selected a bid
+  `completed`   Transaction has been verified
+  `expired`     Request passed expiry date
+  `deleted`     Buyer deleted request
+
+## 11.2 Bid Lifecycle
+
+``` mermaid
+stateDiagram-v2
+    [*] --> pending: Shop places bid
+    pending --> selected: Buyer selects bid
+    pending --> rejected: Buyer rejects bid
+    pending --> withdrawn: Shop withdraws bid
+    selected --> [*]
+    rejected --> [*]
+    withdrawn --> [*]
 ```
 
-### Bids Table
+### Bid States
 
-```sql
-bids:
-- id: uuid (PK)
-- request_id: uuid (FK → requests.id)
-- shop_id: uuid (FK → profiles.id)
-- price: integer
-- note: text (nullable)
-- status: text (pending/selected/rejected)
-- created_at: timestamptz
+  State         Meaning
+  ------------- ----------------------------
+  `pending`     Waiting for buyer decision
+  `selected`    Chosen by buyer
+  `rejected`    Not selected
+  `withdrawn`   Removed by shop owner
+
+------------------------------------------------------------------------
+
+# 12. Buyer User Journey
+
+``` mermaid
+flowchart TD
+    A[Landing Page] --> B[Sign Up / Login]
+    B --> C[Buyer Dashboard]
+    C --> D[Post Request]
+    D --> E[Request becomes OPEN]
+    E --> F[Shops submit bids]
+    F --> G[Buyer views bids]
+    G --> H{Select a bid?}
+    H -->|No| G
+    H -->|Yes| I[Request becomes PURCHASED]
+    I --> J[Purchase History]
+    J --> K[Select Delivery Method]
+    K --> L[Transaction]
+    L --> M[Verify Transaction]
+    M --> N[Request becomes COMPLETED]
 ```
 
----
+## 12.1 Buyer Decision Point
 
-## Status Flow Diagrams
+The central decision in the buyer flow is:
 
-### Request Status Lifecycle
+``` text
+             Available Bids
+                   │
+       ┌───────────┼───────────┐
+       ▼           ▼           ▼
+    Shop A      Shop B      Shop C
+    ₹X          ₹Y          ₹Z
+       │           │           │
+       └───────────┼───────────┘
+                   ▼
+           Compare offers
+                   │
+                   ▼
+             Select one bid
+```
 
-```mermaid
+------------------------------------------------------------------------
+
+# 13. Shop Owner User Journey
+
+``` mermaid
+flowchart TD
+    A[Landing Page] --> B[Sign Up / Login]
+    B --> C[Shop Dashboard]
+    C --> D[Browse Open Requests]
+    D --> E[Review Buyer Requirement]
+    E --> F[Place Bid]
+    F --> G[Bid = PENDING]
+    G --> H[My Bids]
+
+    H --> I{Buyer Decision}
+    I -->|Selected| J[View Buyer Details]
+    I -->|Rejected| K[Bid Rejected]
+    I -->|Still Pending| L[Edit / Withdraw]
+    L --> H
+    J --> M[Contact Buyer]
+    M --> N[Complete Transaction]
+```
+
+------------------------------------------------------------------------
+
+# 14. Authentication and Authorization
+
+## 14.1 Authentication Flow
+
+``` mermaid
+sequenceDiagram
+    participant U as User
+    participant FE as React Frontend
+    participant API as FastAPI
+    participant AUTH as Supabase Auth
+
+    U->>FE: Login / Signup
+    FE->>API: Authentication request
+    API->>AUTH: Validate credentials
+    AUTH-->>API: User identity / token
+    API-->>FE: Access token + role
+    FE->>FE: Store authentication state
+    FE->>API: Protected API request
+    API->>API: Validate token
+    API-->>FE: Authorized response
+```
+
+## 14.2 Authentication Decision Tree
+
+``` text
+                 ┌───────────────┐
+                 │ User accesses │
+                 │ protected page│
+                 └───────┬───────┘
+                         ▼
+                  ┌─────────────┐
+                  │ Token exists│
+                  │ and valid?  │
+                  └──────┬──────┘
+                    Yes  │  No
+                         │
+             ┌───────────┘
+             ▼
+     Access protected route
+
+                         No
+                         │
+                         ▼
+                Redirect to Auth
+                         │
+                         ▼
+                   Login/Signup
+                         │
+                         ▼
+                   Store token
+                         │
+                         ▼
+                   Dashboard
+```
+
+## 14.3 Role-Based Authorization
+
+  -----------------------------------------------------------------------
+  Role                    Dashboard               Main Permissions
+  ----------------------- ----------------------- -----------------------
+  Buyer                   `/buyer/dashboard`      Create/manage requests,
+                                                  view bids, select bids
+
+  Shop Owner              `/shop/dashboard`       Browse requests,
+                                                  place/manage bids, view
+                                                  eligible buyer details
+
+  Unauthenticated         `/` / `/auth`           Public landing page and
+                                                  authentication
+  -----------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 15. API Architecture
+
+## 15.1 API Surface
+
+The documented API is divided into three functional domains:
+
+``` mermaid
+pie title API Endpoints by Domain
+    "Authentication" : 3
+    "Requests" : 7
+    "Bids" : 7
+```
+
+> Counts are derived from the endpoint inventory documented in this
+> project specification.
+
+## 15.2 Endpoint Inventory
+
+  Domain     Method   Endpoint                    Auth
+  ---------- -------- --------------------------- --------
+  Auth       POST     `/auth/signup`              Public
+  Auth       POST     `/auth/login`               Public
+  Auth       GET      `/auth/profiles/{id}`       Yes
+  Requests   POST     `/requests`                 Buyer
+  Requests   GET      `/requests`                 All
+  Requests   GET      `/requests/{id}`            All
+  Requests   PATCH    `/requests/{id}`            Buyer
+  Requests   DELETE   `/requests/{id}`            Buyer
+  Requests   PATCH    `/requests/{id}/delivery`   Buyer
+  Requests   PATCH    `/requests/{id}/verify`     Buyer
+  Bids       POST     `/requests/{id}/bids`       Shop
+  Bids       GET      `/requests/{id}/bids`       All
+  Bids       GET      `/bids`                     All
+  Bids       PATCH    `/bids/{id}`                Shop
+  Bids       DELETE   `/bids/{id}`                Shop
+  Bids       PATCH    `/bids/{id}/select`         Buyer
+  Bids       GET      `/bids/{id}/buyer`          Shop
+  Bids       GET      `/bids/stats`               Shop
+
+------------------------------------------------------------------------
+
+# 16. Authentication API
+
+## 16.1 `POST /auth/signup`
+
+Registers a new MarketFlip user.
+
+### Request
+
+``` json
+{
+  "email": "user@example.com",
+  "password": "TestPass123!",
+  "role": "buyer",
+  "address": "123 Main St",
+  "pincode": "110001",
+  "phone": "9876543210",
+  "shop_name": null
+}
+```
+
+### Response
+
+**201 Created**
+
+``` json
+{
+  "user_id": "uuid",
+  "email": "user@example.com",
+  "role": "buyer",
+  "pincode": "110001"
+}
+```
+
+------------------------------------------------------------------------
+
+## 16.2 `POST /auth/login`
+
+Authenticates an existing user.
+
+### Request
+
+``` json
+{
+  "email": "user@example.com",
+  "password": "TestPass123!"
+}
+```
+
+### Response
+
+**200 OK**
+
+``` json
+{
+  "access_token": "jwt_token_here",
+  "role": "buyer",
+  "user_id": "uuid"
+}
+```
+
+------------------------------------------------------------------------
+
+# 17. Request API
+
+## 17.1 `POST /requests`
+
+Creates a new buyer requirement.
+
+### Request
+
+``` json
+{
+  "item_name": "iPhone 15 Pro",
+  "description": "Looking for new iPhone 15 Pro, 256GB",
+  "budget_min": 80000,
+  "budget_max": 100000,
+  "pincode": "110001",
+  "category": "electronics"
+}
+```
+
+### Response
+
+**201 Created**
+
+``` json
+{
+  "id": "uuid",
+  "buyer_id": "uuid",
+  "item_name": "iPhone 15 Pro",
+  "status": "open",
+  "created_at": "2026-08-11T...",
+  "expires_at": "2026-08-18T..."
+}
+```
+
+## 17.2 `GET /requests`
+
+Returns available requests.
+
+### Query Parameters
+
+  Parameter    Type      Default   Purpose
+  ------------ --------- --------- ---------------------------
+  `status`     string    `open`    Filter by lifecycle state
+  `pincode`    string    None      Location filter
+  `category`   string    None      Category filter
+  `limit`      integer   100       Result count
+  `offset`     integer   0         Pagination offset
+
+### Example Response
+
+``` json
+[
+  {
+    "id": "uuid",
+    "item_name": "iPhone 15 Pro",
+    "budget_min": 80000,
+    "budget_max": 100000,
+    "status": "open",
+    "bid_count": 3
+  }
+]
+```
+
+------------------------------------------------------------------------
+
+# 18. Bid API
+
+## 18.1 `POST /requests/{id}/bids`
+
+Allows a shop owner to submit an offer against a request.
+
+### Request
+
+``` json
+{
+  "price": 85000,
+  "note": "Available in black, 1 year warranty"
+}
+```
+
+### Response
+
+**201 Created**
+
+``` json
+{
+  "id": "uuid",
+  "request_id": "uuid",
+  "shop_id": "uuid",
+  "price": 85000,
+  "status": "pending",
+  "created_at": "2026-08-11T..."
+}
+```
+
+## 18.2 `PATCH /bids/{id}/select`
+
+Selects a bid for a buyer's request.
+
+### Response
+
+**200 OK**
+
+``` json
+{
+  "bid_id": "uuid",
+  "request_id": "uuid",
+  "status": "selected",
+  "selected_bid": {
+    "id": "uuid",
+    "price": 85000,
+    "status": "selected",
+    "shop_name": "Tech Store",
+    "shop_phone": "9876543211",
+    "shop_address": "456 Market Road"
+  },
+  "shop_contact": {
+    "name": "Tech Store",
+    "phone": "9876543211",
+    "address": "456 Market Road"
+  }
+}
+```
+
+### Selection Event
+
+``` mermaid
+sequenceDiagram
+    participant B as Buyer
+    participant FE as Frontend
+    participant API as FastAPI
+    participant DB as PostgreSQL
+
+    B->>FE: Select bid
+    FE->>API: PATCH /bids/{id}/select
+    API->>API: Validate buyer ownership
+    API->>DB: Mark selected bid
+    API->>DB: Update request status
+    API->>DB: Update related bid states
+    DB-->>API: Updated records
+    API-->>FE: Selection + permitted contact data
+    FE-->>B: Show finalized transaction state
+```
+
+------------------------------------------------------------------------
+
+# 19. Frontend Documentation
+
+## 19.1 Route Map
+
+  ---------------------------------------------------------------------------------
+  Page              Route                       Access            Purpose
+  ----------------- --------------------------- ----------------- -----------------
+  Landing           `/`                         Public            Product
+                                                                  introduction
+
+  Authentication    `/auth`                     Public            Login/signup
+
+  Buyer Dashboard   `/buyer/dashboard`          Buyer             Manage buyer
+                                                                  activity
+
+  Post Request      `/buyer/post-request`       Buyer             Create
+                                                                  requirement
+
+  Request Detail    `/buyer/request/:id`        Buyer             View request and
+                                                                  bids
+
+  Purchases         `/buyer/purchases`          Buyer             Purchase history
+
+  Edit Request      `/buyer/edit-request/:id`   Buyer             Modify request
+
+  Shop Dashboard    `/shop/dashboard`           Shop              Shop activity
+
+  Browse            `/shop/browse`              Shop              Discover requests
+
+  My Bids           `/shop/my-bids`             Shop              Manage submitted
+                                                                  bids
+
+  Bid Detail        `/shop/bid/:id`             Shop              View bid
+                                                                  state/details
+
+  Completed         `/shop/completed`           Shop              Completed
+                                                                  transactions
+  ---------------------------------------------------------------------------------
+
+## 19.2 Landing Page Components
+
+  Component         Responsibility
+  ----------------- -------------------------------
+  `LandingNavbar`   Primary navigation
+  `Hero`            Main product proposition
+  `Features`        Feature presentation
+  `HowItWorks`      Workflow explanation
+  `Testimonials`    User review section
+  `FAQ`             Frequently asked questions
+  `AboutDev`        Developer/project information
+  `Footer`          Global footer
+
+------------------------------------------------------------------------
+
+# 20. End-to-End Transaction Flow
+
+The core MarketFlip transaction can be represented as a single pipeline:
+
+``` text
+┌──────────┐
+│  BUYER   │
+└────┬─────┘
+     │
+     │ 1. Create requirement
+     ▼
+┌──────────────┐
+│   REQUEST    │
+│    OPEN      │
+└──────┬───────┘
+       │
+       │ 2. Shops discover
+       ▼
+┌───────────────────────────────┐
+│        MULTIPLE BIDS          │
+│                               │
+│ Shop A → ₹85,000              │
+│ Shop B → ₹87,500              │
+│ Shop C → ₹84,500              │
+└───────────────┬───────────────┘
+                │
+                │ 3. Compare
+                ▼
+         ┌──────────────┐
+         │ BUYER SELECTS│
+         │     BID      │
+         └──────┬───────┘
+                │
+                │ 4. Finalize
+                ▼
+       ┌──────────────────┐
+       │ REQUEST PURCHASED│
+       └────────┬─────────┘
+                │
+                │ 5. Contact / delivery
+                ▼
+       ┌──────────────────┐
+       │   TRANSACTION    │
+       └────────┬─────────┘
+                │
+                │ 6. Verify
+                ▼
+       ┌──────────────────┐
+       │ REQUEST COMPLETED│
+       └──────────────────┘
+```
+
+------------------------------------------------------------------------
+
+# 21. Contact Privacy Model
+
+A key product rule is that buyer/seller contact information should be
+exposed only after a bid is selected.
+
+``` mermaid
 flowchart LR
-    A[open] --> B{purchased}
-    A --> C{deleted}
-    A --> D{expired}
-    
-    B --> E[closed]
-    C --> E
-    D --> E
+    A[Shop submits bid] --> B[Bid = pending]
+    B --> C[Buyer compares bids]
+    C --> D{Bid selected?}
+    D -->|No| E[Contact remains restricted]
+    D -->|Yes| F[Bid = selected]
+    F --> G[Permitted contact details available]
 ```
 
-### Bid Status Lifecycle
+This design reduces unnecessary exposure of personal contact information
+during the bidding phase.
 
-```mermaid
+------------------------------------------------------------------------
+
+# 22. Testing Strategy
+
+## 22.1 API Test Matrix
+
+  Test             Endpoint                     Expected Result
+  ---------------- ---------------------------- -----------------
+  Signup           `POST /auth/signup`          201 Created
+  Login            `POST /auth/login`           200 OK
+  Create Request   `POST /requests`             201 Created
+  Get Requests     `GET /requests`              200 OK
+  Place Bid        `POST /requests/{id}/bids`   201 Created
+  Select Bid       `PATCH /bids/{id}/select`    200 OK
+
+## 22.2 Frontend Test Matrix
+
+  Area              Test            Expected
+  ----------------- --------------- ----------------------------------
+  Landing           Load page       All major sections render
+  Authentication    Valid login     Dashboard redirect
+  Authentication    Invalid login   Error shown
+  Buyer Dashboard   Load requests   Requests displayed
+  Post Request      Submit form     Request created
+  Bid Management    View bids       Correct bids displayed
+  Purchase          Select bid      Request moves to purchased state
+
+## 22.3 Recommended Additional Tests
+
+For future production hardening, the test suite should also cover:
+
+-   Unauthorized API requests
+-   Cross-role access attempts
+-   Invalid UUIDs
+-   Invalid pincodes
+-   Negative or invalid prices
+-   Budget range validation
+-   Duplicate bids
+-   Bid withdrawal rules
+-   Request expiry
+-   Selecting a bid on an expired request
+-   Selecting a second bid after purchase
+-   Concurrent bid selection
+-   Database constraint violations
+-   RLS policy enforcement
+
+------------------------------------------------------------------------
+
+# 23. Performance and Optimization
+
+## 23.1 Documented Targets
+
+  Metric                       Target Documented State
+  ------------------------ ---------- ------------------
+  First Contentful Paint      \< 1.5s Optimized
+  Time to Interactive           \< 3s Optimized
+  API response time          \< 200ms Optimized
+
+> These values are documented project targets/status indicators. They
+> should not be interpreted as independently benchmarked measurements
+> unless a performance test report is added.
+
+## 23.2 Optimization Techniques
+
+  Optimization                      Purpose
+  --------------------------------- ----------------------------------
+  Route lazy loading                Reduce initial frontend bundle
+  SVG icons                         Reduce image overhead
+  Static asset caching              Improve repeat load performance
+  API pagination                    Prevent oversized responses
+  Efficient database queries        Reduce backend/database overhead
+  Hardware-accelerated transforms   Improve animation rendering
+
+------------------------------------------------------------------------
+
+# 24. Security Architecture
+
+## 24.1 Security Controls
+
+  Control               Implementation
+  --------------------- ------------------------------------------
+  Authentication        JWT-based authentication
+  Authorization         Role-based access
+  Database protection   Supabase Row Level Security
+  Input validation      Pydantic schemas
+  CORS                  Restricted origins
+  Secret management     Environment variables
+  Contact privacy       Contact data exposed after bid selection
+
+## 24.2 Example RLS Policies
+
+### Profiles
+
+``` sql
+CREATE POLICY "Users can view their own profile"
+ON profiles
+FOR SELECT
+USING (auth.uid() = id);
+```
+
+### Requests
+
+``` sql
+CREATE POLICY "Buyers can insert their own requests"
+ON requests
+FOR INSERT
+WITH CHECK (auth.uid() = buyer_id);
+```
+
+### Bids
+
+``` sql
+CREATE POLICY "Shop owners can insert their own bids"
+ON bids
+FOR INSERT
+WITH CHECK (auth.uid() = shop_id);
+```
+
+## 24.3 Security Layers
+
+``` mermaid
+flowchart TB
+    A[User]
+    B[Frontend Route Protection]
+    C[JWT Authentication]
+    D[FastAPI Authorization]
+    E[Pydantic Validation]
+    F[Supabase RLS]
+    G[(PostgreSQL)]
+
+    A --> B --> C --> D --> E --> F --> G
+```
+
+Security should therefore not rely on the frontend alone. The backend
+and database should independently enforce authorization boundaries.
+
+------------------------------------------------------------------------
+
+# 25. Environment Configuration
+
+## 25.1 Backend
+
+``` env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+## 25.2 Frontend
+
+``` env
+VITE_API_URL=https://marketflip.onrender.com
+```
+
+### Important
+
+Environment files containing credentials or service-role keys should
+never be committed to a public repository.
+
+------------------------------------------------------------------------
+
+# 26. Local Development
+
+## 26.1 Backend
+
+``` bash
+uvicorn main:app --reload
+```
+
+The FastAPI development server provides interactive API documentation
+through the standard FastAPI documentation endpoint.
+
+## 26.2 Frontend
+
+``` bash
+npm run dev
+```
+
+## 26.3 Production Build
+
+``` bash
+npm run build
+```
+
+## 26.4 Vercel Deployment
+
+``` bash
+vercel --prod
+```
+
+## 26.5 Backend Deployment
+
+``` bash
+git push origin main
+```
+
+------------------------------------------------------------------------
+
+# 27. Deployment Model
+
+``` mermaid
+flowchart TD
+    DEV[Developer]
+    GIT[Git Repository]
+    VERCEL[Vercel]
+    RENDER[Render]
+    SUPA[Supabase]
+
+    DEV --> GIT
+    GIT --> VERCEL
+    GIT --> RENDER
+    RENDER --> SUPA
+    VERCEL -->|API requests| RENDER
+```
+
+## Deployment Responsibilities
+
+  Platform         Role
+  ---------------- -------------------------------
+  Git repository   Source control
+  Vercel           Frontend deployment
+  Render           FastAPI backend deployment
+  Supabase         Authentication and PostgreSQL
+  Browser          Client runtime
+
+------------------------------------------------------------------------
+
+# 28. API Request Lifecycle
+
+``` mermaid
+sequenceDiagram
+    participant Client as Browser
+    participant Router as React Router
+    participant API as Axios Client
+    participant FastAPI as FastAPI
+    participant DB as Supabase PostgreSQL
+
+    Client->>Router: Navigate / perform action
+    Router->>API: Trigger API call
+    API->>FastAPI: HTTPS request + auth token
+    FastAPI->>FastAPI: Validate token
+    FastAPI->>FastAPI: Validate request data
+    FastAPI->>DB: Query / mutation
+    DB-->>FastAPI: Result
+    FastAPI-->>API: JSON response
+    API-->>Client: Update UI
+```
+
+------------------------------------------------------------------------
+
+# 29. Error Handling Model
+
+A robust implementation should treat errors at multiple levels:
+
+``` text
+Client Input
+    │
+    ▼
+Frontend Validation
+    │
+    ▼
+HTTP Request
+    │
+    ▼
+FastAPI Validation
+    │
+    ├── Invalid → 4xx response
+    │
+    ▼
+Authorization
+    │
+    ├── Unauthorized → 401/403
+    │
+    ▼
+Business Rules
+    │
+    ├── Invalid state → 4xx
+    │
+    ▼
+Database Operation
+    │
+    ├── Database error → 5xx
+    │
+    ▼
+JSON Response
+```
+
+Recommended production behavior includes consistent error schemas,
+meaningful messages, server-side logging, and avoidance of sensitive
+information in client-facing errors.
+
+------------------------------------------------------------------------
+
+# 30. Data Integrity Rules
+
+The database model establishes several important integrity
+relationships.
+
+### User Identity
+
+``` text
+auth.users.id
+      │
+      ▼
+profiles.id
+```
+
+### Request Ownership
+
+``` text
+profiles.id
+      │
+      ▼
+requests.buyer_id
+```
+
+### Bid Ownership
+
+``` text
+profiles.id
+      │
+      ▼
+bids.shop_id
+```
+
+### Bid-to-Request Relationship
+
+``` text
+requests.id
+      │
+      ▼
+bids.request_id
+```
+
+These relationships prevent orphaned application records and provide the
+foundation for role-based access enforcement.
+
+------------------------------------------------------------------------
+
+# 31. Functional Requirements
+
+## Buyer Requirements
+
+  ID      Requirement
+  ------- -----------------------------------------------
+  BR-01   Buyer must be able to register
+  BR-02   Buyer must be able to authenticate
+  BR-03   Buyer must be able to create a request
+  BR-04   Buyer must be able to specify budget
+  BR-05   Buyer must be able to specify location
+  BR-06   Buyer must be able to view bids
+  BR-07   Buyer must be able to select a bid
+  BR-08   Buyer must be able to manage delivery details
+  BR-09   Buyer must be able to verify completion
+
+## Shop Requirements
+
+  -----------------------------------------------------------------------
+  ID                                  Requirement
+  ----------------------------------- -----------------------------------
+  SR-01                               Shop owner must be able to register
+
+  SR-02                               Shop owner must be able to
+                                      authenticate
+
+  SR-03                               Shop owner must be able to browse
+                                      requests
+
+  SR-04                               Shop owner must be able to submit
+                                      bids
+
+  SR-05                               Shop owner must be able to manage
+                                      eligible bids
+
+  SR-06                               Shop owner must be able to view
+                                      buyer details after selection
+
+  SR-07                               Shop owner must be able to view
+                                      completed transactions
+  -----------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 32. Non-Functional Requirements
+
+  -----------------------------------------------------------------------
+  Category                            Requirement
+  ----------------------------------- -----------------------------------
+  Security                            Authentication and authorization
+                                      must be enforced
+
+  Privacy                             Contact details should not be
+                                      exposed prematurely
+
+  Scalability                         API/database design should support
+                                      increasing request and bid volume
+
+  Availability                        Frontend and backend are deployed
+                                      as separate services
+
+  Maintainability                     Functional areas are separated into
+                                      routes/services/components
+
+  Performance                         API and frontend optimization
+                                      targets are defined
+
+  Usability                           Buyer and shop workflows are
+                                      separated by role
+  -----------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 33. Current Project Status
+
+  Component           Status
+  ------------------- -------------
+  Backend API         Live
+  Frontend            Live
+  Database            Connected
+  Authentication      Working
+  Buyer Flow          Complete
+  Shop Flow           Complete
+  Bid Management      Complete
+  Request Lifecycle   Implemented
+  POC                 Complete
+
+------------------------------------------------------------------------
+
+# 34. Known Product Evolution Areas
+
+The existing POC establishes the central marketplace loop. The next
+engineering stage should focus on production-grade automation, trust,
+discovery, and transaction handling.
+
+## Priority 1: Lifecycle Automation
+
+-   Automatically expire requests after seven days
+-   Automatically update expired request states
+-   Improve state transition validation
+
+## Priority 2: Discovery
+
+-   Pincode-based request filtering
+-   Advanced search
+-   Category-specific discovery
+-   Better sorting and filtering
+
+## Priority 3: Communication
+
+-   Email notifications
+-   SMS notifications
+-   Bid activity notifications
+-   Transaction status notifications
+
+## Priority 4: Trust
+
+-   Shop ratings
+-   Buyer reviews
+-   Reputation scores
+-   Verified shops
+-   Transaction history
+
+## Priority 5: Commerce
+
+-   In-app payments
+-   Payment status
+-   Refund handling
+-   Order tracking
+
+## Priority 6: Intelligence
+
+-   AI-assisted price suggestions
+-   Bid ranking
+-   Product matching
+-   Personalized recommendations
+
+------------------------------------------------------------------------
+
+# 35. Product Roadmap
+
+``` mermaid
 flowchart LR
-    A[pending] --> B{selected}
-    A --> C{rejected}
-    A --> D[withdrawn by shop]
-    
-    B --> E[closed]
-    C --> E
-    D --> E
+    P1["Phase 1<br/>Core Enhancements"] --> P2["Phase 2<br/>Feature Expansion"]
+    P2 --> P3["Phase 3<br/>Scale & Intelligence"]
+
+    P1 --> A["Auto-expiry"]
+    P1 --> B["Pincode filtering"]
+    P1 --> C["Bid count"]
+
+    P2 --> D["Notifications"]
+    P2 --> E["Ratings & Reviews"]
+    P2 --> F["Search"]
+    P2 --> G["Analytics"]
+
+    P3 --> H["Mobile App"]
+    P3 --> I["Payments"]
+    P3 --> J["Multiple Categories"]
+    P3 --> K["AI Price Suggestions"]
 ```
 
----
+------------------------------------------------------------------------
 
-## Error Handling
+# 36. Future Mobile Architecture
 
-### Common Error Codes
+A future React Native application could reuse the existing backend:
 
-| Status | Description | Solution |
-|--------|-------------|----------|
-| 200 | Success | - |
-| 201 | Created | - |
-| 204 | No Content (Delete Success) | - |
-| 400 | Bad Request | Check validation errors |
-| 401 | Unauthorized | Login again |
-| 403 | Forbidden | Check user role/permissions |
-| 404 | Not Found | Verify ID exists |
-| 422 | Validation Error | Check request body |
+``` mermaid
+flowchart TB
+    API[Existing FastAPI API]
 
-### Error Messages
+    WEB[React Web]
+    MOBILE[React Native Mobile]
+    ADMIN[Future Admin Panel]
 
-| Error | Meaning | Resolution |
-|-------|---------|------------|
-| "Only buyers can create requests" | Non-buyer trying to post | Check user role |
-| "Only shop owners can place bids" | Non-shop trying to bid | Check user role |
-| "Only buyers can select bids" | Non-buyer trying to select | Check user role |
-| "Request is not open for bidding" | Request already purchased/deleted | Create new request |
-| "You already have a pending bid on this request" | Duplicate bid | Withdraw existing bid |
-| "Cannot update a bid that is not pending" | Bid already selected/rejected | Create new bid |
-| "Bid is no longer pending" | Bid already selected/rejected | Create new bid |
-| "You don't have permission" | User doesn't own resource | Check ownership |
+    WEB --> API
+    MOBILE --> API
+    ADMIN --> API
 
----
-
-## Frontend Routes
-
-| Route | Page | Access |
-|-------|------|--------|
-| `/` | Landing | Public |
-| `/login` | Login | Public |
-| `/signup` | Signup | Public |
-| `/buyer/dashboard` | Buyer Dashboard | Buyer only |
-| `/buyer/post-request` | Post Request | Buyer only |
-| `/buyer/request/{id}` | Request Detail | Buyer only |
-| `/shop/dashboard` | Shop Dashboard | Shop Owner only |
-| `/shop/browse` | Browse Requests | Shop Owner only |
-| `/shop/my-bids` | My Bids | Shop Owner only |
-
----
-
-## Testing Credentials
-
-### Buyer Account
-```
-Email: buyer_test@example.com
-Password: TestPass123!
+    API --> AUTH[Supabase Auth]
+    API --> DB[(PostgreSQL)]
 ```
 
-### Shop Owner Account
+This preserves the backend business logic while allowing additional
+client applications to be introduced.
+
+------------------------------------------------------------------------
+
+# 37. Future AI Price Suggestion Concept
+
+The planned AI capability could eventually analyze:
+
+``` text
+Buyer Request
+     │
+     ├── Product category
+     ├── Product name
+     ├── Budget
+     ├── Location
+     └── Historical bids
+             │
+             ▼
+       Pricing Model
+             │
+             ▼
+    Suggested Bid Range
+             │
+             ▼
+       Buyer / Shop UI
 ```
-Email: shop_owner@example.com
-Password: TestPass123!
+
+This feature is a future roadmap item and is not represented as a
+currently deployed ML service in the documented POC.
+
+------------------------------------------------------------------------
+
+# 38. Observability Recommendations
+
+For a production release, the following should be added:
+
+  Area         Recommendation
+  ------------ -----------------------------------
+  API logs     Structured request/error logs
+  Monitoring   Backend uptime monitoring
+  Errors       Centralized exception tracking
+  Database     Query and connection monitoring
+  Frontend     Client-side error tracking
+  Security     Authentication failure monitoring
+  Business     Request/bid/selection metrics
+
+Useful business metrics could include:
+
+``` text
+Requests Created
+        │
+        ▼
+Requests Receiving Bids
+        │
+        ▼
+Average Bids per Request
+        │
+        ▼
+Selected Bids
+        │
+        ▼
+Completed Transactions
 ```
 
----
+------------------------------------------------------------------------
 
-## Deployment Checklist
+# 39. Suggested KPI Dashboard
 
-- [ ] Update API base URL in `api/client.js`
-- [ ] Configure CORS for production domain
-- [ ] Update Supabase credentials in `.env`
-- [ ] Build frontend for production
-- [ ] Set up database indexes for performance
-- [ ] Configure email confirmation (if required)
-- [ ] Set up monitoring and logging
+A future admin dashboard can expose:
 
----
+  KPI                    Description
+  ---------------------- ----------------------------------------
+  Total Users            Registered buyers + shops
+  Active Requests        Requests currently accepting bids
+  Total Bids             Number of submitted bids
+  Avg. Bids/Request      Marketplace competition indicator
+  Selection Rate         Requests that result in a selected bid
+  Completion Rate        Purchased requests reaching completion
+  Active Shops           Shops currently participating
+  Average Bid Value      Average offer amount
+  Requests by Category   Demand distribution
+  Requests by Pincode    Geographic demand
 
-## Version History
+------------------------------------------------------------------------
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2026-08-05 | Initial release |
-| 1.0.1 | 2026-08-05 | Added bid selection flow |
-| 1.0.2 | 2026-08-05 | Fixed RLS issues with supabase_admin |
-| 1.0.3 | 2026-08-05 | Completed buyer and shop flows |
-| 1.0.4 | 2026-08-05 | Added flowcharts and diagrams |
+# 40. Documentation Glossary
 
----
+  -----------------------------------------------------------------------
+  Term                                Meaning
+  ----------------------------------- -----------------------------------
+  Reverse Marketplace                 Marketplace where buyers publish
+                                      demand and sellers compete
 
-## Support
+  Request                             A buyer's requirement for a product
 
-For issues or questions, please refer to:
-- API Documentation: `http://localhost:8000/docs`
-- Supabase Dashboard: `https://app.supabase.com`
-- Frontend: `http://localhost:5173`
+  Bid                                 A shop's offer against a request
 
----
+  Buyer                               User looking to purchase a product
 
-**MarketFlip - Documentation**
+  Shop Owner                          Seller competing for buyer requests
+
+  Selected Bid                        Bid chosen by the buyer
+
+  Pincode                             Six-digit location identifier
+
+  RLS                                 Row Level Security
+
+  JWT                                 JSON Web Token used for
+                                      authenticated requests
+
+  POC                                 Proof of Concept
+
+  API                                 Application Programming Interface
+
+  CRUD                                Create, Read, Update, Delete
+  -----------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 41. Quick Reference
+
+## Production
+
+``` text
+Frontend:
+https://marketflip-web.vercel.app
+
+Backend:
+https://marketflip.onrender.com
+
+Swagger/OpenAPI:
+https://marketflip.onrender.com/docs
+```
+
+## Core API Groups
+
+``` text
+/auth/*
+/requests/*
+/bids/*
+```
+
+## Core Roles
+
+``` text
+buyer
+shop_owner
+```
+
+## Core Request States
+
+``` text
+open
+purchased
+completed
+expired
+deleted
+```
+
+## Core Bid States
+
+``` text
+pending
+selected
+rejected
+withdrawn
+```
+
+------------------------------------------------------------------------
+
+# 42. Final Architecture Summary
+
+MarketFlip is structured around a clean three-layer web architecture:
+
+``` text
+                    ┌─────────────────────────┐
+                    │       PRESENTATION      │
+                    │                         │
+                    │ React + Vite + Tailwind │
+                    │ React Router + Axios     │
+                    └────────────┬────────────┘
+                                 │
+                                 │ HTTPS / REST
+                                 ▼
+                    ┌─────────────────────────┐
+                    │       APPLICATION       │
+                    │                         │
+                    │ FastAPI + Python        │
+                    │ Routes + Services       │
+                    │ Pydantic Validation     │
+                    └────────────┬────────────┘
+                                 │
+                                 │ SQL / Auth
+                                 ▼
+                    ┌─────────────────────────┐
+                    │          DATA           │
+                    │                         │
+                    │ Supabase Auth           │
+                    │ PostgreSQL              │
+                    │ RLS                     │
+                    └─────────────────────────┘
+```
+
+The central business loop is:
+
+``` text
+BUYER
+  │
+  ▼
+CREATE REQUEST
+  │
+  ▼
+SHOPS DISCOVER REQUEST
+  │
+  ▼
+SHOPS PLACE BIDS
+  │
+  ▼
+BUYER COMPARES BIDS
+  │
+  ▼
+BUYER SELECTS BID
+  │
+  ▼
+CONTACT / DELIVERY
+  │
+  ▼
+TRANSACTION
+  │
+  ▼
+BUYER VERIFIES
+  │
+  ▼
+COMPLETED
+```
+
+This architecture gives MarketFlip a straightforward foundation for
+extending the POC into a larger marketplace platform without changing
+the fundamental buyer-driven bidding model.
+
+------------------------------------------------------------------------
+
+# Appendix A: API Status Code Reference
+
+    Status Typical Meaning
+  -------- ---------------------------------
+       200 Successful operation
+       201 Resource created
+       400 Invalid request
+       401 Authentication required/invalid
+       403 Authenticated but not permitted
+       404 Resource not found
+       409 State/conflict condition
+       422 Validation error
+       500 Internal server error
+
+------------------------------------------------------------------------
+
+# Appendix B: Development Checklist
+
+## Before committing
+
+-   [ ] Environment secrets excluded
+-   [ ] API endpoint tested
+-   [ ] Authentication tested
+-   [ ] Buyer authorization tested
+-   [ ] Shop authorization tested
+-   [ ] Request lifecycle tested
+-   [ ] Bid lifecycle tested
+-   [ ] Contact privacy tested
+-   [ ] Invalid input tested
+-   [ ] Database constraints verified
+
+## Before deployment
+
+-   [ ] Frontend production build succeeds
+-   [ ] Backend starts correctly
+-   [ ] Environment variables configured
+-   [ ] CORS origins verified
+-   [ ] Supabase RLS policies enabled
+-   [ ] API health endpoint responds
+-   [ ] Frontend can reach backend
+-   [ ] Authentication works in production
+-   [ ] Core buyer flow tested
+-   [ ] Core shop flow tested
+
+------------------------------------------------------------------------
+
+# Appendix C: Version History
+
+  -----------------------------------------------------------------------
+  Version                 Date                    Description
+  ----------------------- ----------------------- -----------------------
+  1.0.0                   Aug 11, 2026            Initial project
+                                                  documentation
+
+  2.0.0                   Aug 11, 2026            Expanded professional
+                                                  documentation with
+                                                  architecture diagrams,
+                                                  ERD, state diagrams,
+                                                  sequence diagrams, API
+                                                  documentation,
+                                                  requirements, security,
+                                                  deployment, testing,
+                                                  and roadmap
+  -----------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+## Project Status
+
+**MarketFlip --- Flip How You Buy.**
+
+**Current Status:** POC Complete · Live
+
+**Documentation Version:** 2.0.0
+
+**Last Updated:** August 11, 2026
