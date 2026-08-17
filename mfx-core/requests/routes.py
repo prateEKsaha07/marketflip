@@ -465,3 +465,193 @@ async def deny_delivery(request_id: UUID, current_user: dict = Depends(get_curre
             delivery_confirmed_by_shop=updated_request["delivery_confirmed_by_shop"],
             delivery_response_at=updated_request["delivery_response_at"]
        )
+
+@router.patch("/{request_id}/switch-to-pickup")
+async def switch_to_pickup(
+    request_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Switch a purchased request from home_delivery to pickup.
+    
+    Used when:
+    1. Shop denies home delivery
+    2. Buyer chooses to pickup instead
+    
+    This sets delivery_method to 'pickup' and auto-confirms delivery
+    so the buyer can immediately verify the transaction.
+    """
+    # 1. Verify user is a buyer
+    if current_user.get("role") != "buyer":
+        raise HTTPException(
+            status_code=403,
+            detail="Only buyers can switch to pickup"
+        )
+    
+    # 2. Get the request
+    request_result = supabase_admin.table("requests")\
+        .select("*")\
+        .eq("id", request_id)\
+        .execute()
+    
+    if not request_result.data:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    request = request_result.data[0]
+    
+    # 3. Verify buyer owns this request
+    if request["buyer_id"] != current_user["id"]:
+        raise HTTPException(
+            status_code=403,
+            detail="You don't own this request"
+        )
+    
+    # 4. Validate state
+    if request["status"] != "purchased":
+        raise HTTPException(
+            status_code=400,
+            detail="Only purchased requests can be switched to pickup"
+        )
+    
+    if request["delivery_method"] != "home_delivery":
+        raise HTTPException(
+            status_code=400,
+            detail="Request is already set to pickup or no delivery method selected"
+        )
+    
+    # 5. Update to pickup
+    try:
+        result = supabase_admin.table("requests")\
+            .update({
+                "delivery_method": "pickup",
+                "delivery_confirmed_by_shop": True,  # Auto-confirm for pickup
+                "delivery_response_at": datetime.utcnow().isoformat()
+            })\
+            .eq("id", request_id)\
+            .execute()
+        
+        if not result.data:
+            raise HTTPException(
+                status_code=400,
+                detail="Failed to switch to pickup"
+            )
+        
+        updated_request = result.data[0]
+        
+        return {
+            "message": "Successfully switched to pickup",
+            "request": {
+                "id": updated_request["id"],
+                "delivery_method": updated_request["delivery_method"],
+                "delivery_confirmed_by_shop": updated_request["delivery_confirmed_by_shop"],
+                "delivery_response_at": updated_request["delivery_response_at"],
+                "status": updated_request["status"]
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Switch to pickup error for request {request_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to switch to pickup: {str(e)}"
+        )
+
+@router.patch("/{request_id}/delivery")
+async def set_delivery_method(
+    request_id: str,
+    delivery_data: dict,  # { "delivery_method": "home_delivery", "delivery_address": "..." }
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Set delivery method for a purchased request.
+    
+    Used when:
+    1. Buyer initially selects delivery method
+    2. Sets delivery_method and delivery_address
+    """
+    # Verify user is a buyer
+    if current_user.get("role") != "buyer":
+        raise HTTPException(
+            status_code=403,
+            detail="Only buyers can set delivery method"
+        )
+    
+    # Get the request
+    request_result = supabase_admin.table("requests")\
+        .select("*")\
+        .eq("id", request_id)\
+        .execute()
+    
+    if not request_result.data:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    request = request_result.data[0]
+    
+    # Verify buyer owns this request
+    if request["buyer_id"] != current_user["id"]:
+        raise HTTPException(
+            status_code=403,
+            detail="You don't own this request"
+        )
+    
+    # Validate state
+    if request["status"] != "purchased":
+        raise HTTPException(
+            status_code=400,
+            detail="Only purchased requests can set delivery method"
+        )
+    
+    # Validate delivery method
+    delivery_method = delivery_data.get("delivery_method")
+    if delivery_method not in ["home_delivery", "pickup"]:
+        raise HTTPException(
+            status_code=400,
+            detail="delivery_method must be 'home_delivery' or 'pickup'"
+        )
+    
+    # Prepare update data
+    update_data = {
+        "delivery_method": delivery_method,
+        "delivery_address": delivery_data.get("delivery_address")
+    }
+    
+    # If pickup, auto-confirm
+    if delivery_method == "pickup":
+        update_data["delivery_confirmed_by_shop"] = True
+        update_data["delivery_response_at"] = datetime.utcnow().isoformat()
+    
+    try:
+        result = supabase_admin.table("requests")\
+            .update(update_data)\
+            .eq("id", request_id)\
+            .execute()
+        
+        if not result.data:
+            raise HTTPException(
+                status_code=400,
+                detail="Failed to set delivery method"
+            )
+        
+        updated_request = result.data[0]
+        
+        return {
+            "message": f"Delivery method set to {delivery_method}",
+            "request": {
+                "id": updated_request["id"],
+                "delivery_method": updated_request["delivery_method"],
+                "delivery_address": updated_request.get("delivery_address"),
+                "delivery_confirmed_by_shop": updated_request.get("delivery_confirmed_by_shop"),
+                "status": updated_request["status"]
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Set delivery method error for request {request_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to set delivery method: {str(e)}"
+        )

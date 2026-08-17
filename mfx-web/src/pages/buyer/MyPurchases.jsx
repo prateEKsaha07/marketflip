@@ -144,28 +144,27 @@ const MyPurchases = () => {
   // ============================================
   
   const handleSwitchToPickup = async (requestId) => {
-    if (!window.confirm('Switch this order to pickup? The shop cannot deliver to your address.')) return;
+  if (!window.confirm('Switch this order to pickup? The shop cannot deliver to your address.')) return;
+  
+  setActionLoading(prev => ({ ...prev, [requestId]: 'pickup' }));
+  try {
+    // Use the dedicated switch-to-pickup endpoint
+    await api.patch(`/requests/${requestId}/switch-to-pickup`);
     
-    setActionLoading(prev => ({ ...prev, [requestId]: 'pickup' }));
-    try {
-      // Update delivery method to pickup
-      await api.patch(`/requests/${requestId}`, {
-        delivery_method: 'pickup',
-        delivery_confirmed_by_shop: true // Auto-confirm pickup since buyer is choosing it
-      });
-      
-      await fetchAllPurchases();
-      if (selectedPurchase && selectedPurchase.id === requestId) {
-        setSelectedPurchase(null);
-      }
-      alert('✅ Switched to pickup! You can now verify the transaction.');
-    } catch (err) {
-      console.error('Switch to pickup error:', err);
-      alert('❌ Failed to switch to pickup: ' + (err.response?.data?.detail || 'Unknown error'));
-    } finally {
-      setActionLoading(prev => ({ ...prev, [requestId]: false }));
+    await fetchAllPurchases();
+    if (selectedPurchase && selectedPurchase.id === requestId) {
+      setSelectedPurchase(null);
     }
-  };
+    alert('✅ Switched to pickup! You can now verify the transaction.');
+  } catch (err) {
+    console.error('Switch to pickup error:', err);
+    const errorMsg = err.response?.data?.detail || 'Failed to switch to pickup';
+    alert('❌ ' + errorMsg);
+  } finally {
+    setActionLoading(prev => ({ ...prev, [requestId]: false }));
+  }
+};
+
 
   const handleCancelOrder = async (requestId) => {
     if (!window.confirm('Are you sure you want to cancel this order?')) return;
@@ -284,41 +283,40 @@ const MyPurchases = () => {
   };
 
   const handleConfirmDelivery = async () => {
-    if (!window.confirm('Confirm delivery method?')) return;
+  if (!window.confirm('Confirm delivery method?')) return;
+  
+  setUpdating(true);
+  try {
+    console.log('Confirming delivery for:', selectedPurchase.id);
     
-    setUpdating(true);
-    try {
-      console.log('Confirming delivery for:', selectedPurchase.id);
-      
-      const isPickup = deliveryMethod === 'pickup';
-      
-      await api.patch(`/requests/${selectedPurchase.id}`, {
-        delivery_method: isPickup ? 'pickup' : 'home_delivery',
-        delivery_address: deliveryAddress,
-        // If pickup, auto-confirm so buyer can verify immediately
-        ...(isPickup && { delivery_confirmed_by_shop: true })
-      });
-      
-      if (isPickup) {
-        alert('✅ Pickup confirmed! You can now verify the transaction.');
-      } else {
-        alert('✅ Home Delivery selected! Waiting for shop to confirm delivery.');
-      }
-      
-      setSelectedPurchase(null);
-      setDeliveryMethod(null);
-      setDeliveryAddress('');
-      setShowConfirmButton(false);
-      
-      await fetchAllPurchases();
-      
-    } catch (err) {
-      console.error('Confirm delivery error:', err);
-      alert('❌ Failed to confirm delivery: ' + (err.response?.data?.detail || 'Unknown error'));
-    } finally {
-      setUpdating(false);
+    const isPickup = deliveryMethod === 'pickup';
+    
+    // Use the dedicated delivery endpoint
+    await api.patch(`/requests/${selectedPurchase.id}/delivery`, {
+      delivery_method: isPickup ? 'pickup' : 'home_delivery',
+      delivery_address: deliveryAddress
+    });
+    
+    if (isPickup) {
+      alert('✅ Pickup confirmed! You can now verify the transaction.');
+    } else {
+      alert('✅ Home Delivery selected! Waiting for shop to confirm delivery.');
     }
-  };
+    
+    setSelectedPurchase(null);
+    setDeliveryMethod(null);
+    setDeliveryAddress('');
+    setShowConfirmButton(false);
+    
+    await fetchAllPurchases();
+    
+  } catch (err) {
+    console.error('Confirm delivery error:', err);
+    alert('❌ Failed to confirm delivery: ' + (err.response?.data?.detail || 'Unknown error'));
+  } finally {
+    setUpdating(false);
+  }
+};
 
   const handleVerifyTransaction = async () => {
     // Check if verification is allowed

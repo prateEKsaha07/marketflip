@@ -15,6 +15,14 @@ const api = axios.create({
   },
 });
 
+export const setDeliveryMethod = (requestId, data) => {
+  return api.patch(`/requests/${requestId}/delivery`, data);
+};
+
+export const switchToPickup = (requestId) => {
+  return api.patch(`/requests/${requestId}/switch-to-pickup`);
+};
+
 export const confirmDelivery = (requestId) => {
   return api.patch(`/requests/${requestId}/delivery/confirm`);
 };
