@@ -6,3 +6,4 @@ The migration ran without errors, meaning:
 - profiles table extended with new columns
 - requests table extended with new columns
 - Existing category data migrated to the new structure
+

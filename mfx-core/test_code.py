@@ -28,8 +28,8 @@ print(f"SUPABASE_ANON_KEY: {supabase_anon[:30] if supabase_anon else 'MISSING'}.
 print(f"SUPABASE_SERVICE_ROLE_KEY: {supabase_service[:30] if supabase_service else 'MISSING'}...")
 
 if supabase_url and supabase_anon and supabase_service:
-    print("\n✅ All environment variables are set correctly!")
+    print("\nAll environment variables are set correctly!")
 else:
-    print("\n❌ Some environment variables are missing")
+    print("\nSome environment variables are missing")
 
 print("=" * 60)

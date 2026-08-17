@@ -9,9 +9,9 @@ from requests.schemas import (
     RequestCreate, 
     RequestResponse, 
     RequestDetailResponse,
-    RequestQueryParams,
     DeliveryUpdate,
-    RequestUpdate
+    RequestUpdate,
+    DeliveryConfirmresponse
 )
 from requests.services import RequestService
 from auth.dependencies import supabase_anon, supabase_admin
@@ -406,3 +406,62 @@ async def update_request(
     except Exception as e:
         logger.error(f"Update request error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.patch("/{request_id}/delivery/confirm", response_model=DeliveryConfirmresponse)
+async def confirm_delivery(
+    request_id : str,
+    current_user : dict  = Depends(get_current_user)
+):
+   """
+    Shop confirms home delivery for a request.
+    - Only the shop owner whose bid was selected can confirm
+    - Request must be in 'purchased' state
+    - Delivery method must be 'home_delivery'
+    """
+
+   if current_user.get("role") != "shop_owner":
+       raise HTTPException(
+           status_code=403,
+           detail="not a shop owner"
+       )
+
+   try:
+       service = RequestService(supabase_admin,supabase_anon)
+       updated_request = service.confirm_delivery(
+           request_id=request_id,
+           shop_id=current_user["id"]
+       )
+   except Exception as e :
+       raise HTTPException(
+           status_code=400,
+           detail=str(e)
+       )
+   return DeliveryConfirmresponse(
+        request_id=updated_request["id"],
+        delivery_confirmed_by_shop=updated_request["delivery_confirmed_by_shop"],
+        delivery_response_at=updated_request["delivery_response_at"]
+   )
+
+@router.patch("/{request_id}/delivery/deny")
+async def deny_delivery(request_id: UUID, current_user: dict = Depends(get_current_user)):
+    """
+    same as confirm just exchanged the funtions
+    """
+    if current_user["role"] != "shop_owner":
+        raise HTTPException(status_code=403, detail="Only shop owners can deny delivery")
+    try:
+           service = RequestService(supabase_admin,supabase_anon)
+           updated_request = service.deny_delivery(
+               request_id=request_id,
+               shop_id=current_user["id"]
+           )
+    except Exception as e :
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    return DeliveryConfirmresponse(
+            request_id=updated_request["id"],
+            delivery_confirmed_by_shop=updated_request["delivery_confirmed_by_shop"],
+            delivery_response_at=updated_request["delivery_response_at"]
+       )

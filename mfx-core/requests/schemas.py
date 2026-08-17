@@ -15,6 +15,8 @@ class RequestCreate(BaseModel):
     category: Optional[str] = "electronics"
     reference_url: Optional[str] = None
     reference_image: Optional[str] = None
+    delivery_method: Optional[str] = "home_delivery"
+    delivery_address: Optional[str] = None
     
     @field_validator('budget_max')
     @classmethod
@@ -42,6 +44,8 @@ class RequestResponse(BaseModel):
     category: str
     reference_url: Optional[str] = None
     reference_image: Optional[str] = None
+    delivery_method: Optional[str] = None   
+    delivery_address: Optional[str] = None 
     status: str
     created_at: datetime
     expires_at: datetime
@@ -99,3 +103,9 @@ class RequestUpdate(BaseModel):
     category: Optional[str] = None
     reference_url: Optional[str] = None
     reference_image: Optional[str] = None
+
+class DeliveryConfirmresponse(BaseModel):
+    request_id : UUID
+    delivery_confirmed_by_shop: bool
+    delivery_response_at: datetime
+    model_config = {"from_attributes" : True}

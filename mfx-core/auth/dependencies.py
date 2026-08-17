@@ -50,9 +50,9 @@ try:
     supabase_anon: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
     # Use SERVICE ROLE key for admin operations (bypasses RLS)
     supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    logger.info(f"✅ Supabase clients initialized with URL: {SUPABASE_URL}")
+    logger.info(f"Supabase clients initialized with URL: {SUPABASE_URL}")
 except Exception as e:
-    logger.error(f"❌ Failed to initialize Supabase clients: {str(e)}")
+    logger.error(f"Failed to initialize Supabase clients: {str(e)}")
     raise
 
 security = HTTPBearer()
