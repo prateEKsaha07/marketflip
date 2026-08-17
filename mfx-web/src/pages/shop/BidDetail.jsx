@@ -21,9 +21,16 @@ import {
   Package,
   FileText,
   Sparkles,
-  Heart
+  Heart,
+  Check,
+  X,
+  AlertCircle,
+  Loader2,
+  ThumbsUp,
+  ThumbsDown
 } from 'lucide-react';
 import api from '../../api/client';
+import { confirmDelivery, denyDelivery } from '../../api/client';
 
 const BidDetail = () => {
   const { id } = useParams();
@@ -32,6 +39,8 @@ const BidDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState(null);
+  const [deliveryAction, setDeliveryAction] = useState(false);
+  const [deliveryError, setDeliveryError] = useState('');
 
   useEffect(() => {
     fetchBidDetails();
@@ -44,12 +53,50 @@ const BidDetail = () => {
       console.log('Fetching bid details for:', id);
       const response = await api.get(`/bids/${id}/buyer`);
       console.log('Bid details:', response.data);
+      console.log('Request object:', response.data.request);
+      console.log('Delivery fields:', {
+        delivery_method: response.data.request.delivery_method,
+        delivery_confirmed_by_shop: response.data.request.delivery_confirmed_by_shop,
+        delivery_address: response.data.request.delivery_address
+      });
       setData(response.data);
     } catch (err) {
       console.error('Fetch error:', err);
       setError(err.response?.data?.detail || 'Failed to fetch bid details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmDelivery = async () => {
+    if (!window.confirm('Confirm home delivery for this request?')) return;
+    
+    setDeliveryAction(true);
+    setDeliveryError('');
+    try {
+      await confirmDelivery(data.request.id);
+      await fetchBidDetails();
+    } catch (err) {
+      console.error('Confirm delivery error:', err);
+      setDeliveryError(err.response?.data?.detail || 'Failed to confirm delivery');
+    } finally {
+      setDeliveryAction(false);
+    }
+  };
+
+  const handleDenyDelivery = async () => {
+    if (!window.confirm('Deny home delivery for this request? The buyer will need to choose pickup or cancel.')) return;
+    
+    setDeliveryAction(true);
+    setDeliveryError('');
+    try {
+      await denyDelivery(data.request.id);
+      await fetchBidDetails();
+    } catch (err) {
+      console.error('Deny delivery error:', err);
+      setDeliveryError(err.response?.data?.detail || 'Failed to deny delivery');
+    } finally {
+      setDeliveryAction(false);
     }
   };
 
@@ -123,6 +170,13 @@ const BidDetail = () => {
   const bidStatus = getStatusConfig(bid.status);
   const requestStatus = getStatusConfig(request.status);
   const isSelected = bid.status === 'selected';
+
+  // Check if delivery confirmation is needed
+  const needsDeliveryConfirmation = 
+    isSelected && 
+    request.status === 'purchased' && 
+    request.delivery_method === 'home_delivery' &&
+    (request.delivery_confirmed_by_shop === null || request.delivery_confirmed_by_shop === undefined);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
@@ -271,6 +325,69 @@ const BidDetail = () => {
                     <span className="text-amber-600">· {request.delivery_address}</span>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Delivery Confirmation - Show when needed */}
+            {needsDeliveryConfirmation && (
+              <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                <p className="text-xs font-medium text-blue-700 mb-2">
+                  🚚 Buyer requested home delivery — can you deliver?
+                </p>
+                {request.delivery_address && (
+                  <p className="text-[10px] text-blue-600 mb-2">
+                    Address: {request.delivery_address}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={handleConfirmDelivery}
+                    disabled={deliveryAction}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-1.5 h-auto flex items-center gap-1.5"
+                  >
+                    {deliveryAction ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <CheckCircle size={13} />
+                    )}
+                    Confirm Delivery
+                  </Button>
+                  <Button
+                    onClick={handleDenyDelivery}
+                    disabled={deliveryAction}
+                    variant="outline"
+                    className="border-rose-200 text-rose-600 hover:bg-rose-50 text-xs px-4 py-1.5 h-auto flex items-center gap-1.5"
+                  >
+                    {deliveryAction ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <XCircle size={13} />
+                    )}
+                    Deny Delivery
+                  </Button>
+                </div>
+                {deliveryError && (
+                  <p className="text-[10px] text-rose-600 mt-2 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    {deliveryError}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Delivery Confirmed State */}
+            {isSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && request.delivery_confirmed_by_shop === true && (
+              <div className="mt-3 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100 flex items-center gap-2 text-xs text-emerald-700">
+                <CheckCircle size={13} />
+                ✅ You confirmed home delivery for this order on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'}
+              </div>
+            )}
+
+            {/* Delivery Denied State */}
+            {isSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && request.delivery_confirmed_by_shop === false && (
+              <div className="mt-3 p-3 bg-rose-50/50 rounded-lg border border-rose-100 flex items-center gap-2 text-xs text-rose-700">
+                <XCircle size={13} />
+                ❌ You denied home delivery on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'} — waiting for buyer to choose pickup or cancel
               </div>
             )}
           </motion.div>

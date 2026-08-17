@@ -1,8 +1,12 @@
 import axios from 'axios';
 
+// Use local URL in development, production URL otherwise
+const isDev = import.meta.env.DEV;
+const render_url = isDev 
+  ? 'http://127.0.0.1:8000' 
+  : (import.meta.env.VITE_API_URL || 'https://marketflip.onrender.com');
 
-const render_url =  import.meta.env.VITE_API_URL || 'https://marketflip.onrender.com';
-// this for local -> http://127.0.0.1:8000
+console.log(`API Base URL: ${render_url}`);  // Helpful for debugging
 
 const api = axios.create({
   baseURL: render_url,
@@ -10,6 +14,14 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+export const confirmDelivery = (requestId) => {
+  return api.patch(`/requests/${requestId}/delivery/confirm`);
+};
+
+export const denyDelivery = (requestId) => {
+  return api.patch(`/requests/${requestId}/delivery/deny`);
+};
 
 api.interceptors.request.use(
   (config) => {
@@ -24,7 +36,7 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {  // ← Add curly braces around the function body
+  (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('access_token');
       localStorage.removeItem('role');

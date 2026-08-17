@@ -262,9 +262,9 @@ async def get_buyer_details(
         if str(bid["status"]) != "selected":
             raise HTTPException(status_code=400, detail="Only selected bids can be shown to the shop owner")
 
-        # Get request details
+        # Get request details - ADD the missing fields
         request_details = supabase_admin.table("requests") \
-            .select("id, buyer_id, item_name, description, budget_min, budget_max, pincode, status, delivery_method, delivery_address, completed_at") \
+            .select("id, buyer_id, item_name, description, budget_min, budget_max, pincode, status, delivery_method, delivery_address, completed_at, delivery_confirmed_by_shop, delivery_response_at") \
             .eq("id", str(bid["request_id"])) \
             .execute()
 
@@ -311,7 +311,9 @@ async def get_buyer_details(
                 "status": request.get("status"),
                 "delivery_method": request.get("delivery_method"),
                 "delivery_address": request.get("delivery_address"),
-                "completed_at": request.get("completed_at")
+                "completed_at": request.get("completed_at"),
+                "delivery_confirmed_by_shop": request.get("delivery_confirmed_by_shop"),  # ← ADDED
+                "delivery_response_at": request.get("delivery_response_at")  # ← ADDED
             },
             "buyer": {
                 "id": request.get("buyer_id"),
