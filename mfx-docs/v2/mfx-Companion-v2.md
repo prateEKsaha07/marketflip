@@ -130,3 +130,10 @@ Sequenced so each step unlocks or de-risks the next. Edit as we go.
 - Mobile (Phase 11) is last — no point wrapping/PWA-ing a UI that's still changing.
 - Privacy/compliance (Phase 12) is last but should happen before real users beyond your own testing use the app — not a hard blocker for continued dev.
 - Admin panel and shop verification are deliberately deferred, not forgotten — revisit once core v2 feature set is live.
+
+## License
+
+Copyright © 2026 Prateek Saha
+
+Licensed under the Apache License, Version 2.0.
+See the [LICENSE](LICENSE) file for details.

@@ -447,3 +447,11 @@ Two paths, decide once v2 web is stable:
 - **Aug 12, 2026 (update 5)** — Added: multi-image support (image_urls array, replaces single image field), sort options (price/newest/most bids/ending soon), report/flag listings (`reports` table, manual review for now — no admin panel), Apriori-based category/item recommendations. Admin panel and shop verification badge explicitly deferred, not scoped yet.
 - **Aug 12, 2026 (update 6)** — Clarified authorization model (FastAPI backend primary, RLS as secondary safety net) and finalized per-table RLS read/write rules for all 12 new tables, including notifications delete permission, backend-only message read receipts, and auction_bids as insert-only (no editing past bids). Ready to begin Phase 1 build.
 - **Aug 12, 2026 (update 2)** — Added synthetic/seed data strategy using Faker, staging Supabase project, to unblock ML prototyping ahead of real data volume.
+
+
+## License
+
+Copyright © 2026 Prateek Saha
+
+Licensed under the Apache License, Version 2.0.
+See the [LICENSE](LICENSE) file for details.
