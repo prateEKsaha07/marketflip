@@ -4,7 +4,6 @@ from datetime import datetime
 from uuid import UUID
 
 # ----- Request Schemas -----
-
 class RequestCreate(BaseModel):
     """Schema for creating a new request"""
     item_name: str = Field(..., min_length=1, max_length=255)
@@ -17,6 +16,7 @@ class RequestCreate(BaseModel):
     reference_image: Optional[str] = None
     delivery_method: Optional[str] = "home_delivery"
     delivery_address: Optional[str] = None
+    image_urls: Optional[List[str]] = []
     
     @field_validator('budget_max')
     @classmethod
@@ -32,6 +32,7 @@ class RequestCreate(BaseModel):
             raise ValueError('pincode must contain only digits')
         return v
 
+
 class RequestResponse(BaseModel):
     """Schema for request response"""
     id: UUID
@@ -45,7 +46,8 @@ class RequestResponse(BaseModel):
     reference_url: Optional[str] = None
     reference_image: Optional[str] = None
     delivery_method: Optional[str] = None   
-    delivery_address: Optional[str] = None 
+    delivery_address: Optional[str] = None
+    image_urls: Optional[List[str]] = []
     status: str
     created_at: datetime
     expires_at: datetime
@@ -54,9 +56,13 @@ class RequestResponse(BaseModel):
         "from_attributes": True
     }
 
+
 class RequestDetailResponse(RequestResponse):
     """Schema for detailed request response with bids"""
     bids: List['BidResponse'] = []
+    
+    model_config = {"from_attributes": True}
+
 
 # ----- Bid Schemas (for nested responses) -----
 
@@ -75,6 +81,7 @@ class BidResponse(BaseModel):
         "from_attributes": True
     }
 
+
 # ----- Query Params -----
 
 class RequestQueryParams(BaseModel):
@@ -90,9 +97,11 @@ class RequestQueryParams(BaseModel):
             raise ValueError('pincode must contain only digits')
         return v
 
+
 class DeliveryUpdate(BaseModel):
     delivery_method: str
     delivery_address: Optional[str] = None
+
 
 class RequestUpdate(BaseModel):
     item_name: Optional[str] = None
@@ -104,8 +113,11 @@ class RequestUpdate(BaseModel):
     reference_url: Optional[str] = None
     reference_image: Optional[str] = None
 
-class DeliveryConfirmresponse(BaseModel):
-    request_id : UUID
+
+class DeliveryConfirmResponse(BaseModel):
+    """Schema for delivery confirmation response"""
+    request_id: UUID
     delivery_confirmed_by_shop: bool
     delivery_response_at: datetime
-    model_config = {"from_attributes" : True}
+    
+    model_config = {"from_attributes": True}

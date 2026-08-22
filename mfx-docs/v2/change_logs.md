@@ -23,7 +23,7 @@ changes:
 - Requests with pickup or confirmed home_delivery move to "Verify" tab; pending/denied stay in "Selected" tab
 - Verify button disabled until shop confirms delivery or buyer switches to pickup
 
-date: 8/23/2026
+date: 8/22/2026
 changes:
 - Created Faker seed script (mfx-core/utils/seed_data.py) for synthetic data generation
 - Added Bhilai pincodes (490001-490050) for realistic location data
@@ -38,3 +38,43 @@ changes:
 - Added verification functions before generation (connection, tables, users)
 - Added `is_negotiable` column to bids table for future use
 - Cleaned database tables (kept only 2 main users: prateeksaha098@gmail.com, prateeksaha963@gmail.com)
+
+date: 8/23/2026
+changes:
+- Verified image_urls JSONB column exists on requests table
+- Updated RequestCreate and RequestResponse schemas with image_urls field
+- Updated create_request service method to handle image_urls
+- Created useCloudinary hook for frontend upload handling
+- Updated PostRequest component with multi-file upload UI
+- Created ImageCarousel component with fullscreen view
+- Added ImageCarousel to RequestDetail page
+- Updated card components to show first image only
+- Added file validation: max 5MB, jpg/png/webp only, max 5 images
+- Added upload progress indicator
+
+date: 8/23/2026
+changes:
+- Added Cloudinary integration for image uploads (cloud_name: dhsf8mub9)
+- Created cloudinary_config.py with upload configuration
+- Created routes/upload.py with /upload/single and /upload/multiple endpoints
+- Added file validation: max 5MB, jpg/png/webp only, max 5 images
+- Added Cloudinary startup verification
+- Added CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET to .env
+- Created useCloudinary hook for frontend upload handling
+- Updated PostRequest component with multi-file upload UI
+- Created ImageCarousel component with fullscreen view
+- Added ImageCarousel to RequestDetail page
+- Updated RequestCreate and RequestResponse schemas with image_urls field
+- Updated create_request service method to handle image_urls
+- Fixed GET /requests/{id} endpoint to return image_urls field
+- Fixed router prefix issues (removed duplicate /requests in routes)
+- Fixed DeliveryConfirmResponse import (corrected spelling)
+- Fixed requests.services import path
+
+
+## License
+
+Copyright © 2026 Prateek Saha
+
+Licensed under the Apache License, Version 2.0.
+See the [LICENSE](LICENSE) file for details.

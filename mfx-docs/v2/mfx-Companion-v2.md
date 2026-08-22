@@ -10,16 +10,17 @@ Sequenced so each step unlocks or de-risks the next. Edit as we go.
 
 ---
 
-## Phase 1: Data Foundation (do first — unlocks everything else)
+## Phase 1: Data Foundation — ✅ DONE (Aug 17, 2026)
 1. `categories` table — migrate existing hardcoded `category` string field to reference this
 2. `request_events` table — start logging views/bid_placed/selected immediately (ML data starts accumulating from day one of v2, don't wait)
 3. Extend `profiles` with new columns (bio, business_hours, preferences, computed stats fields — start as nullable, backfill later); keep DOB/gender optional, not required
 4. Extend `requests` with `views_count`, `urgency`, `preferred_contact_time`
-5. **Faker seed script** — set up a separate staging Supabase project, write Python script using `Faker` + custom logic to generate realistic buyers/shops/requests/bids/auctions matching schema (Bhilai pincodes, electronics price ranges, realistic bid variance). Use this to prototype ML pipelines (Phase 6) without waiting on live volume.
+5. **Faker seed script** — ✅ DONE (Aug 22, 2026). Built `mfx-core/utils/seed_data.py`. *Note: run against the same (production) Supabase project for now, not a separate staging one as originally planned — flagged to revisit/separate later, not blocking.* Generated: 15 buyers + 12 shops (kept 2 real users), 50 requests across 5 categories, 120 bids (108 pending/12 selected), 272 request_events, realistic lifecycle mix (32 open, 7 completed, 6 expired, 5 purchased). Used Supabase Auth Admin API to bypass email confirmation for bulk fake users; duplicate-checking on all inserts.
 
 ---
 
-## Phase 2: Delivery Confirmation Flow
+## Phase 2: Delivery Confirmation Flow — ✅ DONE (Aug 17, 2026)
+*(also added, beyond original scope: `PATCH /requests/{id}/switch-to-pickup`, cancel-order action, and tab-gating in `buyer/Dashboard.jsx`/`MyPurchases.jsx` so unresolved deliveries stay in "Selected" tab while pickup/confirmed move to "Verify" tab)*
 6. Add `delivery_confirmed_by_shop`, `delivery_response_at` to `requests`
 7. Backend: `PATCH /requests/{id}/delivery/confirm`, `PATCH /requests/{id}/delivery/deny`
 8. Frontend: extend `shop/BidDetail.jsx` (confirm/deny UI), extend `buyer/MyPurchases.jsx` (shows shop's response, pickup/cancel option on denial)
@@ -28,13 +29,18 @@ Sequenced so each step unlocks or de-risks the next. Edit as we go.
 
 ---
 
-## Phase 3: Image Uploads (Cloudinary, multi-image)
+## Phase 3: Image Uploads (Cloudinary, multi-image) — ✅ DONE (Aug 23, 2026), except shop-side display (see note below)
 9. Set up Cloudinary account, free-tier upload preset (unsigned, or signed via backend for more control)
 10. Add validation: max file size (e.g. 5MB), type whitelist (jpg/png/webp), max image count per listing (e.g. 3–5) — client-side + server-side check on Cloudinary response metadata
 11. Migrate `reference_image`/`image_url` single fields to `image_urls` array/jsonb field on `requests` and `auctions`
 12. Frontend: replace URL text input with multi-file picker + upload widget in `PostRequest.jsx`, `PostAuction.jsx` (once built)
 13. Card components: show first/primary image only (keep cards lightweight)
 14. Detail pages (`RequestDetail.jsx`, future auction detail): image carousel/gallery component for all uploaded images
+
+---
+
+## Phase 3b: Shop-Side Image Display (gap from Phase 3)
+13b. Add the image carousel (same as `RequestDetail.jsx`) to whichever detail/bid view shops use when reviewing a request before bidding — currently only buyer-side shows images. Cards stay simple/text-only on both sides, per decision to keep images detail-view-only.
 
 ---
 
@@ -130,6 +136,7 @@ Sequenced so each step unlocks or de-risks the next. Edit as we go.
 - Mobile (Phase 11) is last — no point wrapping/PWA-ing a UI that's still changing.
 - Privacy/compliance (Phase 12) is last but should happen before real users beyond your own testing use the app — not a hard blocker for continued dev.
 - Admin panel and shop verification are deliberately deferred, not forgotten — revisit once core v2 feature set is live.
+
 
 ## License
 

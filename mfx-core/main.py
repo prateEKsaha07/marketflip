@@ -4,16 +4,13 @@ import os
 import logging
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="MarketFlip API", version="2.0.0")
+app = FastAPI(title="MarketFlip API", version="2.0.0", redirect_slashes=False)
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -28,27 +25,15 @@ app.add_middleware(
 )
 
 # ============================================
-# IMPORT ROUTERS (after app initialization)
+# IMPORT ROUTERS
 # ============================================
 
-# Import routers
-try:
-    from auth.routes import router as auth_router
-    logger.info("Auth router imported successfully")
-except Exception as e:
-    logger.error(f"Failed to import auth router: {e}")
+from auth.routes import router as auth_router
+from requests.routes import router as requests_router
+from bids.routes import router as bids_router, bid_router
+from routes.upload import router as upload_router
 
-try:
-    from requests.routes import router as requests_router
-    logger.info("Requests router imported successfully")
-except Exception as e:
-    logger.error(f"Failed to import requests router: {e}")
-
-try:
-    from bids.routes import router as bids_router, bid_router
-    logger.info("Bids router imported successfully")
-except Exception as e:
-    logger.error(f"Failed to import bids router: {e}")
+logger.info("All routers imported successfully")
 
 # ============================================
 # INCLUDE ROUTERS
@@ -58,6 +43,9 @@ app.include_router(auth_router)
 app.include_router(requests_router)
 app.include_router(bids_router)
 app.include_router(bid_router)
+app.include_router(upload_router)
+
+logger.info("All routers included successfully")
 
 # ============================================
 # STARTUP EVENT
@@ -65,24 +53,45 @@ app.include_router(bid_router)
 
 @app.on_event("startup")
 async def startup_event():
-    """Check Supabase connection on startup"""
+    """Check Supabase and Cloudinary connections on startup"""
+    
+    # Check Supabase
     try:
         from auth.dependencies import supabase_anon, supabase_admin
         
-        # Test connection with ANON key
-        test_anon = supabase_anon.table("profiles").select("count").limit(1).execute()
+        supabase_anon.table("profiles").select("count").limit(1).execute()
         logger.info("Supabase ANON connection successful")
         
-        # Test connection with SERVICE ROLE key
-        test_admin = supabase_admin.table("profiles").select("count").limit(1).execute()
+        supabase_admin.table("profiles").select("count").limit(1).execute()
         logger.info("Supabase SERVICE ROLE connection successful")
         
     except Exception as e:
         logger.error(f"Supabase connection failed: {str(e)}")
-        logger.error("Please check environment variables")
+    
+    # Check Cloudinary
+    try:
+        import cloudinary
+        from utils.cloudinary_config import CLOUDINARY_CLOUD_NAME
+        
+        if CLOUDINARY_CLOUD_NAME:
+            logger.info(f"Cloudinary configured with cloud name: {CLOUDINARY_CLOUD_NAME}")
+            
+            # Test upload by checking config (no actual upload)
+            config = cloudinary.config()
+            if config.cloud_name:
+                logger.info("Cloudinary connection verified")
+            else:
+                logger.warning("Cloudinary config loaded but cloud_name is empty")
+        else:
+            logger.warning("Cloudinary credentials not set. Image upload will not work.")
+            
+    except ImportError:
+        logger.warning("Cloudinary package not installed. Image upload will not work.")
+    except Exception as e:
+        logger.warning(f"Cloudinary verification failed: {str(e)}")
 
 # ============================================
-# ROOT ENDPOINT
+# ROOT ENDPOINTS
 # ============================================
 
 @app.get("/")

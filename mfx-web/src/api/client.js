@@ -6,7 +6,7 @@ const render_url = isDev
   ? 'http://127.0.0.1:8000' 
   : (import.meta.env.VITE_API_URL || 'https://marketflip.onrender.com');
 
-console.log(`API Base URL: ${render_url}`);  // Helpful for debugging
+console.log(`API Base URL: ${render_url}`);
 
 const api = axios.create({
   baseURL: render_url,

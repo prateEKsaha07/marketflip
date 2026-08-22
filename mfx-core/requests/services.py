@@ -30,8 +30,10 @@ class RequestService:
                 "reference_url", 
                 "reference_image",
                 "delivery_method",
-                "delivery_address"
-                ]
+                "delivery_address",
+                "image_urls" 
+            ]
+            
             for field in optional_fields:
                 if field in request_data and request_data[field] is not None:
                     data[field] = request_data[field]
@@ -91,6 +93,12 @@ class RequestService:
                 raise Exception("Request not found")
             
             request = request_response.data[0]
+            
+            # Ensure image_urls is always included
+            if "image_urls" not in request:
+                request["image_urls"] = []
+            elif request["image_urls"] is None:
+                request["image_urls"] = []
             
             # Check if current user is the buyer
             is_buyer = str(request["buyer_id"]) == current_user_id
@@ -155,24 +163,24 @@ class RequestService:
 
     def confirm_delivery(self, request_id: UUID, shop_id: UUID) -> Dict[str, Any]:
         """
-    Shop confirms home delivery for a request.
-    
-    Args:
-        request_id: The request ID
-        shop_id: The shop owner's profile ID
+        Shop confirms home delivery for a request.
         
-    Returns:
-        Updated request data with delivery confirmation
-        
-    Raises:
-        ValueError: If validation fails
-    """
+        Args:
+            request_id: The request ID
+            shop_id: The shop owner's profile ID
+            
+        Returns:
+            Updated request data with delivery confirmation
+            
+        Raises:
+            ValueError: If validation fails
+        """
         try:
             request_result = self.supabase_admin.table("requests")\
-            .select("*, selected_bid_id") \
-            .eq("status", "purchased") \
-            .eq("id", str(request_id)) \
-            .execute()
+                .select("*, selected_bid_id") \
+                .eq("status", "purchased") \
+                .eq("id", str(request_id)) \
+                .execute()
         
             if not request_result.data:
                 raise ValueError("Request not found or not in 'purchased' status")
@@ -217,24 +225,24 @@ class RequestService:
 
     def deny_delivery(self, request_id: str, shop_id: str) -> Dict[str, Any]:
         """
-    Shop denies home delivery for a request.
-    
-    Args:
-        request_id: The request ID
-        shop_id: The shop owner's profile ID
+        Shop denies home delivery for a request.
         
-    Returns:
-        Updated request data with delivery denial
-        
-    Raises:
-        ValueError: If validation fails
-    """
+        Args:
+            request_id: The request ID
+            shop_id: The shop owner's profile ID
+            
+        Returns:
+            Updated request data with delivery denial
+            
+        Raises:
+            ValueError: If validation fails
+        """
         try:
             request_result = self.supabase_admin.table("requests")\
-            .select("*, selected_bid_id") \
-            .eq("id", str(request_id)) \
-            .eq("status", "purchased") \
-            .execute()
+                .select("*, selected_bid_id") \
+                .eq("id", str(request_id)) \
+                .eq("status", "purchased") \
+                .execute()
         
             if not request_result.data:
                 raise ValueError("Request not found or not in 'purchased' state")
@@ -249,10 +257,10 @@ class RequestService:
                 raise ValueError("No bid selected for this request")
         
             bid_result = self.supabase_admin.table("bids")\
-            .select("shop_id") \
-            .eq("id", selected_bid_id) \
-            .eq("status", "selected") \
-            .execute()
+                .select("shop_id") \
+                .eq("id", selected_bid_id) \
+                .eq("status", "selected") \
+                .execute()
         
             if not bid_result.data:
                 raise ValueError("Selected bid not found")
@@ -262,11 +270,11 @@ class RequestService:
         
             update_result = self.supabase_admin.table("requests")\
                 .update({
-                "delivery_confirmed_by_shop": False,
-                "delivery_response_at": datetime.utcnow().isoformat()
-            })\
-            .eq("id", str(request_id))\
-            .execute()
+                    "delivery_confirmed_by_shop": False,
+                    "delivery_response_at": datetime.utcnow().isoformat()
+                })\
+                .eq("id", str(request_id))\
+                .execute()
         
             if not update_result.data:
                 raise ValueError("Failed to update delivery denial")
@@ -275,13 +283,4 @@ class RequestService:
         
         except Exception as e:
             logger.error(f"Error while denying delivery for {request_id}: {str(e)}")
-            raise 
-         
-
-    
-
-
-        
-
-            
-        
+            raise

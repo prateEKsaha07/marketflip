@@ -19,9 +19,145 @@ import {
   Home,
   Store,
   Check,
-  AlertCircle
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
 import api from '../../api/client';
+
+// Image Carousel Component (inline for now, or import from components)
+const ImageCarousel = ({ images, alt = 'Product image' }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  if (!images || images.length === 0) {
+    return (
+      <div className="w-full h-64 bg-[#F8F6F0] rounded-xl flex items-center justify-center border border-[#EEECE6]">
+        <div className="flex flex-col items-center gap-2">
+          <ImageIcon size={32} className="text-[#A0A0B0]" />
+          <span className="text-[#A0A0B0] text-sm">No images available</span>
+        </div>
+      </div>
+    );
+  }
+
+  const goToPrevious = () => {
+    setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+  };
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+  };
+
+  const openFullscreen = () => {
+    setIsFullscreen(true);
+  };
+
+  const closeFullscreen = () => {
+    setIsFullscreen(false);
+  };
+
+  return (
+    <>
+      {/* Main Carousel */}
+      <div className="relative w-full h-64 md:h-96 bg-[#F8F6F0] rounded-xl overflow-hidden border border-[#EEECE6] group">
+        <img
+          src={images[currentIndex]}
+          alt={`${alt} ${currentIndex + 1}`}
+          className="w-full h-full object-contain cursor-pointer"
+          onClick={openFullscreen}
+        />
+
+        {/* Navigation Arrows */}
+        {images.length > 1 && (
+          <>
+            <button
+              onClick={goToPrevious}
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button
+              onClick={goToNext}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </>
+        )}
+
+        {/* Image Counter */}
+        {images.length > 1 && (
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-3 py-1 rounded-full">
+            {currentIndex + 1} / {images.length}
+          </div>
+        )}
+      </div>
+
+      {/* Thumbnails */}
+      {images.length > 1 && (
+        <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+          {images.map((image, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentIndex(index)}
+              className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                index === currentIndex
+                  ? 'border-[#1A1A2E]'
+                  : 'border-transparent hover:border-[#A0A0B0]'
+              }`}
+            >
+              <img
+                src={image}
+                alt={`Thumbnail ${index + 1}`}
+                className="w-full h-full object-cover"
+              />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Fullscreen Modal */}
+      {isFullscreen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={closeFullscreen}
+        >
+          <button
+            onClick={closeFullscreen}
+            className="absolute top-4 right-4 text-white hover:text-[#FFBE91] transition-colors"
+          >
+            <X size={32} />
+          </button>
+          <img
+            src={images[currentIndex]}
+            alt={`${alt} ${currentIndex + 1}`}
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          {images.length > 1 && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 text-white rounded-full p-3 transition-colors"
+              >
+                <ChevronLeft size={28} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); goToNext(); }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 text-white rounded-full p-3 transition-colors"
+              >
+                <ChevronRight size={28} />
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  );
+};
 
 const RequestDetail = () => {
   const { id } = useParams();
@@ -114,7 +250,7 @@ const RequestDetail = () => {
     } catch (err) {
       console.error('Select bid error:', err);
       const errorMsg = err.response?.data?.detail || 'Unknown error';
-      alert(`❌ Failed to select bid: ${errorMsg}`);
+      alert('Failed to select bid: ' + errorMsg);
     } finally {
       setSelecting(false);
     }
@@ -126,11 +262,11 @@ const RequestDetail = () => {
     setDeleting(true);
     try {
       await api.delete(`/requests/${id}`);
-      alert('✅ Request deleted successfully');
+      alert('Request deleted successfully');
       navigate('/buyer/dashboard');
     } catch (err) {
       const errorMsg = err.response?.data?.detail || 'Unknown error';
-      alert(`❌ Failed to delete request: ${errorMsg}`);
+      alert('Failed to delete request: ' + errorMsg);
     } finally {
       setDeleting(false);
     }
@@ -149,9 +285,9 @@ const RequestDetail = () => {
 
   const getBidStatusBadge = (status) => {
     switch(status) {
-      case 'selected': return { bg: 'bg-emerald-100 text-emerald-700', label: 'Selected ✓' };
-      case 'rejected': return { bg: 'bg-rose-100 text-rose-700', label: 'Rejected ✗' };
-      case 'pending': return { bg: 'bg-amber-100 text-amber-700', label: 'Pending ⏳' };
+      case 'selected': return { bg: 'bg-emerald-100 text-emerald-700', label: 'Selected' };
+      case 'rejected': return { bg: 'bg-rose-100 text-rose-700', label: 'Rejected' };
+      case 'pending': return { bg: 'bg-amber-100 text-amber-700', label: 'Pending' };
       default: return { bg: 'bg-gray-100 text-gray-700', label: status };
     }
   };
@@ -171,7 +307,9 @@ const RequestDetail = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FFFCE1] p-4">
         <Card className="max-w-md w-full text-center p-8 border-rose-200 bg-rose-50/50">
-          <div className="text-5xl mb-4">🔍</div>
+          <div className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle size={32} className="text-rose-500" />
+          </div>
           <h2 className="text-2xl font-bold text-rose-700">Request Not Found</h2>
           <p className="text-rose-600 mt-2">The request you're looking for doesn't exist or has been removed.</p>
           <Button 
@@ -230,6 +368,13 @@ const RequestDetail = () => {
           </div>
         </div>
 
+        {/* Image Carousel */}
+        {request.image_urls && request.image_urls.length > 0 && (
+          <div className="mb-6">
+            <ImageCarousel images={request.image_urls} alt={request.item_name} />
+          </div>
+        )}
+
         {/* Success Card */}
         {showSuccessCard && selectedBidInfo && (
           <Card className="mb-6 border-emerald-400 bg-emerald-50/80 shadow-lg">
@@ -239,7 +384,7 @@ const RequestDetail = () => {
                   <CheckCircle size={24} className="text-emerald-600" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-xl font-bold text-emerald-800">🎉 Purchase Finalized!</h3>
+                  <h3 className="text-xl font-bold text-emerald-800">Purchase Finalized!</h3>
                   <p className="text-emerald-700 text-sm">Your bid has been selected successfully. The request is now marked as purchased.</p>
                   
                   <div className="mt-4 p-4 bg-white rounded-xl border border-emerald-200">

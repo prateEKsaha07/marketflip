@@ -17,12 +17,21 @@ import {
   AlertCircle,
   ArrowRight,
   Link2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Upload,
+  X,
+  Home,
+  Truck,
+  Clock,
+  Pin
 } from 'lucide-react';
 import api from '../../api/client';
+import { useCloudinary } from '../../hooks/useCloudinary';
 
 const PostRequest = () => {
   const navigate = useNavigate();
+  const { uploadMultiple, uploading, progress, error: uploadError, reset } = useCloudinary();
+  
   const [formData, setFormData] = useState({
     item_name: '',
     description: '',
@@ -30,9 +39,12 @@ const PostRequest = () => {
     budget_max: '',
     pincode: '',
     category: 'electronics',
-    reference_url: '',
-    reference_image: ''
+    delivery_method: 'home_delivery',
+    delivery_address: '',
   });
+  
+  const [imageFiles, setImageFiles] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -44,11 +56,50 @@ const PostRequest = () => {
     if (success) setSuccess('');
   };
 
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    console.log('Files selected:', files);
+    
+    const validFiles = files.filter((file) => {
+      const isValidType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type);
+      const isValidSize = file.size <= 5 * 1024 * 1024;
+      return isValidType && isValidSize;
+    });
+
+    if (validFiles.length !== files.length) {
+      setError('Some files were skipped. Allowed: jpg, png, webp, max 5MB each.');
+    }
+
+    const totalImages = imageFiles.length + validFiles.length;
+    if (totalImages > 5) {
+      setError('Maximum 5 images allowed.');
+      return;
+    }
+
+    const previews = validFiles.map((file) => URL.createObjectURL(file));
+    setImageFiles((prev) => [...prev, ...validFiles]);
+    setImagePreviews((prev) => [...prev, ...previews]);
+    setError('');
+    console.log('Valid files:', validFiles.length, 'Image files:', imageFiles.length + validFiles.length);
+  };
+
+  const removeImage = (index) => {
+    const newFiles = imageFiles.filter((_, i) => i !== index);
+    const newPreviews = imagePreviews.filter((_, i) => i !== index);
+    setImageFiles(newFiles);
+    setImagePreviews(newPreviews);
+    URL.revokeObjectURL(imagePreviews[index]);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     setSuccess('');
+
+    console.log('=== SUBMITTING REQUEST ===');
+    console.log('Form data:', formData);
+    console.log('Image files:', imageFiles.length, 'files');
 
     if (parseInt(formData.budget_min) > parseInt(formData.budget_max)) {
       setError('Min budget cannot be greater than max budget');
@@ -62,19 +113,41 @@ const PostRequest = () => {
       return;
     }
 
+    if (formData.delivery_method === 'home_delivery' && !formData.delivery_address.trim()) {
+      setError('Please enter a delivery address');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const payload = {
+      let uploadedUrls = [];
+      
+      if (imageFiles.length > 0) {
+        console.log('Uploading images to Cloudinary...');
+        const results = await uploadMultiple(imageFiles);
+        console.log('Upload results:', results);
+        uploadedUrls = results.map((result) => result.url);
+        console.log('Uploaded URLs:', uploadedUrls);
+      } else {
+        console.log('No images to upload');
+      }
+
+      const requestData = {
         ...formData,
         budget_min: parseInt(formData.budget_min),
         budget_max: parseInt(formData.budget_max),
-        reference_url: formData.reference_url || null,
-        reference_image: formData.reference_image || null
+        image_urls: uploadedUrls,
       };
       
-      const response = await api.post('/requests', payload);
+      console.log('Request data being sent:', requestData);
+
+      // FIX: Remove trailing slash
+      const response = await api.post('/requests', requestData);
       console.log('Request created:', response.data);
-      setSuccess('✅ Request created successfully!');
+      console.log('Image URLs in response:', response.data.image_urls);
       
+      setSuccess('Request created successfully!');
+
       setFormData({
         item_name: '',
         description: '',
@@ -82,17 +155,20 @@ const PostRequest = () => {
         budget_max: '',
         pincode: '',
         category: 'electronics',
-        reference_url: '',
-        reference_image: ''
+        delivery_method: 'home_delivery',
+        delivery_address: '',
       });
-      
+      setImageFiles([]);
+      setImagePreviews([]);
+
       setTimeout(() => {
         navigate('/buyer/dashboard');
-      }, 2000);
-      
+      }, 1500);
+
     } catch (err) {
+      console.error('Error:', err);
+      console.error('Error response:', err.response);
       setError(err.response?.data?.detail || 'Failed to create request');
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -130,7 +206,6 @@ const PostRequest = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFFCE1] via-[#FFDDB0]/10 to-[#CFEBFF]/10 p-4 md:p-6">
       <div className="max-w-xl mx-auto">
-        {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -160,7 +235,6 @@ const PostRequest = () => {
           </motion.div>
         </motion.div>
 
-        {/* Form Card */}
         <motion.div
           initial="hidden"
           animate="visible"
@@ -175,7 +249,6 @@ const PostRequest = () => {
             />
             
             <CardContent className="p-5 md:p-6">
-              {/* Success Message */}
               <AnimatePresence>
                 {success && (
                   <motion.div
@@ -199,7 +272,6 @@ const PostRequest = () => {
                 )}
               </AnimatePresence>
 
-              {/* Error Message */}
               <AnimatePresence>
                 {error && (
                   <motion.div
@@ -217,7 +289,6 @@ const PostRequest = () => {
               </AnimatePresence>
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Item Name */}
                 <motion.div 
                   custom={0} variants={fieldVariants} initial="hidden" animate="visible"
                   onFocus={() => setFocused('item')}
@@ -248,7 +319,6 @@ const PostRequest = () => {
                   <p className="text-[10px] text-[#A0A0B0] mt-1">Be specific to get better offers</p>
                 </motion.div>
 
-                {/* Description */}
                 <motion.div 
                   custom={1} variants={fieldVariants} initial="hidden" animate="visible"
                   onFocus={() => setFocused('desc')}
@@ -277,7 +347,6 @@ const PostRequest = () => {
                   </motion.div>
                 </motion.div>
 
-                {/* Budget */}
                 <motion.div 
                   custom={2} variants={fieldVariants} initial="hidden" animate="visible"
                   className="grid grid-cols-2 gap-3"
@@ -340,7 +409,6 @@ const PostRequest = () => {
                   </div>
                 </motion.div>
 
-                {/* Pincode */}
                 <motion.div 
                   custom={3} variants={fieldVariants} initial="hidden" animate="visible"
                   onFocus={() => setFocused('pin')}
@@ -372,7 +440,6 @@ const PostRequest = () => {
                   <p className="text-[10px] text-[#A0A0B0] mt-1">Shop owners in your area will see your request</p>
                 </motion.div>
 
-                {/* Category */}
                 <motion.div 
                   custom={4} variants={fieldVariants} initial="hidden" animate="visible"
                   onFocus={() => setFocused('cat')}
@@ -396,90 +463,175 @@ const PostRequest = () => {
                       onChange={handleChange}
                       className="w-full px-3 py-2.5 text-sm bg-[#FFFCE1]/80 border-2 border-[#FFDDB0]/50 rounded-xl text-[#1A1A2E] focus:outline-none focus:ring-4 focus:ring-[#FFDDB0]/20 focus:border-[#FFDDB0] transition-all appearance-none"
                     >
-                      <option value="electronics">📱 Electronics</option>
-                      <option value="clothing">👕 Clothing</option>
-                      <option value="furniture">🪑 Furniture</option>
-                      <option value="books">📚 Books</option>
-                      <option value="vehicles">🚗 Vehicles</option>
-                      <option value="other">📦 Other</option>
+                      <option value="electronics">Electronics</option>
+                      <option value="furniture">Furniture</option>
+                      <option value="clothing">Clothing</option>
+                      <option value="books">Books</option>
+                      <option value="home_kitchen">Home & Kitchen</option>
                     </select>
                   </motion.div>
                 </motion.div>
 
-                {/* Reference URL - NEW */}
                 <motion.div 
                   custom={5} variants={fieldVariants} initial="hidden" animate="visible"
-                  onFocus={() => setFocused('ref')}
-                  onBlur={() => setFocused(null)}
                 >
                   <label className="block text-xs font-semibold text-[#1A1A2E] mb-1 flex items-center gap-2">
                     <motion.div 
                       variants={iconVariants}
                       initial="initial"
-                      animate={focused === 'ref' ? 'hover' : 'animate'}
-                      className="w-5 h-5 rounded-lg bg-[#CFEBFF]/10 flex items-center justify-center"
-                    >
-                      <Link2 size={12} className="text-[#CFEBFF]" />
-                    </motion.div>
-                    Reference URL
-                  </label>
-                  <motion.div variants={inputVariants} animate={focused === 'ref' ? 'focus' : 'blur'}>
-                    <input
-                      type="url"
-                      name="reference_url"
-                      value={formData.reference_url}
-                      onChange={handleChange}
-                      placeholder="https://example.com/product"
-                      className="w-full px-3 py-2.5 text-sm bg-[#FFFCE1]/80 border-2 border-[#FFDDB0]/50 rounded-xl text-[#1A1A2E] placeholder-[#A0A0B0] focus:outline-none focus:ring-4 focus:ring-[#CFEBFF]/20 focus:border-[#CFEBFF] transition-all"
-                    />
-                  </motion.div>
-                  <p className="text-[10px] text-[#A0A0B0] mt-1">Link to product for reference</p>
-                </motion.div>
-
-                {/* Reference Image - NEW */}
-                <motion.div 
-                  custom={6} variants={fieldVariants} initial="hidden" animate="visible"
-                  onFocus={() => setFocused('img')}
-                  onBlur={() => setFocused(null)}
-                >
-                  <label className="block text-xs font-semibold text-[#1A1A2E] mb-1 flex items-center gap-2">
-                    <motion.div 
-                      variants={iconVariants}
-                      initial="initial"
-                      animate={focused === 'img' ? 'hover' : 'animate'}
+                      animate="animate"
                       className="w-5 h-5 rounded-lg bg-[#FFBE91]/10 flex items-center justify-center"
                     >
-                      <ImageIcon size={12} className="text-[#FFBE91]" />
+                      <Truck size={12} className="text-[#FFBE91]" />
                     </motion.div>
-                    Reference Image URL
+                    Delivery Method
                   </label>
-                  <motion.div variants={inputVariants} animate={focused === 'img' ? 'focus' : 'blur'}>
-                    <input
-                      type="url"
-                      name="reference_image"
-                      value={formData.reference_image}
-                      onChange={handleChange}
-                      placeholder="https://example.com/image.jpg"
-                      className="w-full px-3 py-2.5 text-sm bg-[#FFFCE1]/80 border-2 border-[#FFDDB0]/50 rounded-xl text-[#1A1A2E] placeholder-[#A0A0B0] focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
-                    />
-                  </motion.div>
-                  <p className="text-[10px] text-[#A0A0B0] mt-1">Image URL for reference</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, delivery_method: 'home_delivery' }));
+                        if (error) setError('');
+                      }}
+                      className={`flex items-center justify-center gap-2 px-3 py-2.5 text-sm rounded-xl border-2 transition-all ${
+                        formData.delivery_method === 'home_delivery'
+                          ? 'border-[#FFBE91] bg-[#FFBE91]/10 text-[#1A1A2E]'
+                          : 'border-[#EEECE6] bg-white/50 text-[#A0A0B0] hover:border-[#FFDDB0]'
+                      }`}
+                    >
+                      <Home size={14} />
+                      Home Delivery
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, delivery_method: 'pickup' }));
+                        if (error) setError('');
+                      }}
+                      className={`flex items-center justify-center gap-2 px-3 py-2.5 text-sm rounded-xl border-2 transition-all ${
+                        formData.delivery_method === 'pickup'
+                          ? 'border-[#FFBE91] bg-[#FFBE91]/10 text-[#1A1A2E]'
+                          : 'border-[#EEECE6] bg-white/50 text-[#A0A0B0] hover:border-[#FFDDB0]'
+                      }`}
+                    >
+                      <MapPin size={14} />
+                      Pickup
+                    </button>
+                  </div>
                 </motion.div>
 
-                {/* Submit Button */}
+                {formData.delivery_method === 'home_delivery' && (
+                  <motion.div 
+                    custom={6} variants={fieldVariants} initial="hidden" animate="visible"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                  >
+                    <label className="block text-xs font-semibold text-[#1A1A2E] mb-1 flex items-center gap-2">
+                      <span>Delivery Address</span>
+                      <span className="text-rose-400">*</span>
+                    </label>
+                    <textarea
+                      name="delivery_address"
+                      value={formData.delivery_address}
+                      onChange={handleChange}
+                      placeholder="Enter your full delivery address..."
+                      rows={2}
+                      className="w-full px-3 py-2.5 text-sm bg-[#FFFCE1]/80 border-2 border-[#FFDDB0]/50 rounded-xl text-[#1A1A2E] placeholder-[#A0A0B0] focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all resize-none"
+                      required={formData.delivery_method === 'home_delivery'}
+                    />
+                  </motion.div>
+                )}
+
                 <motion.div 
                   custom={7} variants={fieldVariants} initial="hidden" animate="visible"
+                >
+                  <label className="block text-xs font-semibold text-[#1A1A2E] mb-1 flex items-center gap-2">
+                    <motion.div 
+                      variants={iconVariants}
+                      initial="initial"
+                      animate="animate"
+                      className="w-5 h-5 rounded-lg bg-[#CFEBFF]/10 flex items-center justify-center"
+                    >
+                      <ImageIcon size={12} className="text-[#CFEBFF]" />
+                    </motion.div>
+                    Images (Optional, max 5)
+                  </label>
+                  <div className="border-2 border-dashed border-[#FFDDB0]/50 rounded-xl p-4 text-center hover:border-[#FFBE91] transition-colors">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      onChange={handleFileChange}
+                      className="hidden"
+                      id="image-upload"
+                      disabled={imageFiles.length >= 5 || loading}
+                    />
+                    <label
+                      htmlFor="image-upload"
+                      className={`cursor-pointer flex flex-col items-center gap-2 ${(loading) ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      <Upload size={28} className="text-[#A0A0B0]" />
+                      <span className="text-sm text-[#A0A0B0]">
+                        Click to upload images (JPG, PNG, WEBP, max 5MB each)
+                      </span>
+                      <span className="text-xs text-[#A0A0B0]">
+                        {imageFiles.length}/5 images selected
+                      </span>
+                    </label>
+                  </div>
+
+                  {imagePreviews.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-2">
+                      {imagePreviews.map((preview, index) => (
+                        <div key={index} className="relative group aspect-square">
+                          <img
+                            src={preview}
+                            alt={`Preview ${index + 1}`}
+                            className="w-full h-full object-cover rounded-lg border border-[#EEECE6]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            disabled={loading}
+                            className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 hover:bg-rose-600 transition-colors disabled:opacity-50"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {uploading && (
+                    <div className="mt-2">
+                      <div className="flex items-center gap-2">
+                        <Loader2 size={16} className="animate-spin text-[#FFBE91]" />
+                        <span className="text-sm text-[#4A4A5A]">Uploading... {progress}%</span>
+                      </div>
+                      <div className="w-full bg-[#EEECE6] rounded-full h-2 mt-1">
+                        <div
+                          className="bg-[#FFBE91] h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+
+                <motion.div 
+                  custom={8} variants={fieldVariants} initial="hidden" animate="visible"
                   className="pt-2"
                 >
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || uploading}
                     className="w-full bg-gradient-to-r from-[#FFBE91] via-[#FFDDB0] to-[#CFEBFF] hover:from-[#FFA87A] hover:via-[#FFDDB0] hover:to-[#CFEBFF] text-[#1A1A2E] py-3 text-sm font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {loading ? (
+                    {loading || uploading ? (
                       <>
                         <Loader2 size={16} className="animate-spin" />
-                        Creating...
+                        {uploading ? `Uploading... ${progress}%` : 'Creating...'}
                       </>
                     ) : (
                       <>
@@ -492,7 +644,6 @@ const PostRequest = () => {
                 </motion.div>
               </form>
 
-              {/* Footer */}
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -500,11 +651,11 @@ const PostRequest = () => {
                 className="mt-4 pt-3 border-t border-[#FFDDB0]/30 flex flex-wrap items-center justify-between gap-2 text-[10px] text-[#A0A0B0]"
               >
                 <span className="flex items-center gap-1.5">
-                  <span className="text-[#FFBE91]">📌</span>
+                  <Pin size={12} className="text-[#FFBE91]" />
                   Visible to local shops
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="text-[#CFEBFF]">⏳</span>
+                  <Clock size={12} className="text-[#CFEBFF]" />
                   Expires in 7 days
                 </span>
               </motion.div>
