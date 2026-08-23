@@ -41,13 +41,27 @@ const MyBids = () => {
 
   const fetchMyBids = async () => {
     setLoading(true);
+    setError('');
     try {
       const response = await api.get('/bids');
-      console.log('My bids:', response.data);
-      setBids(response.data);
+      console.log('My bids response:', response.data);
+      
+      let bidsData = response.data;
+      if (Array.isArray(bidsData)) {
+        setBids(bidsData);
+      } else if (bidsData && typeof bidsData === 'object') {
+        if (bidsData.data && Array.isArray(bidsData.data)) {
+          setBids(bidsData.data);
+        } else {
+          setBids([]);
+        }
+      } else {
+        setBids([]);
+      }
     } catch (err) {
-      setError('Failed to fetch your bids');
-      console.error(err);
+      console.error('Fetch bids error:', err);
+      setError('Failed to fetch your bids: ' + (err.response?.data?.detail || err.message));
+      setBids([]);
     } finally {
       setLoading(false);
     }
@@ -145,10 +159,56 @@ const MyBids = () => {
     }
   };
 
-  const handleBidClick = (bid) => {
-    if (bid.status === 'selected') {
-      navigate(`/shop/bid/${bid.id}`);
+  // Navigate to bid detail page
+  const goToBidDetail = (bidId) => {
+    console.log('=== goToBidDetail called ===');
+    console.log('Bid ID:', bidId);
+    
+    if (!bidId) {
+      console.error('No bid ID provided');
+      return;
     }
+    
+    const url = `/shop/bid/${bidId}`;
+    console.log('Navigating to:', url);
+    navigate(url);
+  };
+
+  // Handle card click
+  const handleCardClick = (bid) => {
+    console.log('=== Card clicked ===');
+    console.log('Bid:', bid);
+    console.log('Bid status:', bid.status);
+    console.log('Bid ID:', bid.id);
+    
+    // Navigate for all bids (selected, pending, rejected)
+    goToBidDetail(bid.id);
+  };
+
+  const getItemName = (bid) => {
+    if (bid.requests && bid.requests.item_name) {
+      return bid.requests.item_name;
+    }
+    if (bid.request && bid.request.item_name) {
+      return bid.request.item_name;
+    }
+    if (bid.item_name) {
+      return bid.item_name;
+    }
+    return 'Unknown Request';
+  };
+
+  const getRequestId = (bid) => {
+    if (bid.requests && bid.requests.id) {
+      return bid.requests.id;
+    }
+    if (bid.request && bid.request.id) {
+      return bid.request.id;
+    }
+    if (bid.request_id) {
+      return bid.request_id;
+    }
+    return null;
   };
 
   const containerVariants = {
@@ -256,19 +316,21 @@ const MyBids = () => {
               const isEditing = editing === bid.id;
               const isSelected = bid.status === 'selected';
               const isPending = bid.status === 'pending';
+              const itemName = getItemName(bid);
+              const requestId = getRequestId(bid);
               
               return (
                 <motion.div
                   key={bid.id}
                   variants={itemVariants}
-                  onClick={() => handleBidClick(bid)}
                   className={`
                     group relative bg-white/80 backdrop-blur-xl rounded-xl p-4
                     shadow-sm shadow-[#1A1A2E]/5 hover:shadow-md hover:shadow-[#1A1A2E]/10
-                    transition-all duration-300 cursor-pointer
+                    transition-all duration-300
                     border-l-3 ${status.borderLeft}
-                    ${isSelected ? 'hover:-translate-y-0.5' : ''}
+                    cursor-pointer hover:-translate-y-0.5
                   `}
+                  onClick={() => handleCardClick(bid)}
                 >
                   {/* Subtle Glow */}
                   <div className={`absolute inset-0 ${status.bg} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-xl`} />
@@ -332,7 +394,7 @@ const MyBids = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
                             <h3 className="text-sm font-medium text-[#1A1A2E] truncate">
-                              {bid.requests?.item_name || 'Unknown Request'}
+                              {itemName}
                             </h3>
                             <span className={`
                               inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium
@@ -358,10 +420,10 @@ const MyBids = () => {
                               {new Date(bid.created_at).toLocaleDateString()}
                             </span>
                           </div>
-                          {bid.requests && (
+                          {requestId && (
                             <p className="text-[10px] text-[#A0A0B0] mt-1 flex items-center gap-1">
                               <Store size={11} />
-                              Request #{bid.requests.id?.slice(0, 8)}...
+                              Request #{requestId.slice(0, 8)}...
                             </p>
                           )}
                         </div>
@@ -386,11 +448,17 @@ const MyBids = () => {
                             </>
                           )}
                           {isSelected && (
-                            <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-700 rounded-lg text-[10px] font-medium transition-all group-hover:bg-emerald-500/15">
+                            <button
+                              onClick={() => {
+                                console.log('View Details button clicked for bid:', bid.id);
+                                goToBidDetail(bid.id);
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-700 rounded-lg text-[10px] font-medium transition-all hover:bg-emerald-500/20"
+                            >
                               <Eye size={12} />
-                              View
-                              <ChevronRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
-                            </div>
+                              View Details
+                              <ChevronRight size={12} className="transition-transform" />
+                            </button>
                           )}
                         </div>
                       </div>

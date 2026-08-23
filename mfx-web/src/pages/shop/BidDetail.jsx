@@ -27,10 +27,12 @@ import {
   AlertCircle,
   Loader2,
   ThumbsUp,
-  ThumbsDown
+  ThumbsDown,
+  Image as ImageIcon
 } from 'lucide-react';
 import api from '../../api/client';
 import { confirmDelivery, denyDelivery } from '../../api/client';
+import ImageCarousel from '../../components/ImageCarousel';
 
 const BidDetail = () => {
   const { id } = useParams();
@@ -51,15 +53,38 @@ const BidDetail = () => {
     setError('');
     try {
       console.log('Fetching bid details for:', id);
-      const response = await api.get(`/bids/${id}/buyer`);
-      console.log('Bid details:', response.data);
-      console.log('Request object:', response.data.request);
-      console.log('Delivery fields:', {
-        delivery_method: response.data.request.delivery_method,
-        delivery_confirmed_by_shop: response.data.request.delivery_confirmed_by_shop,
-        delivery_address: response.data.request.delivery_address
-      });
-      setData(response.data);
+      
+      const bidResponse = await api.get(`/bids/${id}`);
+      console.log('Bid response:', bidResponse.data);
+      
+      const requestId = bidResponse.data.request_id;
+      const requestResponse = await api.get(`/requests/${requestId}`);
+      console.log('Request response:', requestResponse.data);
+      
+      let buyerDetails = null;
+      if (bidResponse.data.status === 'selected') {
+        try {
+          const buyerResponse = await api.get(`/bids/${id}/buyer`);
+          buyerDetails = buyerResponse.data;
+          console.log('Buyer details:', buyerDetails);
+        } catch (err) {
+          console.log('Could not fetch buyer details:', err.message);
+        }
+      }
+      
+      const combinedData = {
+        bid: bidResponse.data,
+        request: requestResponse.data,
+        buyer: buyerDetails?.buyer || {
+          name: 'Buyer',
+          phone: 'N/A',
+          address: 'N/A',
+          pincode: 'N/A'
+        },
+        isSelected: bidResponse.data.status === 'selected'
+      };
+      
+      setData(combinedData);
     } catch (err) {
       console.error('Fetch error:', err);
       setError(err.response?.data?.detail || 'Failed to fetch bid details');
@@ -166,17 +191,18 @@ const BidDetail = () => {
 
   if (!data) return null;
 
-  const { bid, request, buyer } = data;
+  const { bid, request, buyer, isSelected } = data;
   const bidStatus = getStatusConfig(bid.status);
   const requestStatus = getStatusConfig(request.status);
-  const isSelected = bid.status === 'selected';
+  const isBidSelected = bid.status === 'selected';
 
-  // Check if delivery confirmation is needed
   const needsDeliveryConfirmation = 
-    isSelected && 
+    isBidSelected && 
     request.status === 'purchased' && 
     request.delivery_method === 'home_delivery' &&
     (request.delivery_confirmed_by_shop === null || request.delivery_confirmed_by_shop === undefined);
+
+  const hasImages = request.image_urls && request.image_urls.length > 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
@@ -190,16 +216,16 @@ const BidDetail = () => {
         >
           <div className="flex items-center gap-3">
             <Button 
-              onClick={() => navigate('/shop/dashboard')}
+              onClick={() => navigate('/shop/my-bids')}
               variant="ghost"
               className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
             >
               <ArrowLeft size={14} className="mr-1.5" />
-              Dashboard
+              My Bids
             </Button>
             <h1 className="text-lg font-semibold text-[#1A1A2E] tracking-tight">Bid Details</h1>
           </div>
-          {isSelected && (
+          {isBidSelected && (
             <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-200">
               <Sparkles size={12} className="text-emerald-600" />
               <span className="text-[10px] font-medium text-emerald-600">Selected</span>
@@ -213,8 +239,8 @@ const BidDetail = () => {
           animate="visible"
           className="space-y-4"
         >
-          {/* Success Banner - Only for selected bids */}
-          {isSelected && (
+          {/* Success Banner */}
+          {isBidSelected && (
             <motion.div 
               variants={itemVariants}
               className="relative overflow-hidden bg-gradient-to-r from-emerald-50/80 to-emerald-100/30 backdrop-blur-sm rounded-xl p-4 border border-emerald-200"
@@ -225,7 +251,7 @@ const BidDetail = () => {
                   <Award size={20} className="text-emerald-600" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-emerald-800">🎉 Congratulations!</h3>
+                  <h3 className="text-sm font-semibold text-emerald-800">Congratulations!</h3>
                   <p className="text-xs text-emerald-700">Your bid has been selected by the buyer</p>
                 </div>
               </div>
@@ -271,7 +297,7 @@ const BidDetail = () => {
             </div>
           </motion.div>
 
-          {/* Request Info */}
+          {/* Request Info with Images */}
           <motion.div 
             variants={itemVariants}
             className="bg-white/80 backdrop-blur-xl rounded-xl p-4 shadow-sm border border-[#EEECE6]"
@@ -282,6 +308,14 @@ const BidDetail = () => {
               </div>
               <h3 className="text-xs font-medium text-[#1A1A2E] uppercase tracking-wider">Request Details</h3>
             </div>
+
+            {/* Image Carousel */}
+            {hasImages && (
+              <div className="mb-4">
+                <ImageCarousel images={request.image_urls} alt={request.item_name} />
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="col-span-2">
                 <p className="text-[10px] text-[#A0A0B0]">Item</p>
@@ -314,6 +348,7 @@ const BidDetail = () => {
               </div>
             </div>
 
+            {/* Delivery Method */}
             {request.delivery_method && (
               <div className="mt-3 p-3 bg-amber-50/50 rounded-lg border border-amber-100">
                 <div className="flex items-center gap-2 text-xs">
@@ -328,11 +363,11 @@ const BidDetail = () => {
               </div>
             )}
 
-            {/* Delivery Confirmation - Show when needed */}
+            {/* Delivery Confirmation */}
             {needsDeliveryConfirmation && (
               <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
                 <p className="text-xs font-medium text-blue-700 mb-2">
-                  🚚 Buyer requested home delivery — can you deliver?
+                  Buyer requested home delivery — can you deliver?
                 </p>
                 {request.delivery_address && (
                   <p className="text-[10px] text-blue-600 mb-2">
@@ -376,18 +411,18 @@ const BidDetail = () => {
             )}
 
             {/* Delivery Confirmed State */}
-            {isSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && request.delivery_confirmed_by_shop === true && (
+            {isBidSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && request.delivery_confirmed_by_shop === true && (
               <div className="mt-3 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100 flex items-center gap-2 text-xs text-emerald-700">
-                <CheckCircle size={13} />
-                ✅ You confirmed home delivery for this order on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'}
+                <ThumbsUp size={13} className="text-emerald-600" />
+                You confirmed home delivery for this order on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'}
               </div>
             )}
 
             {/* Delivery Denied State */}
-            {isSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && request.delivery_confirmed_by_shop === false && (
+            {isBidSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && request.delivery_confirmed_by_shop === false && (
               <div className="mt-3 p-3 bg-rose-50/50 rounded-lg border border-rose-100 flex items-center gap-2 text-xs text-rose-700">
-                <XCircle size={13} />
-                ❌ You denied home delivery on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'} — waiting for buyer to choose pickup or cancel
+                <ThumbsDown size={13} className="text-rose-600" />
+                You denied home delivery on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'} — waiting for buyer to choose pickup or cancel
               </div>
             )}
           </motion.div>
@@ -406,27 +441,35 @@ const BidDetail = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-[10px] text-[#A0A0B0]">Name</p>
-                <p className="text-sm font-medium text-[#1A1A2E]">{buyer.name || 'Buyer'}</p>
+                <p className="text-sm font-medium text-[#1A1A2E]">{buyer?.name || 'Buyer'}</p>
               </div>
               <div>
                 <p className="text-[10px] text-[#A0A0B0]">Phone</p>
                 <p className="text-sm text-[#1A1A2E] flex items-center gap-1">
                   <Phone size={12} className="text-[#A0A0B0]" />
-                  {buyer.phone || 'N/A'}
+                  {buyer?.phone || 'N/A'}
                 </p>
               </div>
               <div className="sm:col-span-2">
                 <p className="text-[10px] text-[#A0A0B0]">Address</p>
                 <p className="text-sm text-[#1A1A2E] flex items-start gap-1">
                   <Home size={12} className="text-[#A0A0B0] mt-0.5" />
-                  {buyer.address || 'N/A'}
+                  {buyer?.address || 'N/A'}
                 </p>
               </div>
               <div>
                 <p className="text-[10px] text-[#A0A0B0]">Pincode</p>
-                <p className="text-sm text-[#1A1A2E]">{buyer.pincode || 'N/A'}</p>
+                <p className="text-sm text-[#1A1A2E]">{buyer?.pincode || 'N/A'}</p>
               </div>
             </div>
+            {!isBidSelected && (
+              <div className="mt-3 p-2 bg-amber-50/50 rounded-lg border border-amber-100">
+                <p className="text-xs text-amber-700 flex items-center gap-1.5">
+                  <Clock size={12} />
+                  Contact details will be revealed once your bid is selected
+                </p>
+              </div>
+            )}
           </motion.div>
 
           {/* Action Buttons */}

@@ -72,6 +72,23 @@ changes:
 - Fixed requests.services import path
 
 
+date: 8/24/2026
+changes:
+- Added image display to shop BrowseRequests cards (first image only, left-aligned)
+- Added ImageCarousel component with fullscreen view
+- Added ImageCarousel to shop BidDetail page
+- Created GET /bids/{id} endpoint to fetch single bid details
+- Updated MyBids navigation to route to BidDetail for all bid statuses
+- Enhanced BidDetail to fetch and display bid, request, and buyer details
+- Added image carousel to BidDetail page
+- Improved BidDetail UI with better visual hierarchy
+- Fixed MyBids card click navigation to open BidDetail
+- Added buyer contact display with conditional visibility (shown only for selected bids)
+- Added delivery confirmation status display in BidDetail
+- Replaced emojis with Lucide icons across components
+- Fixed /bids route (removed trailing slash issue)
+
+
 ## License
 
 Copyright © 2026 Prateek Saha

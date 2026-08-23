@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -18,9 +18,11 @@ import {
   Lock,
   TrendingUp,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  X
 } from 'lucide-react';
 import api from '../../api/client';
+import ImageCarousel from '../../components/ImageCarousel';
 
 const BrowseRequests = () => {
   const navigate = useNavigate();
@@ -48,23 +50,19 @@ const BrowseRequests = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [expandedBid, setExpandedBid] = useState(null);
+  const [selectedRequest, setSelectedRequest] = useState(null);
   const sliderRef = useRef(null);
 
-  useEffect(() => {
-    fetchMyBids();
-    fetchRequests();
-  }, [activeFilters]);
-
-  const fetchMyBids = async () => {
+  const fetchMyBids = useCallback(async () => {
     try {
       const response = await api.get('/bids');
       setMyBids(response.data);
     } catch (err) {
       console.error('Failed to fetch my bids:', err);
     }
-  };
+  }, []);
 
-  const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -80,7 +78,12 @@ const BrowseRequests = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeFilters]);
+
+  useEffect(() => {
+    fetchMyBids();
+    fetchRequests();
+  }, [fetchMyBids, fetchRequests]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -106,16 +109,8 @@ const BrowseRequests = () => {
   };
 
   const handleBidInputChange = (e, req) => {
-    const value = parseInt(e.target.value);
-    if (isNaN(value)) {
-      setBidding({
-        ...bidding,
-        requestId: req.id,
-        price: req.budget_min,
-        pricePercent: 0
-      });
-      return;
-    }
+    const rawValue = parseInt(e.target.value);
+    const value = isNaN(rawValue) ? req.budget_min : rawValue;
     const clampedValue = Math.min(Math.max(value, req.budget_min), req.budget_max);
     const priceRange = req.budget_max - req.budget_min;
     const percent = priceRange === 0 ? 50 : Math.round(((clampedValue - req.budget_min) / priceRange) * 100);
@@ -137,8 +132,20 @@ const BrowseRequests = () => {
   };
 
   const handleSubmitBid = async (requestId) => {
-    if (!bidding.price || parseInt(bidding.price) <= 0) {
+    const req = requests.find(r => r.id === requestId);
+    if (!req) {
+      alert('Request not found');
+      return;
+    }
+
+    const price = parseInt(bidding.price);
+    if (!price || price <= 0) {
       alert('Please enter a valid price');
+      return;
+    }
+
+    if (price < req.budget_min || price > req.budget_max) {
+      alert(`Price must be between ₹${req.budget_min} and ₹${req.budget_max}`);
       return;
     }
 
@@ -146,7 +153,7 @@ const BrowseRequests = () => {
     
     try {
       const payload = {
-        price: parseInt(bidding.price),
+        price: price,
         note: bidding.note || ''
       };
       
@@ -172,6 +179,9 @@ const BrowseRequests = () => {
   };
 
   const toggleBidForm = (requestId) => {
+    const req = requests.find(r => r.id === requestId);
+    if (!req) return;
+
     if (expandedBid === requestId) {
       setExpandedBid(null);
       setBidding({
@@ -182,12 +192,11 @@ const BrowseRequests = () => {
         pricePercent: 50
       });
     } else {
-      const req = requests.find(r => r.id === requestId);
       setExpandedBid(requestId);
       setBidding({
         ...bidding,
         requestId: requestId,
-        price: req?.budget_min || 0,
+        price: req.budget_min || 0,
         pricePercent: 0,
         note: ''
       });
@@ -230,11 +239,19 @@ const BrowseRequests = () => {
 
   const getPriceBadge = (price, min, max) => {
     const range = max - min;
-    if (range === 0) return 'Good Deal';
+    if (range === 0) return 'Premium';
     const percent = ((price - min) / range) * 100;
-    if (percent <= 33) return 'Good Deal';
+    if (percent <= 33) return 'Premium';
     if (percent <= 66) return 'Fair Price';
-    return 'Premium';
+    return 'Good Deal';
+  };
+
+  const viewRequestDetail = (request) => {
+    setSelectedRequest(request);
+  };
+
+  const closeRequestDetail = () => {
+    setSelectedRequest(null);
   };
 
   const containerVariants = {
@@ -422,6 +439,11 @@ const BrowseRequests = () => {
               const isExpanded = expandedBid === req.id;
               const isBidding = bidding.requestId === req.id;
               
+              const firstImage = req.image_urls && req.image_urls.length > 0 
+                ? req.image_urls[0] 
+                : null;
+              const imageCount = req.image_urls ? req.image_urls.length : 0;
+              
               return (
                 <motion.div
                   key={req.id}
@@ -433,12 +455,41 @@ const BrowseRequests = () => {
                     ${isExpanded ? 'ring-2 ring-[#1A1A2E]/5 shadow-md' : ''}
                   `}
                 >
-                  {/* Request Header - Always Visible */}
+                  {/* Request with Image - Left aligned */}
                   <div 
                     className="p-4 cursor-pointer hover:bg-[#F8F6F0]/50 transition-colors"
                     onClick={() => isOpen && !hasBid && toggleBidForm(req.id)}
                   >
-                    <div className="flex flex-wrap justify-between items-start gap-3">
+                    <div className="flex items-start gap-4">
+                      {/* Image - Fixed size on left */}
+                      {firstImage ? (
+                        <div 
+                          className="relative w-28 h-28 md:w-32 md:h-32 flex-shrink-0 bg-[#F8F6F0] rounded-lg overflow-hidden border border-[#EEECE6] group/card"
+                          onClick={(e) => { e.stopPropagation(); viewRequestDetail(req); }}
+                        >
+                          <img
+                            src={firstImage}
+                            alt={req.item_name}
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                          />
+                          {imageCount > 1 && (
+                            <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                              +{imageCount - 1}
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/10 transition-colors duration-300 flex items-center justify-center">
+                            <span className="text-white text-xs font-medium opacity-0 group-hover/card:opacity-100 transition-opacity duration-300">
+                              View All
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-28 h-28 md:w-32 md:h-32 flex-shrink-0 bg-[#F8F6F0] rounded-lg border border-[#EEECE6] flex items-center justify-center">
+                          <span className="text-[#A0A0B0] text-xs">No image</span>
+                        </div>
+                      )}
+
+                      {/* Content - Right side */}
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-1">
                           <h3 className="text-sm font-medium text-[#1A1A2E]">
@@ -483,20 +534,14 @@ const BrowseRequests = () => {
                             <Calendar size={11} />
                             {new Date(req.created_at).toLocaleDateString()}
                           </span>
+                          {req.bid_count !== undefined && (
+                            <span className="flex items-center gap-1 text-[#A0A0B0]">
+                              <TrendingUp size={11} />
+                              {req.bid_count} bids
+                            </span>
+                          )}
                         </div>
                       </div>
-                      {isOpen && !hasBid && (
-                        <div className="flex-shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-[#A0A0B0] hover:text-[#1A1A2E] p-1 h-auto"
-                            onClick={(e) => { e.stopPropagation(); toggleBidForm(req.id); }}
-                          >
-                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                          </Button>
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -523,7 +568,7 @@ const BrowseRequests = () => {
                     </div>
                   )}
 
-                  {/* Bid Form - Expandable */}
+                  {/* Bid Form */}
                   {isOpen && !hasBid && isExpanded && (
                     <AnimatePresence>
                       <motion.div
@@ -536,7 +581,6 @@ const BrowseRequests = () => {
                         <div className="px-4 pb-4 pt-1 border-t border-[#EEECE6]">
                           <div className="p-3 bg-[#F8F6F0] rounded-lg">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                              {/* Price Slider */}
                               <div className="md:col-span-2">
                                 <div className="flex items-center justify-between mb-1">
                                   <label className="text-[10px] font-medium text-[#A0A0B0]">Your Bid Price</label>
@@ -590,7 +634,6 @@ const BrowseRequests = () => {
                                 )}
                               </div>
 
-                              {/* Note */}
                               <div>
                                 <label className="block text-[10px] font-medium text-[#A0A0B0] mb-1">Note (optional)</label>
                                 <input
@@ -603,7 +646,6 @@ const BrowseRequests = () => {
                                 />
                               </div>
 
-                              {/* Bid Button */}
                               <div className="md:col-span-3 flex justify-end">
                                 <Button
                                   onClick={() => handleSubmitBid(req.id)}
@@ -648,6 +690,45 @@ const BrowseRequests = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Request Detail Modal - Image Only */}
+      <AnimatePresence>
+        {selectedRequest && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black flex items-center justify-center p-4"
+            onClick={closeRequestDetail}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative max-w-5xl w-full max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={closeRequestDetail}
+                className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors z-10"
+              >
+                <X size={28} />
+              </button>
+              
+              {selectedRequest.image_urls && selectedRequest.image_urls.length > 0 ? (
+                <ImageCarousel 
+                  images={selectedRequest.image_urls} 
+                  alt={selectedRequest.item_name} 
+                />
+              ) : (
+                <div className="w-full h-96 bg-[#F8F6F0] rounded-xl flex items-center justify-center">
+                  <p className="text-[#A0A0B0]">No images available</p>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -24,33 +24,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ============================================
 # IMPORT ROUTERS
-# ============================================
-
 from auth.routes import router as auth_router
 from requests.routes import router as requests_router
 from bids.routes import router as bids_router, bid_router
 from routes.upload import router as upload_router
-
 logger.info("All routers imported successfully")
 
-# ============================================
 # INCLUDE ROUTERS
-# ============================================
-
 app.include_router(auth_router)
 app.include_router(requests_router)
 app.include_router(bids_router)
 app.include_router(bid_router)
 app.include_router(upload_router)
-
 logger.info("All routers included successfully")
 
-# ============================================
 # STARTUP EVENT
-# ============================================
-
 @app.on_event("startup")
 async def startup_event():
     """Check Supabase and Cloudinary connections on startup"""
@@ -90,10 +79,8 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"Cloudinary verification failed: {str(e)}")
 
-# ============================================
-# ROOT ENDPOINTS
-# ============================================
 
+# ROOT ENDPOINTS
 @app.get("/")
 async def root():
     return {

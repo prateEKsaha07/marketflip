@@ -13,7 +13,9 @@ from bids.schemas import (
 )
 from bids.services import BidService
 from auth.dependencies import supabase_anon, supabase_admin
+
 logger = logging.getLogger(__name__)
+
 # Two routers - one for /requests prefix, one for /bids prefix
 router = APIRouter(prefix="/requests", tags=["bids"])
 bid_router = APIRouter(prefix="/bids", tags=["bids"])
@@ -99,7 +101,7 @@ async def get_bids_for_request(
 
 # ====== /bids/... ENDPOINTS ======
 
-@bid_router.get("/")
+@bid_router.get("")
 async def get_bids(
     request_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
@@ -107,7 +109,6 @@ async def get_bids(
     """Get bids based on user role."""
     try:
         if current_user.get("role") == "shop_owner":
-            # Use explicit foreign key relationship name
             query = supabase_admin.table("bids") \
                 .select("*, requests!bids_request_id_fkey(item_name, buyer_id, status)") \
                 .eq("shop_id", current_user["id"]) \
@@ -120,7 +121,6 @@ async def get_bids(
             return response.data if response.data else []
             
         elif current_user.get("role") == "buyer":
-            # First get all requests owned by buyer
             requests_response = supabase_admin.table("requests") \
                 .select("id") \
                 .eq("buyer_id", current_user["id"]) \
@@ -131,7 +131,6 @@ async def get_bids(
             if not request_ids:
                 return []
             
-            # Get bids for those requests with explicit relationship
             query = supabase_admin.table("bids") \
                 .select("*, requests!bids_request_id_fkey(item_name, buyer_id, status), profiles!shop_id(shop_name, phone, address)") \
                 .in_("request_id", request_ids) \
@@ -150,6 +149,49 @@ async def get_bids(
         logger.error(f"Get bids error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
+# ====== NEW: GET SINGLE BID BY ID ======
+@bid_router.get("/{bid_id}")
+async def get_bid_by_id(
+    bid_id: UUID,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get a single bid by ID.
+    Only the shop owner who owns the bid can view it.
+    """
+    print(f"=== GET BID BY ID ===")
+    print(f"Bid ID: {bid_id}")
+    print(f"User ID: {current_user['id']}")
+    
+    if current_user.get("role") != "shop_owner":
+        raise HTTPException(status_code=403, detail="Only shop owners can view bid details")
+    
+    try:
+        # Get bid with request details
+        bid_response = supabase_admin.table("bids") \
+            .select("*, requests!bids_request_id_fkey(*)") \
+            .eq("id", str(bid_id)) \
+            .execute()
+        
+        if not bid_response.data:
+            raise HTTPException(status_code=404, detail="Bid not found")
+        
+        bid = bid_response.data[0]
+        print(f"Bid found, shop_id: {bid['shop_id']}")
+        
+        # Check if the current user owns this bid
+        if str(bid["shop_id"]) != current_user["id"]:
+            raise HTTPException(status_code=403, detail="You don't have permission to view this bid")
+        
+        return bid
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get bid by ID error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ====== UPDATE BID ======
 @bid_router.patch("/{bid_id}", response_model=BidResponse)
 async def update_bid(
     bid_id: UUID,
@@ -178,6 +220,7 @@ async def update_bid(
             raise HTTPException(status_code=400, detail="Only pending bids can be updated")
         raise HTTPException(status_code=400, detail=str(e))
 
+# ====== DELETE BID ======
 @bid_router.delete("/{bid_id}", status_code=204)
 async def delete_bid(
     bid_id: UUID,
@@ -204,6 +247,7 @@ async def delete_bid(
             raise HTTPException(status_code=400, detail="Only pending bids can be deleted")
         raise HTTPException(status_code=400, detail=str(e))
 
+# ====== SELECT BID ======
 @bid_router.patch("/{bid_id}/select", response_model=BidSelectionResponse)
 async def select_bid(
     bid_id: UUID,
@@ -235,6 +279,7 @@ async def select_bid(
             raise HTTPException(status_code=400, detail="Bid is no longer pending")
         raise HTTPException(status_code=400, detail=str(e))
 
+# ====== GET BUYER DETAILS ======
 @bid_router.get("/{bid_id}/buyer")
 async def get_buyer_details(
     bid_id: UUID,
@@ -262,7 +307,7 @@ async def get_buyer_details(
         if str(bid["status"]) != "selected":
             raise HTTPException(status_code=400, detail="Only selected bids can be shown to the shop owner")
 
-        # Get request details - ADD the missing fields
+        # Get request details
         request_details = supabase_admin.table("requests") \
             .select("id, buyer_id, item_name, description, budget_min, budget_max, pincode, status, delivery_method, delivery_address, completed_at, delivery_confirmed_by_shop, delivery_response_at") \
             .eq("id", str(bid["request_id"])) \
@@ -312,8 +357,8 @@ async def get_buyer_details(
                 "delivery_method": request.get("delivery_method"),
                 "delivery_address": request.get("delivery_address"),
                 "completed_at": request.get("completed_at"),
-                "delivery_confirmed_by_shop": request.get("delivery_confirmed_by_shop"),  # ← ADDED
-                "delivery_response_at": request.get("delivery_response_at")  # ← ADDED
+                "delivery_confirmed_by_shop": request.get("delivery_confirmed_by_shop"),
+                "delivery_response_at": request.get("delivery_response_at")
             },
             "buyer": {
                 "id": request.get("buyer_id"),
@@ -329,6 +374,7 @@ async def get_buyer_details(
         logger.error(f"Get buyer details error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
+# ====== GET BID STATS ======
 @bid_router.get("/stats")
 async def get_bid_stats(
     current_user: dict = Depends(get_current_user)
@@ -337,12 +383,10 @@ async def get_bid_stats(
     Get bid statistics for the shop owner.
     Returns counts of bids by status.
     """
-    # Check role
     if current_user.get("role") != "shop_owner":
         raise HTTPException(status_code=403, detail="Only shop owners can view bid statistics")
     
     try:
-        # Get all bids for the shop owner
         response = supabase_admin.table("bids") \
             .select("status") \
             .eq("shop_id", current_user["id"]) \
@@ -350,7 +394,6 @@ async def get_bid_stats(
         
         bids = response.data if response.data else []
         
-        # Count by status
         stats = {
             "pending": 0,
             "selected": 0,
@@ -363,7 +406,6 @@ async def get_bid_stats(
             if status in stats:
                 stats[status] += 1
         
-        # Add total
         stats["total"] = len(bids)
         
         return stats
@@ -371,5 +413,3 @@ async def get_bid_stats(
     except Exception as e:
         logger.error(f"Get bid stats error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
-
-    
