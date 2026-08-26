@@ -88,6 +88,10 @@ changes:
 - Replaced emojis with Lucide icons across components
 - Fixed /bids route (removed trailing slash issue)
 
+date: 8/27/2026
+- added auction , auction_bids and their respective RLS policies
+- added auction schemas for creation, update, and bidding functionality
+
 
 ## License
 
