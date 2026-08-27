@@ -47,8 +47,8 @@ class RequestResponse(BaseModel):
     reference_image: Optional[str] = None
     delivery_method: Optional[str] = None   
     delivery_address: Optional[str] = None
-    delivery_confirmed_by_shop: Optional[bool] = None  # ADD THIS
-    delivery_response_at: Optional[datetime] = None   # ADD THIS
+    delivery_confirmed_by_shop: Optional[bool] = None 
+    delivery_response_at: Optional[datetime] = None  
     image_urls: Optional[List[str]] = []
     status: str
     created_at: datetime
