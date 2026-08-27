@@ -25,43 +25,65 @@ import {
   Eye,
   MessageSquare,
   Gavel,
-  User  // ADD THIS
+  User,
+  Sparkles,
+  Rocket,
+  Building2,
+  AlertCircle,
+  Phone,
+  MapPin,
+  Calendar,
+  Star,
+  Briefcase,
+  Shield,
+  Clock as ClockIcon,
+  Smile
 } from 'lucide-react';
 import api from '../../api/client';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [stats, setStats] = useState({ pending: 0, selected: 0, rejected: 0, completed: 0, total: 0 });
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [shopName, setShopName] = useState('');
+  const [copiedGST, setCopiedGST] = useState(false);
+  const [profile, setProfile] = useState(null);
+  const [greeting, setGreeting] = useState('');
 
   useEffect(() => {
-    fetchStats();
     fetchShopProfile();
+    generateGreeting();
   }, []);
 
-  const fetchStats = async () => {
-    try {
-      const response = await api.get('/bids/stats');
-      console.log('Stats:', response.data);
-      setStats(response.data);
-    } catch (err) {
-      console.error('Failed to fetch stats:', err);
-    } finally {
-      setLoading(false);
-    }
+  const generateGreeting = () => {
+    const greetings = [
+      'Good to see you again',
+      'Welcome back',
+      'Happy to have you here',
+      'Great to have you back',
+      'Welcome to your dashboard',
+      'Good to see you',
+      'Welcome back to your workspace',
+      'Ready for a productive day',
+      'Glad to have you here',
+      'Welcome to your business hub'
+    ];
+    
+    const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+    setGreeting(randomGreeting);
   };
 
   const fetchShopProfile = async () => {
     try {
+      setLoading(true);
       const response = await api.get(`/auth/profiles/${user?.user_id}`);
-      if (response.data?.shop_name) {
-        setShopName(response.data.shop_name);
+      if (response.data) {
+        setProfile(response.data);
       }
     } catch (err) {
       console.error('Failed to fetch shop profile:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -78,46 +100,12 @@ const Dashboard = () => {
     }
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: { staggerChildren: 0.06 }
+  const copyGSTNumber = async () => {
+    if (profile?.gst_number) {
+      await navigator.clipboard.writeText(profile.gst_number);
+      setCopiedGST(true);
+      setTimeout(() => setCopiedGST(false), 2000);
     }
-  };
-
-  const cardVariants = {
-    hidden: { opacity: 0, y: 15 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: { duration: 0.3, ease: "easeOut" }
-    }
-  };
-
-  const StatCard = ({ label, count, color, icon, delay = 0 }) => {
-    const isActive = count > 0;
-    
-    return (
-      <motion.div
-        variants={cardVariants}
-        custom={delay}
-        whileHover={{ y: -2 }}
-        className={`
-          bg-white rounded-xl border border-[#EEECE6] p-4 flex-1 min-w-[100px]
-          ${isActive ? 'hover:shadow-md' : 'opacity-40'}
-          transition-all duration-200
-        `}
-      >
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-[#A0A0B0]">{icon}</span>
-          <span className="text-xs font-medium text-[#A0A0B0] uppercase tracking-wider">{label}</span>
-        </div>
-        <div className="text-2xl font-semibold" style={{ color }}>
-          {count}
-        </div>
-      </motion.div>
-    );
   };
 
   if (loading) {
@@ -131,18 +119,61 @@ const Dashboard = () => {
     );
   }
 
+  const getFullName = () => {
+    if (profile?.full_name) return profile.full_name;
+    return 'User';
+  };
+
+  const getShopName = () => {
+    if (profile?.shop_name) return profile.shop_name;
+    return null;
+  };
+
+  const getInitials = () => {
+    const name = getShopName() || getFullName();
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const getGSTStatus = () => {
+    if (profile?.gst_number) {
+      return profile.gst_number;
+    }
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-[#F8F6F0]">
       {/* Top Bar */}
-      <div className="bg-white border-b border-[#EEECE6] px-6 py-3">
+      <div className="bg-white border-b border-[#EEECE6] px-6 py-3 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-9 h-9 rounded-xl bg-[#1A1A2E] flex items-center justify-center text-white font-bold text-sm">
-              {shopName ? shopName.charAt(0).toUpperCase() : 'S'}
-            </div>
+            {profile?.profile_photo_url ? (
+              <img 
+                src={profile.profile_photo_url} 
+                alt={getFullName()}
+                className="w-9 h-9 rounded-xl object-cover border border-[#EEECE6]"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-xl bg-[#1A1A2E] flex items-center justify-center text-white font-bold text-sm">
+                {getInitials()}
+              </div>
+            )}
             <div>
-              <h2 className="text-sm font-semibold text-[#1A1A2E]">{shopName || 'My Shop'}</h2>
-              <div className="flex items-center gap-2 text-xs text-[#A0A0B0]">
+              <h2 className="text-sm font-semibold text-[#1A1A2E] flex items-center gap-2">
+                {getShopName() || getFullName()}
+                {profile?.is_verified && (
+                  <span className="inline-flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full text-[10px] font-medium">
+                    <Shield size={10} />
+                    Verified
+                  </span>
+                )}
+                {!getShopName() && (
+                  <span className="text-xs font-normal text-[#A0A0B0]">
+                    (Add shop name)
+                  </span>
+                )}
+              </h2>
+              <div className="flex items-center gap-2 text-xs text-[#A0A0B0] flex-wrap">
                 <span>ID: {user?.user_id?.slice(0, 8)}</span>
                 <button
                   onClick={copyShopId}
@@ -151,11 +182,41 @@ const Dashboard = () => {
                   {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
                 </button>
                 {copied && <span className="text-emerald-600 text-[10px]">Copied!</span>}
+                <span className="w-px h-3 bg-[#EEECE6]" />
+                {getGSTStatus() ? (
+                  <>
+                    <span>GST: {getGSTStatus()}</span>
+                    <button
+                      onClick={copyGSTNumber}
+                      className="p-0.5 hover:bg-[#F5F3EF] rounded transition-colors"
+                    >
+                      {copiedGST ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                    </button>
+                    {copiedGST && <span className="text-emerald-600 text-[10px]">Copied!</span>}
+                  </>
+                ) : (
+                  <>
+                    <span>GST: Not added</span>
+                    <button 
+                      onClick={() => navigate('/shop/profile')}
+                      className="text-emerald-600 hover:text-emerald-700 text-[10px] font-medium underline-offset-2 hover:underline"
+                    >
+                      Add GST
+                    </button>
+                  </>
+                )}
+                {profile?.phone && (
+                  <>
+                    <span className="w-px h-3 bg-[#EEECE6]" />
+                    <Phone size={12} />
+                    <span>{profile.phone}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 text-xs text-[#A0A0B0]">
+            <span className="flex items-center gap-1.5 text-xs text-[#A0A0B0] bg-[#F8F6F0] px-3 py-1 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               Active
             </span>
@@ -164,7 +225,7 @@ const Dashboard = () => {
       </div>
 
       <div className="max-w-6xl mx-auto p-4 md:p-6">
-        {/* Header */}
+        {/* Header with Greeting */}
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -172,11 +233,31 @@ const Dashboard = () => {
           className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-6"
         >
           <div>
-            <h1 className="text-xl font-semibold text-[#1A1A2E] tracking-tight flex items-center gap-2">
-              <Store size={18} className="text-[#A0A0B0]" />
-              Dashboard
+            <h1 className="text-lg font-medium text-[#1A1A2E] tracking-tight flex items-center gap-2">
+              <Smile size={18} className="text-[#A0A0B0]" />
+              {greeting}, {getFullName().split(' ')[0]}
             </h1>
-            <p className="text-sm text-[#A0A0B0]">Manage your bids and track performance</p>
+            <p className="text-sm text-[#A0A0B0] flex items-center gap-2 flex-wrap">
+              <Store size={14} className="text-[#A0A0B0]" />
+              <span>{getShopName() || 'No shop name set'}</span>
+              {profile?.role && (
+                <>
+                  <span className="text-[#D0D0D0]">·</span>
+                  <span className="text-xs bg-[#F8F6F0] px-2 py-0.5 rounded-full text-[#1A1A2E]">
+                    {profile.role}
+                  </span>
+                </>
+              )}
+              {profile?.years_in_business && (
+                <>
+                  <span className="text-[#D0D0D0]">·</span>
+                  <span className="text-xs text-[#A0A0B0] flex items-center gap-1">
+                    <Briefcase size={12} />
+                    {profile.years_in_business} years
+                  </span>
+                </>
+              )}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button 
@@ -228,130 +309,23 @@ const Dashboard = () => {
           </div>
         </motion.div>
 
-        {/* Stats Cards */}
-        <motion.div 
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 size={15} className="text-[#A0A0B0]" />
-            <h2 className="text-sm font-medium text-[#1A1A2E]">Performance Overview</h2>
-            <span className="text-xs text-[#A0A0B0]">· {stats.total} total bids</span>
-          </div>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <StatCard 
-              label="Total" 
-              count={stats.total} 
-              color="#1A1A2E" 
-              icon={<PieChart size={14} />} 
-              delay={0} 
-            />
-            <StatCard 
-              label="Pending" 
-              count={stats.pending} 
-              color="#D4A000" 
-              icon={<Clock size={14} />} 
-              delay={0.1} 
-            />
-            <StatCard 
-              label="Selected" 
-              count={stats.selected} 
-              color="#2D7A3A" 
-              icon={<Target size={14} />} 
-              delay={0.2} 
-            />
-            <StatCard 
-              label="Rejected" 
-              count={stats.rejected} 
-              color="#B33A3A" 
-              icon={<XCircle size={14} />} 
-              delay={0.3} 
-            />
-            <StatCard 
-              label="Completed" 
-              count={stats.completed} 
-              color="#2A6B9C" 
-              icon={<CheckCircle size={14} />} 
-              delay={0.4} 
-            />
-          </div>
-        </motion.div>
-
-        {/* Quick Stats Row */}
+        {/* Coming Soon Section with Image - Warmer & Lighter */}
         <motion.div 
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3"
+          transition={{ delay: 0.3 }}
+          className="mt-6"
         >
-          <div className="bg-white rounded-xl border border-[#EEECE6] p-3 hover:shadow-sm transition-shadow">
-            <div className="flex items-center gap-2 mb-0.5">
-              <TrendingUp size={13} className="text-[#A0A0B0]" />
-              <span className="text-xs text-[#A0A0B0]">Success Rate</span>
-            </div>
-            <p className="text-lg font-semibold text-[#1A1A2E]">
-              {stats.total > 0 ? Math.round((stats.selected / stats.total) * 100) : 0}%
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-[#EEECE6] p-3 hover:shadow-sm transition-shadow">
-            <div className="flex items-center gap-2 mb-0.5">
-              <Clock size={13} className="text-[#A0A0B0]" />
-              <span className="text-xs text-[#A0A0B0]">Awaiting</span>
-            </div>
-            <p className="text-lg font-semibold text-[#1A1A2E]">{stats.pending}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-[#EEECE6] p-3 hover:shadow-sm transition-shadow">
-            <div className="flex items-center gap-2 mb-0.5">
-              <Award size={13} className="text-[#A0A0B0]" />
-              <span className="text-xs text-[#A0A0B0]">Conversion</span>
-            </div>
-            <p className="text-lg font-semibold text-[#1A1A2E]">
-              {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-[#EEECE6] p-3 hover:shadow-sm transition-shadow">
-            <div className="flex items-center gap-2 mb-0.5">
-              <Activity size={13} className="text-[#A0A0B0]" />
-              <span className="text-xs text-[#A0A0B0]">Active</span>
-            </div>
-            <p className="text-lg font-semibold text-[#1A1A2E]">{stats.pending + stats.selected}</p>
-          </div>
-        </motion.div>
-
-        {/* Recent Activity */}
-        <motion.div 
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="mt-6 bg-white rounded-xl border border-[#EEECE6] p-4"
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <Activity size={14} className="text-[#A0A0B0]" />
-            <h3 className="text-sm font-medium text-[#1A1A2E]">Activity Summary</h3>
-            <span className="text-[10px] text-[#A0A0B0]">Last 7 days</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-4 text-sm text-[#A0A0B0]">
-            <div className="flex items-center gap-2">
-              <Target size={13} className="text-[#2D7A3A]" />
-              <span>{stats.selected} selected</span>
-            </div>
-            <div className="w-px h-4 bg-[#EEECE6]" />
-            <div className="flex items-center gap-2">
-              <CheckCircle size={13} className="text-[#2A6B9C]" />
-              <span>{stats.completed} completed</span>
-            </div>
-            <div className="w-px h-4 bg-[#EEECE6]" />
-            <div className="flex items-center gap-2">
-              <Clock size={13} className="text-[#D4A000]" />
-              <span>{stats.pending} pending</span>
-            </div>
-            <div className="w-px h-4 bg-[#EEECE6]" />
-            <div className="flex items-center gap-2">
-              <XCircle size={13} className="text-[#B33A3A]" />
-              <span>{stats.rejected} rejected</span>
-            </div>
+          <div className="bg-gradient-to-br from-[#FDF6ED] via-[#F8EDE0] to-[#F5E8D8] rounded-2xl p-8 text-center border border-[#E8DCC8] min-h-[450px] flex flex-col items-center justify-center shadow-sm">
+            <h3 className="text-3xl font-bold text-[#2A1F1A] mb-6">
+              More Updates Soon
+            </h3>
+            
+            <img 
+              src="/shop_dsb.png" 
+              alt="Coming Soon" 
+              className="max-w-full h-auto max-h-[250px] object-contain rounded-lg"
+            />
           </div>
         </motion.div>
       </div>
