@@ -9,9 +9,9 @@ class AuctionCreate(BaseModel):
     item_name : str = Field(..., min_length=1, max_length=255)
     description : Optional[str] = None
     starting_price : int = Field(..., gt=0)
-    pincode = str = Field(..., min_length=6)
-    category = Optional[str] = "electronics"
-    end_time = datetime
+    pincode : str = Field(..., min_length=6)
+    category : Optional[str] = "electronics"
+    end_time : datetime
     delivery_method : str = 'home_delivery'
     delivery_address: Optional[str] = None
     image_urls : Optional[List[str]] = []
