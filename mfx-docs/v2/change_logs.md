@@ -93,19 +93,23 @@ changes:
 - Created auctions and auction_bids tables with RLS policies
 - Created auctions module with schemas, service, and routes
 - Added POST /auctions endpoint (shop owners create auctions)
-- Added GET /auctions endpoint (list with filters: pincode, category, status)
+- Added GET /auctions endpoint (list with filters)
 - Added GET /auctions/{id} endpoint (detail + bid history)
 - Added POST /auctions/{id}/bids endpoint (buyers place bids)
-- Added DELETE /auctions/{id} endpoint (shop cancels active auctions)
-- Added sniping prevention logic (auto-extend end_time by 5 minutes on late bids)
-- Added current_highest_bid and current_highest_bidder tracking
-- Created close-auctions Edge Function (auto-closes expired auctions)
-- Scheduled close-auctions cron job (every 5 minutes)
-- Fixed service.py issues: missing return, typo in supabase_admin, missing current_highest_bid
-- Fixed routes.py issues: variable name conflict (AuctionService → auction_service)
-- Fixed schemas.py issues: from_attributes typo, consistent default values
-- Added limit/offset support to GET /auctions
-- Added proper handling for status="all" in GET /auctions
+- Added DELETE /auctions/{id} endpoint (shop cancels)
+- Added sniping prevention logic
+- Created close-auctions Edge Function
+- Scheduled close-auctions cron job
+- Created Shop Auction Dashboard
+- Created Post Auction page
+- Created My Auctions page
+- Created Shop Auction Detail page
+- Created Buyer Auction Dashboard
+- Created Browse Auctions page
+- Created Buyer Auction Detail page
+- Fixed timezone issue in placeBid function
+- Added current_highest_bidder tracking
+- Added bid history with buyer names
 
 
 ## License
