@@ -47,6 +47,7 @@ const BidDetail = () => {
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [successSubtext, setSuccessSubtext] = useState('');
+  const [deliveryResolved, setDeliveryResolved] = useState(false);
 
   useEffect(() => {
     fetchBidDetails();
@@ -98,6 +99,14 @@ const BidDetail = () => {
       };
       
       setData(combinedData);
+      
+      // Check if delivery has been resolved (confirmed or denied)
+      const deliveryStatus = requestResponse.data.delivery_confirmed_by_shop;
+      if (deliveryStatus === true || deliveryStatus === false) {
+        setDeliveryResolved(true);
+      } else {
+        setDeliveryResolved(false);
+      }
     } catch (err) {
       console.error('Fetch error:', err);
       setError(err.response?.data?.detail || 'Failed to fetch bid details');
@@ -113,6 +122,7 @@ const BidDetail = () => {
     setDeliveryError('');
     try {
       await confirmDelivery(data.request.id);
+      setDeliveryResolved(true);
       await fetchBidDetails();
       showSuccess(
         'Delivery Confirmed!',
@@ -133,6 +143,7 @@ const BidDetail = () => {
     setDeliveryError('');
     try {
       await denyDelivery(data.request.id);
+      setDeliveryResolved(true);
       await fetchBidDetails();
       showSuccess(
         'Delivery Denied',
@@ -221,9 +232,10 @@ const BidDetail = () => {
     isBidSelected && 
     request.status === 'purchased' && 
     request.delivery_method === 'home_delivery' &&
-    (request.delivery_confirmed_by_shop === null || request.delivery_confirmed_by_shop === undefined);
+    !deliveryResolved;
 
   const hasImages = request.image_urls && request.image_urls.length > 0;
+  const deliveryStatus = request.delivery_confirmed_by_shop;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
@@ -418,8 +430,8 @@ const BidDetail = () => {
               </div>
             )}
 
-            {/* Delivery Confirmation */}
-            {needsDeliveryConfirmation && (
+            {/* Delivery Confirmation - Show when needed */}
+            {needsDeliveryConfirmation ? (
               <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
                 <p className="text-xs font-medium text-blue-700 mb-2">
                   Buyer requested home delivery — can you deliver?
@@ -463,22 +475,59 @@ const BidDetail = () => {
                   </p>
                 )}
               </div>
-            )}
+            ) : (
+              // Show delivery status - confirmed or denied
+              <>
+                {isBidSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && deliveryStatus === true && (
+                  <div className="mt-3 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100">
+                    <div className="flex items-center gap-2 text-xs text-emerald-700">
+                      <ThumbsUp size={16} className="text-emerald-600" />
+                      <span className="font-medium">Delivery Confirmed</span>
+                    </div>
+                    <p className="text-xs text-emerald-600 mt-1 ml-6">
+                      You confirmed home delivery on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'}. 
+                      The buyer has been notified. Please proceed with the delivery.
+                    </p>
+                    <div className="mt-2 ml-6 p-2 bg-emerald-100/50 rounded-lg border border-emerald-200">
+                      <p className="text-[10px] text-emerald-700 flex items-center gap-1">
+                        <CheckCircle size={12} />
+                        Delivery address: {request.delivery_address || 'Not specified'}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-            {/* Delivery Confirmed State */}
-            {isBidSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && request.delivery_confirmed_by_shop === true && (
-              <div className="mt-3 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100 flex items-center gap-2 text-xs text-emerald-700">
-                <ThumbsUp size={13} className="text-emerald-600" />
-                You confirmed home delivery for this order on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'}
-              </div>
-            )}
+                {isBidSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && deliveryStatus === false && (
+                  <div className="mt-3 p-3 bg-rose-50/50 rounded-lg border border-rose-100">
+                    <div className="flex items-center gap-2 text-xs text-rose-700">
+                      <ThumbsDown size={16} className="text-rose-600" />
+                      <span className="font-medium">Delivery Denied</span>
+                    </div>
+                    <p className="text-xs text-rose-600 mt-1 ml-6">
+                      You denied home delivery on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'}. 
+                      Waiting for buyer to choose pickup or cancel the order.
+                    </p>
+                    <div className="mt-2 ml-6 p-2 bg-rose-100/50 rounded-lg border border-rose-200">
+                      <p className="text-[10px] text-rose-700 flex items-center gap-1">
+                        <Clock size={12} />
+                        Awaiting buyer's response...
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-            {/* Delivery Denied State */}
-            {isBidSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && request.delivery_confirmed_by_shop === false && (
-              <div className="mt-3 p-3 bg-rose-50/50 rounded-lg border border-rose-100 flex items-center gap-2 text-xs text-rose-700">
-                <ThumbsDown size={13} className="text-rose-600" />
-                You denied home delivery on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'} — waiting for buyer to choose pickup or cancel
-              </div>
+                {isBidSelected && request.status === 'purchased' && request.delivery_method === 'pickup' && (
+                  <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                    <div className="flex items-center gap-2 text-xs text-blue-700">
+                      <Home size={16} className="text-blue-600" />
+                      <span className="font-medium">Pickup Selected</span>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-1 ml-6">
+                      The buyer has selected pickup. No delivery confirmation needed.
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </motion.div>
 

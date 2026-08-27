@@ -127,6 +127,7 @@ async def get_request_detail(
     Bids are only shown if the current user is the buyer.
     """
     try:
+        # Get request with all fields
         request_result = supabase_admin.table("requests")\
             .select("*")\
             .eq("id", str(request_id))\
@@ -137,11 +138,28 @@ async def get_request_detail(
         
         request = request_result.data[0]
         
+        #ALL delivery fields are included
+        delivery_fields = [
+            "delivery_method",
+            "delivery_address",
+            "delivery_confirmed_by_shop",
+            "delivery_response_at"
+        ]
+        
+        for field in delivery_fields:
+            if field not in request:
+                request[field] = None
+        
+        #image_urls is always included
         if "image_urls" not in request:
             request["image_urls"] = []
         elif request["image_urls"] is None:
             request["image_urls"] = []
         
+        # Log the delivery status for debugging
+        logger.info(f"Request {request_id} delivery_confirmed_by_shop: {request.get('delivery_confirmed_by_shop')}")
+        
+        # If user is the buyer, get bids too
         if current_user["id"] == request["buyer_id"]:
             bids_result = supabase_admin.table("bids")\
                 .select("*, profiles!bids_shop_id_fkey(shop_name, phone, address)")\
