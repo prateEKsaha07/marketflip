@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional, List
 from uuid import UUID
 import logging
-from datetime import datetime
 
 from auth.dependencies import get_current_user
 from auctions.schemas import (
@@ -13,13 +12,14 @@ from auctions.schemas import (
     AuctionBidCreate,
     AuctionBidResponse
 )
-
 from auctions.service import AuctionService
 from auth.dependencies import supabase_anon, supabase_admin
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auctions", tags=["Auctions"])
+
+# Initialize service
 auction_service = AuctionService(supabase_admin, supabase_anon)
 
 
@@ -46,7 +46,7 @@ async def createAuction(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Create auction error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create auction")
+        raise HTTPException(status_code=500, detail=f"Failed to create auction: {str(e)}")
 
 
 @router.get("", response_model=List[AuctionResponse])
@@ -60,22 +60,16 @@ async def getAuctions(
 ):
     """Get auctions with filters"""
     try:
-        if status == "all":
-            auctions = auction_service.getAuctions(
-                pincode=pincode,
-                category=category,
-                status=None,
-                limit=limit,
-                offset=offset
-            )
-        else:
-            auctions = auction_service.getAuctions(
-                pincode=pincode,
-                category=category,
-                status=status,
-                limit=limit,
-                offset=offset
-            )
+        # Handle "all" status by passing None
+        status_filter = None if status == "all" else status
+        
+        auctions = auction_service.getAuctions(
+            pincode=pincode,
+            category=category,
+            status=status_filter,
+            limit=limit,
+            offset=offset
+        )
         return auctions
     except Exception as e:
         logger.error(f"Get auctions error: {str(e)}")
@@ -91,7 +85,6 @@ async def getAuctionDetail(
     try:
         result = auction_service.getAuctionById(str(auction_id))
         return result
-
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -113,13 +106,12 @@ async def placeBid(
         )
 
     try:
-        result = auction_service.placeBid( 
+        result = auction_service.placeBid(
             auction_id=str(auction_id),
             buyer_id=current_user["id"],
             bid_amount=bid_data.bid_amount
         )
         return result["bid"]
-
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -140,14 +132,13 @@ async def cancelAuction(
         )
 
     try:
-        success = auction_service.cancelAuction( 
+        success = auction_service.cancelAuction(
             auction_id=str(auction_id),
             shop_id=current_user["id"]
         )
         if not success:
             raise HTTPException(status_code=400, detail="Failed to cancel auction")
         return None
-
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

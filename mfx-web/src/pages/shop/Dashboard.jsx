@@ -23,7 +23,8 @@ import {
   Zap,
   ShoppingBag,
   Eye,
-  MessageSquare
+  MessageSquare,
+  Gavel 
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -199,6 +200,13 @@ const Dashboard = () => {
             >
               <Search size={15} className="mr-1.5" />
               Browse
+            </Button>
+            <Button 
+              onClick={() => navigate('/shop/auctions')}
+              variant="outline"
+              className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] hover:border-[#D0D0D0] text-sm px-4 py-2">
+              <Gavel size={15} className="mr-1.5" />
+              Auctions
             </Button>
             <Button 
               onClick={() => navigate('/shop/completed')}

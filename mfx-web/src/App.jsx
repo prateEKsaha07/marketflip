@@ -16,6 +16,13 @@ import BrowseRequests from './pages/shop/BrowseRequests';
 import MyBids from './pages/shop/MyBids';
 import BidDetail from './pages/shop/BidDetail';
 import CompletedTransactions from './pages/shop/CompletedTransactions';
+import AuctionDashboard from './pages/shop/AuctionDashboard';
+import PostAuction from './pages/shop/PostAuction';
+import MyAuctions from './pages/shop/MyAuctions';
+import AuctionDetailShop from './pages/shop/AuctionDetailShop';
+import BuyerAuctionDashboard from './pages/buyer/AuctionDashboard';
+import BrowseAuctions from './pages/buyer/BrowseAuctions';
+import AuctionDetail from './pages/buyer/AuctionDetail';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -92,6 +99,27 @@ const AnimatedRoutes = () => {
             </ProtectedRoute>
           </PageTransition>
         } />
+        <Route path="/buyer/auctions" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <BuyerAuctionDashboard />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/buyer/auctions/browse" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <BrowseAuctions />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/buyer/auctions/:id" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <AuctionDetail />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
         
         {/* Shop Routes */}
         <Route path="/shop/dashboard" element={
@@ -129,6 +157,35 @@ const AnimatedRoutes = () => {
             </ProtectedRoute>
           </PageTransition>
         } />
+        <Route path="/shop/auctions" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="shop_owner">
+              <AuctionDashboard />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/shop/auctions/post" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="shop_owner">
+              <PostAuction />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/shop/auctions/my" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="shop_owner">
+              <MyAuctions />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/shop/auctions/:id" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="shop_owner">
+              <AuctionDetailShop />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

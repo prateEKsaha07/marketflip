@@ -15,7 +15,8 @@ import {
   TrendingUp,
   Calendar,
   Sparkles,
-  Zap
+  Zap,
+  Gavel  // ADD THIS
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -199,6 +200,16 @@ const Dashboard = () => {
               >
                 <Package size={16} className="mr-1.5" />
                 My Purchases
+              </Button>
+            </motion.div>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}>
+              <Button 
+                onClick={() => navigate('/buyer/auctions')}
+                variant="outline"
+                className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] hover:border-[#D0D0D0] text-sm px-4 py-2"
+              >
+                <Gavel size={15} className="mr-1.5" />
+                Auctions
               </Button>
             </motion.div>
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}>
