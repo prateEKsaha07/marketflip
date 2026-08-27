@@ -23,6 +23,8 @@ import AuctionDetailShop from './pages/shop/AuctionDetailShop';
 import BuyerAuctionDashboard from './pages/buyer/AuctionDashboard';
 import BrowseAuctions from './pages/buyer/BrowseAuctions';
 import AuctionDetail from './pages/buyer/AuctionDetail';
+import Profile from './pages/profile/Profile';
+import ProfileFormPage from './pages/profile/ProfileForm';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -185,6 +187,39 @@ const AnimatedRoutes = () => {
             </ProtectedRoute>
           </PageTransition>
         } />
+
+        {/* profile routes */}
+
+        <Route path="/buyer/profile" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <Profile />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/buyer/profile/edit" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <ProfileFormPage />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+
+        <Route path="/shop/profile" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="shop_owner">
+              <Profile />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/shop/profile/edit" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="shop_owner">
+              <ProfileFormPage />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+
 
         
         <Route path="*" element={<Navigate to="/" replace />} />

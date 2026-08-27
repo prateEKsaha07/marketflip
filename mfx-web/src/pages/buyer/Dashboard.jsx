@@ -16,7 +16,8 @@ import {
   Calendar,
   Sparkles,
   Zap,
-  Gavel  // ADD THIS
+  Gavel,
+  User  // ADD THIS
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -212,6 +213,19 @@ const Dashboard = () => {
                 Auctions
               </Button>
             </motion.div>
+
+            {/* FIXED: Changed from /shop/profile to /buyer/profile */}
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}>
+              <Button 
+                onClick={() => navigate('/buyer/profile')}
+                variant="ghost"
+                className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
+              >
+                <User size={14} className="mr-1.5" />
+                Profile
+              </Button>
+            </motion.div>
+
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}>
               <Button 
                 onClick={handleLogout}

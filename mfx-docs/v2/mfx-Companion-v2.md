@@ -39,19 +39,70 @@ Sequenced so each step unlocks or de-risks the next. Edit as we go.
 
 ---
 
-## Phase 3b: Shop-Side Image Display (gap from Phase 3)
-13b. Add the image carousel (same as `RequestDetail.jsx`) to whichever detail/bid view shops use when reviewing a request before bidding — currently only buyer-side shows images. Cards stay simple/text-only on both sides, per decision to keep images detail-view-only.
+## Phase 3b: Shop-Side Image Display — ✅ DONE (Aug 24, 2026)
+13b. Image carousel added to shop `BidDetail.jsx`; shop `BrowseRequests.jsx` cards show first image (buyer cards remain text-only by design — see roadmap 2.18). Bonus fixes: new `GET /bids/{id}` endpoint, `MyBids`→`BidDetail` navigation fixed for all statuses, `/bids` trailing-slash route bug fixed, emojis replaced with Lucide icons.
 
 ---
 
-## Phase 4: Seller Auctions (new core flow #2)
-15. `auctions` table (with delivery + multi-image fields baked in per Section 4.5 of roadmap)
-16. `auction_bids` table
-17. Backend routes: `POST /auctions`, `GET /auctions`, `GET /auctions/{id}`, `POST /auctions/{id}/bids`, `DELETE /auctions/{id}` (cancel, shop only)
-18. **Sniping prevention:** in the `POST /auctions/{id}/bids` handler, if a bid lands within N minutes (e.g. 5) of `end_time`, auto-extend `end_time` by a few minutes; repeat until no late bids land
-19. Auto-close cron/Edge Function (mirrors `expire-requests`): at `end_time`, set `status='sold'`, `winning_bid_id` = highest bid, `closed_at` = now — or `status='expired'` if zero bids
-20. Frontend: `shop/PostAuction.jsx` (adapt `buyer/PostRequest.jsx`), `buyer/BrowseAuctions.jsx` (adapt `shop/BrowseRequests.jsx`), auction bid placement (adapt existing bid modal)
-21. Post-auction flow: winner sees delivery method selection (reuse Phase 2 pattern) → shop confirm/deny → verify (reuse `MyPurchases.jsx`/`BidDetail.jsx` logic)
+## Phase 4: Seller Auctions (new core flow #2) — ✅ DONE (Aug 27, 2026)
+
+**Folder structure (backend `mfx-core`):**
+```
+auctions/        — routes.py, schemas.py, service.py (POST/GET /auctions, GET/{id}, DELETE/{id})
+auction_bids/     — routes.py, schemas.py, service.py (POST /auctions/{id}/bids)
+supabase/functions/close-auctions/index.ts   — new Edge Function, mirrors expire-requests
+```
+**Folder structure (frontend `mfx-web`):**
+```
+pages/shop/PostAuction.jsx, MyAuctions.jsx   — new
+pages/buyer/BrowseAuctions.jsx, AuctionDetail.jsx   — new
+```
+**Navigation:** auctions sit behind an intermediate "Auction Dashboard" hub on both roles (see roadmap Section 12) rather than flat top-level nav links.
+
+15. ✅ `auctions` table (with delivery + sniping-prevention fields baked in per Section 4.5 of roadmap) — done Aug 27
+16. ✅ `auction_bids` table — done Aug 27
+16b. ✅ RLS policies for both tables — done Aug 27
+16c. ✅ Auction schemas (creation, update, bidding) — done Aug 27
+17. ✅ Backend routes: `POST /auctions`, `GET /auctions` (+ filters, `status="all"`, limit/offset), `GET /auctions/{id}`, `POST /auctions/{id}/bids`, `DELETE /auctions/{id}` — done Aug 27
+18. ✅ **Sniping prevention** — done Aug 27 (auto-extends `end_time` by 5 min on late bids)
+19. ✅ Auto-close Edge Function `close-auctions`, scheduled every 5 min — done Aug 27
+20. ✅ Frontend: Shop Auction Dashboard, `PostAuction.jsx`, `MyAuctions.jsx`, Shop Auction Detail, Buyer Auction Dashboard, `BrowseAuctions.jsx`, Buyer Auction Detail — done Aug 27
+21. ✅ Post-auction delivery/verify flow — done Aug 27 (reuses Phase 2 pattern, extended for auctions)
+
+*Bug fix along the way: timezone issue in `placeBid` function. Bid history now shows buyer names.*
+
+---
+
+## Phase 4b: Profile Completion Page (new, raised Aug 27)
+21b. Build profile edit/complete page for both roles — surfaces the Phase 1 `profiles` extensions (bio, business_hours, etc.) that currently have no UI
+21c. Add identity fields: shop GST number (likely immutable once set), buyer phone/ID number (immutability TBD)
+21d. Surface these fields on request/auction detail pages once matched (post-selection), similar to existing contact-reveal pattern
+21e. Decide exact field set + which are immutable vs. editable before building (see roadmap Section 13.1 open question)
+
+---
+
+## Phase 4c: OTP-Based Transaction Completion (finalized mechanics, Aug 27)
+
+**Decided mechanics — in-app code, no third-party SMS/email cost:**
+1. On delivery confirmation (home delivery confirmed by shop, or pickup arranged), backend generates a random 4-digit `verification_code`, stored on the `requests`/`auctions` row
+2. **Buyer holds the code** — shown only in their app (`MyPurchases.jsx` / auction equivalent)
+3. Physical handoff happens — buyer shares the code with the shop in person
+4. **Shop enters the code** in their app (`BidDetail.jsx` / auction equivalent) to confirm
+5. Backend checks entered code against stored → match sets `status='completed'`; mismatch returns error, allows retry
+
+21f. Schema: add `verification_code text, nullable`, `verification_attempts integer default 0`, `completed_via_override boolean default false` to both `requests` and `auctions`
+21g. Backend: generate code on delivery-confirmed/pickup-ready transition; verification endpoint for shop to submit code; increment `verification_attempts` on mismatch
+21h. **Dispute/fallback path (required):** cap attempts (e.g. 5); after cap, allow buyer to manually mark completed instead, setting `completed_via_override = true` for future admin/dispute visibility (no admin panel yet, this is the interim safety net)
+21i. Frontend: code display on buyer's `MyPurchases.jsx`/auction equivalent; code entry UI on shop's `BidDetail.jsx`/auction equivalent; override button on buyer side after attempt cap is hit
+21j. Replaces the current single-button verify step in both `requests.verify` flow (Phase 2) and future auction post-sale verify step (Phase 4, step 21) — test existing verify edge cases (denial, pickup-switch) still work with this layered in
+21k. **Reserve price (v2-scoped, from roadmap 13.5):** add `reserve_price integer, nullable` to `auctions`; `close-auctions` Edge Function checks highest bid against it — if unmet, auction doesn't auto-sell (goes unsold/expired instead of `sold`) even past `end_time`. Bundle here since it touches the same close-out logic already built in Phase 4 step 19.
+
+---
+
+## Phase 4d: Transaction History / Reports Page (new, raised Aug 27)
+21l. New user-facing page: combined request + auction transaction history/log — distinct from the dashboard KPI cards and from the platform-analytics-dashboard idea explicitly skipped in Section 2.12
+21m. Scope for now: chronological history + basic summary (counts, totals) — no ML yet
+21n. Reserve as the future surface for ML outputs (Phase 9: price trends, demand patterns, personal insights) once those features exist — don't over-build the ML-facing parts now
 
 ---
 
@@ -118,8 +169,11 @@ Sequenced so each step unlocks or de-risks the next. Edit as we go.
 
 ## Deferred (not scoped yet — noted for future consideration)
 - Admin panel/role (approve verifications, moderate reports at scale)
-- Shop verification badge (business proof upload + manual approval)
+- Shop verification badge — **full** manual-approval version (partial GST-based badge is v2, see Phase 4b)
 - Full-text search on item_name/description
+- Requests flow/format change, similar to auction restructure — explicitly "at the very last," no specifics yet
+- "Watching" / live bid count on auctions (via extending `favorites`) — needs Phase 7 first, v3 candidate
+- Notification digest (email) — needs new external email service, in-app-only stays the v2 decision
 
 ---
 
@@ -130,17 +184,10 @@ Sequenced so each step unlocks or de-risks the next. Edit as we go.
 - Delivery confirmation (Phase 2) is intentionally before Auctions (Phase 4) — smaller scope, validates the pattern that Auctions' post-sale flow will reuse.
 - Multi-image Cloudinary (Phase 3) is placed before Auctions so `PostAuction.jsx` can be built with proper image upload from the start, rather than retrofitting later.
 - Sniping prevention (Phase 4, step 18) is built into the auction bid handler itself, not bolted on after — cheaper to do at the same time as the base bid endpoint.
+- Phases 4b/4c/4d (profile completion, OTP verification, transaction history) were raised the same day Phase 4 finished — placed right after Auctions since 4b/4c directly touch flows Auctions and Core Flow both just built (delivery/verify), and 4d is a natural follow-on reporting surface. 4c's mechanics are finalized (buyer holds code, shop enters it, retry cap + buyer-override fallback) — no third-party OTP/SMS cost. Reserve price bundled into 4c since it shares the same auction close-out logic. Not yet started; sequence among 4b/4c/4d themselves isn't fixed — pick whichever fits next.
 - Chat (Phase 5) comes after Auctions since it needs both Core Flow selection and Auction win as trigger points; moderation is built alongside chat, not after.
 - Sort + report/flag (Phase 6) grouped together as both are browse/listing-page additions, done right after both listing types (requests + auctions) exist.
 - Reliability scores (Phase 8) must come before ML bid ranking (Phase 9, step 40) since ranking depends on it.
 - Mobile (Phase 11) is last — no point wrapping/PWA-ing a UI that's still changing.
 - Privacy/compliance (Phase 12) is last but should happen before real users beyond your own testing use the app — not a hard blocker for continued dev.
 - Admin panel and shop verification are deliberately deferred, not forgotten — revisit once core v2 feature set is live.
-
-
-## License
-
-Copyright © 2026 Prateek Saha
-
-Licensed under the Apache License, Version 2.0.
-See the [LICENSE](LICENSE) file for details.

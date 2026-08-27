@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr, validator
-from typing import Optional
+from typing import Optional, Dict, Any
+from uuid import UUID
 import logging
 from auth.dependencies import supabase_anon, supabase_admin, get_current_user
-from uuid import UUID
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -45,6 +45,7 @@ class LoginResponse(BaseModel):
     access_token: str
     role: str
     user_id: str
+
 
 # ----- Routes -----
 
@@ -155,7 +156,6 @@ async def get_profile(
         logger.info(f"User ID requested: {user_id}")
         logger.info(f"Current user: {current_user}")
         
-        # Use supabase_admin to bypass RLS
         response = supabase_admin.table("profiles") \
             .select("*") \
             .eq("id", str(user_id)) \
@@ -174,10 +174,122 @@ async def get_profile(
             "phone": profile.get("phone"),
             "address": profile.get("address"),
             "pincode": profile.get("pincode"),
-            "role": profile.get("role")
+            "role": profile.get("role"),
+            "full_name": profile.get("full_name"),
+            "bio": profile.get("bio"),
+            "profile_photo_url": profile.get("profile_photo_url"),
+            "date_of_birth": profile.get("date_of_birth"),
+            "gender": profile.get("gender"),
+            "preferred_categories": profile.get("preferred_categories"),
+            "business_hours": profile.get("business_hours"),
+            "years_in_business": profile.get("years_in_business"),
+            "gst_number": profile.get("gst_number"),
+            "is_verified": profile.get("is_verified")
         }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Get profile error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ====== NEW: Update Profile Endpoint ======
+
+@router.patch("/profiles/{user_id}")
+async def update_profile(
+    user_id: UUID,
+    profile_data: Dict[str, Any],
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Update a user's profile.
+    Users can only update their own profile.
+    """
+    if current_user["id"] != str(user_id):
+        raise HTTPException(
+            status_code=403,
+            detail="You can only update your own profile"
+        )
+    
+    try:
+        logger.info(f"=== UPDATE PROFILE ===")
+        logger.info(f"User ID: {user_id}")
+        logger.info(f"Update data: {profile_data}")
+        
+        # Check if profile exists
+        check_response = supabase_admin.table("profiles") \
+            .select("id") \
+            .eq("id", str(user_id)) \
+            .execute()
+        
+        if not check_response.data:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        
+        # Remove immutable fields
+        immutable_fields = ["id", "role", "created_at", "total_transactions", "completed_transactions", "is_verified"]
+        for field in immutable_fields:
+            profile_data.pop(field, None)
+        
+        profile_data.pop("role", None)
+        
+        # Clean up - convert empty strings to None for date and other fields
+        # This prevents PostgreSQL errors with invalid data types
+        update_dict = {}
+        for k, v in profile_data.items():
+            if v is None:
+                continue
+            # Convert empty strings to None for fields that expect NULL
+            if v == "" and k in ["date_of_birth", "gender", "profile_photo_url", "gst_number"]:
+                continue  # Skip empty strings, leave as NULL in DB
+            elif v == "":
+                continue  # Skip other empty strings
+            else:
+                update_dict[k] = v
+        
+        # Special handling for date_of_birth - ensure valid date format
+        if "date_of_birth" in profile_data and profile_data["date_of_birth"]:
+            try:
+                # Validate date format
+                from datetime import datetime
+                datetime.strptime(profile_data["date_of_birth"], "%Y-%m-%d")
+                update_dict["date_of_birth"] = profile_data["date_of_birth"]
+            except ValueError:
+                # Invalid date, skip it
+                logger.warning(f"Invalid date format: {profile_data['date_of_birth']}")
+        
+        # Special handling for preferred_categories - ensure it's a list
+        if "preferred_categories" in profile_data:
+            if isinstance(profile_data["preferred_categories"], list):
+                update_dict["preferred_categories"] = profile_data["preferred_categories"]
+            else:
+                update_dict["preferred_categories"] = []
+        
+        if not update_dict:
+            return {
+                "message": "No fields to update",
+                "profile": check_response.data[0]
+            }
+        
+        logger.info(f"Updating profile {user_id} with: {update_dict}")
+        
+        response = supabase_admin.table("profiles") \
+            .update(update_dict) \
+            .eq("id", str(user_id)) \
+            .execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=400, detail="Failed to update profile")
+        
+        updated_profile = response.data[0]
+        logger.info(f"Profile updated successfully: {user_id}")
+        
+        return {
+            "message": "Profile updated successfully",
+            "profile": updated_profile
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating profile {user_id}: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))

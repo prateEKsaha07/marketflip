@@ -24,7 +24,8 @@ import {
   ShoppingBag,
   Eye,
   MessageSquare,
-  Gavel 
+  Gavel,
+  User  // ADD THIS
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -119,14 +120,6 @@ const Dashboard = () => {
     );
   };
 
-  const ActivityItem = ({ icon, label, value, color }) => (
-    <div className="flex items-center gap-2 text-sm">
-      <span className="text-[#A0A0B0]">{icon}</span>
-      <span className="text-[#A0A0B0]">{label}</span>
-      <span className={`font-medium text-${color}`}>{value}</span>
-    </div>
-  );
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
@@ -187,6 +180,14 @@ const Dashboard = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button 
+              onClick={() => navigate('/shop/profile')}
+              variant="outline"
+              className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] hover:border-[#D0D0D0] text-sm px-4 py-2"
+            >
+              <User size={15} className="mr-1.5" />
+              Profile
+            </Button>
+            <Button 
               onClick={() => navigate('/shop/my-bids')}
               variant="outline"
               className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] hover:border-[#D0D0D0] text-sm px-4 py-2"
@@ -204,7 +205,8 @@ const Dashboard = () => {
             <Button 
               onClick={() => navigate('/shop/auctions')}
               variant="outline"
-              className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] hover:border-[#D0D0D0] text-sm px-4 py-2">
+              className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] hover:border-[#D0D0D0] text-sm px-4 py-2"
+            >
               <Gavel size={15} className="mr-1.5" />
               Auctions
             </Button>
