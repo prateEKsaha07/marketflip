@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { 
@@ -28,7 +28,8 @@ import {
   Loader2,
   ThumbsUp,
   ThumbsDown,
-  Image as ImageIcon
+  Image as ImageIcon,
+  PartyPopper
 } from 'lucide-react';
 import api from '../../api/client';
 import { confirmDelivery, denyDelivery } from '../../api/client';
@@ -43,10 +44,22 @@ const BidDetail = () => {
   const [data, setData] = useState(null);
   const [deliveryAction, setDeliveryAction] = useState(false);
   const [deliveryError, setDeliveryError] = useState('');
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [successSubtext, setSuccessSubtext] = useState('');
 
   useEffect(() => {
     fetchBidDetails();
   }, [id]);
+
+  const showSuccess = (message, subtext) => {
+    setSuccessMessage(message);
+    setSuccessSubtext(subtext);
+    setShowSuccessPopup(true);
+    setTimeout(() => {
+      setShowSuccessPopup(false);
+    }, 4000);
+  };
 
   const fetchBidDetails = async () => {
     setLoading(true);
@@ -101,6 +114,10 @@ const BidDetail = () => {
     try {
       await confirmDelivery(data.request.id);
       await fetchBidDetails();
+      showSuccess(
+        'Delivery Confirmed!',
+        'You have confirmed home delivery. The buyer will be notified.'
+      );
     } catch (err) {
       console.error('Confirm delivery error:', err);
       setDeliveryError(err.response?.data?.detail || 'Failed to confirm delivery');
@@ -117,6 +134,10 @@ const BidDetail = () => {
     try {
       await denyDelivery(data.request.id);
       await fetchBidDetails();
+      showSuccess(
+        'Delivery Denied',
+        'You have denied home delivery. The buyer can choose pickup or cancel.'
+      );
     } catch (err) {
       console.error('Deny delivery error:', err);
       setDeliveryError(err.response?.data?.detail || 'Failed to deny delivery');
@@ -207,6 +228,40 @@ const BidDetail = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
       <div className="max-w-3xl mx-auto">
+        {/* Success Popup */}
+        <AnimatePresence>
+          {showSuccessPopup && (
+            <motion.div
+              initial={{ opacity: 0, y: -60, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -60, scale: 0.9 }}
+              className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-white shadow-2xl rounded-2xl border border-emerald-200 max-w-md w-full mx-4 overflow-hidden"
+            >
+              <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <PartyPopper size={18} className="text-white" />
+                  </div>
+                  <span className="font-bold text-white text-sm">{successMessage}</span>
+                </div>
+                <button
+                  onClick={() => setShowSuccessPopup(false)}
+                  className="text-white/70 hover:text-white transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="px-4 py-3 bg-white">
+                <p className="text-sm text-[#4A4A5A]">{successSubtext}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs text-emerald-600">Processing...</span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -8 }}

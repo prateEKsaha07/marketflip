@@ -11,7 +11,7 @@ class AuctionService:
         self.supabase_admin = supabase_admin
         self.supabase_anon = supabase_anon
 
-    def CreateAuction(self, 
+    def createAuction(self, 
                       shop_id: str, 
                       auction_data: Dict[str,Any]
                       ) -> Dict[str, Any]:
@@ -20,10 +20,11 @@ class AuctionService:
             data = {
                 "shop_id": shop_id,
                 "item_name": auction_data["item_name"],
-                "description": auction_data["description"],
+                "description": auction_data.get("description"),
                 "starting_price" : auction_data["starting_price"],
+                "current_highest_bid": auction_data["starting_price"],
                 "pincode" : auction_data["pincode"],
-                "category" : auction_data["category"],
+                "category" : auction_data["category","electronics"],
                 "end_time" : auction_data["end_time"],
                 "delivery_method" : auction_data.get("delivery_method","home_delivery"),
                 "delivery_address": auction_data.get("delivery_address"),
@@ -33,6 +34,7 @@ class AuctionService:
             response = self.supabase_admin.table("auctions").insert(data).execute()
             if not response.data:
                 raise  Exception("failed to create Auction")
+            return response.data[0]
         except Exception as e:
             logger.error(f"Error Creating a auction {str(e)}")
             raise
@@ -46,7 +48,7 @@ class AuctionService:
                     ) -> List[Dict[str, Any]]:
         """get auctions with filter"""
         try: 
-            query = self.supabsae_admin.table("auctions").select("*,profiles!shop_id(shop_name)").eq("status",status)
+            query = self.supabase_admin.table("auctions").select("*,profiles!shop_id(shop_name)").eq("status",status)
             if pincode:
                 query = query.eq("pincode", pincode)
             if category:

@@ -29,6 +29,7 @@ from auth.routes import router as auth_router
 from requests.routes import router as requests_router
 from bids.routes import router as bids_router, bid_router
 from routes.upload import router as upload_router
+from auctions.routes import router as auctions_router
 logger.info("All routers imported successfully")
 
 # INCLUDE ROUTERS
@@ -37,6 +38,7 @@ app.include_router(requests_router)
 app.include_router(bids_router)
 app.include_router(bid_router)
 app.include_router(upload_router)
+app.include_router(auctions_router)
 logger.info("All routers included successfully")
 
 # STARTUP EVENT
