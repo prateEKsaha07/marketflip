@@ -25,7 +25,8 @@ import {
   Tag,
   Home,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Lock
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -60,6 +61,12 @@ const ProfileFormPage = () => {
     },
     years_in_business: '',
     gst_number: '',
+    // NEW buyer fields
+    identity_number: '',
+    identity_type: '',
+    delivery_address: '',
+    budget_range_preference: { min: null, max: null },
+    notification_preferences: {}
   });
   
   const [photoFile, setPhotoFile] = useState(null);
@@ -122,6 +129,12 @@ const ProfileFormPage = () => {
         },
         years_in_business: data.years_in_business || '',
         gst_number: data.gst_number || '',
+        // NEW buyer fields
+        identity_number: data.identity_number || '',
+        identity_type: data.identity_type || '',
+        delivery_address: data.delivery_address || '',
+        budget_range_preference: data.budget_range_preference || { min: null, max: null },
+        notification_preferences: data.notification_preferences || {}
       });
       
       if (data.profile_photo_url) {
@@ -169,7 +182,6 @@ const ProfileFormPage = () => {
       setPhotoFile(file);
       setPhotoPreview(URL.createObjectURL(file));
       setPhotoUploaded(false);
-      // Clear previous photo URL from form data so we upload the new one
       setFormData(prev => ({ ...prev, profile_photo_url: '' }));
     }
   };
@@ -204,6 +216,28 @@ const ProfileFormPage = () => {
     setPhotoPreview(null);
     setPhotoUploaded(false);
     setFormData(prev => ({ ...prev, profile_photo_url: '' }));
+  };
+
+  const handleBudgetMinChange = (e) => {
+    const val = e.target.value ? parseInt(e.target.value) : null;
+    setFormData(prev => ({
+      ...prev,
+      budget_range_preference: {
+        ...(prev.budget_range_preference || {}),
+        min: val
+      }
+    }));
+  };
+
+  const handleBudgetMaxChange = (e) => {
+    const val = e.target.value ? parseInt(e.target.value) : null;
+    setFormData(prev => ({
+      ...prev,
+      budget_range_preference: {
+        ...(prev.budget_range_preference || {}),
+        max: val
+      }
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -263,6 +297,14 @@ const ProfileFormPage = () => {
         years_in_business: formData.years_in_business ? parseInt(formData.years_in_business) : null,
         gst_number: formData.gst_number || '',
       };
+
+      // Add buyer fields only if not a shop owner
+      if (!isShopOwner) {
+        submitData.identity_number = formData.identity_number || '';
+        submitData.identity_type = formData.identity_type || '';
+        submitData.delivery_address = formData.delivery_address || '';
+        submitData.budget_range_preference = formData.budget_range_preference || null;
+      }
       
       // If date_of_birth is empty, set to null
       if (submitData.date_of_birth === '') {
@@ -299,6 +341,7 @@ const ProfileFormPage = () => {
   ];
 
   const genderOptions = ['male', 'female', 'other', 'prefer_not_to_say'];
+  const identityTypeOptions = ['pan', 'aadhaar', 'other'];
 
   const backPath = isShopOwner ? '/shop/profile' : '/buyer/profile';
 
@@ -608,6 +651,113 @@ const ProfileFormPage = () => {
                       Select categories you're interested in
                     </p>
                   </div>
+
+                  {/* ====== NEW BUYER FIELDS: Identity & Trust ====== */}
+                  <div className="border-t border-[#EEECE6] pt-4 mt-4">
+                    <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
+                      <FileText size={14} className="text-[#FFBE91]" />
+                      Identity & Trust
+                    </h3>
+                    <p className="text-[10px] text-[#A0A0B0] mb-3">
+                      This helps build trust with shops. Identity number cannot be changed once set.
+                    </p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
+                          Identity Number
+                          {profile?.identity_number && (
+                            <span className="text-[10px] text-amber-600 ml-2">(Locked)</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          name="identity_number"
+                          value={formData.identity_number || ''}
+                          onChange={handleChange}
+                          placeholder="PAN/Aadhaar/Other ID"
+                          disabled={!!profile?.identity_number}
+                          className={`w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all ${profile?.identity_number ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        />
+                        {profile?.identity_number && (
+                          <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
+                            <Lock size={10} />
+                            Identity number cannot be changed once set
+                          </p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
+                          Identity Type
+                        </label>
+                        <select
+                          name="identity_type"
+                          value={formData.identity_type || ''}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all appearance-none"
+                        >
+                          <option value="">Select type</option>
+                          {identityTypeOptions.map(type => (
+                            <option key={type} value={type}>{type.toUpperCase()}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ====== NEW BUYER FIELDS: Delivery Preferences ====== */}
+                  <div className="border-t border-[#EEECE6] pt-4 mt-4">
+                    <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
+                      <Home size={14} className="text-[#FFBE91]" />
+                      Delivery Preferences
+                    </h3>
+                    
+                    <div>
+                      <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
+                        Default Delivery Address
+                      </label>
+                      <input
+                        type="text"
+                        name="delivery_address"
+                        value={formData.delivery_address || ''}
+                        onChange={handleChange}
+                        placeholder="Enter your default delivery address"
+                        className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                      />
+                    </div>
+                    
+                    <div className="mt-3">
+                      <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
+                        Budget Range Preference
+                      </label>
+                      <p className="text-[10px] text-[#A0A0B0] mb-2">
+                        This helps us suggest better prices for your requests
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <input
+                            type="number"
+                            value={formData.budget_range_preference?.min || ''}
+                            onChange={handleBudgetMinChange}
+                            placeholder="Min budget"
+                            min="0"
+                            className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="number"
+                            value={formData.budget_range_preference?.max || ''}
+                            onChange={handleBudgetMaxChange}
+                            placeholder="Max budget"
+                            min="0"
+                            className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </>
               )}
 
@@ -632,17 +782,21 @@ const ProfileFormPage = () => {
                     <div>
                       <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
                         GST Number
+                        {profile?.gst_number && (
+                          <span className="text-[10px] text-amber-600 ml-2">(Locked)</span>
+                        )}
                       </label>
                       <input
                         type="text"
                         name="gst_number"
-                        value={formData.gst_number}
+                        value={formData.gst_number || ''}
                         onChange={handleChange}
                         placeholder="22ABCDE1234F1Z5"
-                        className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                        disabled={!!profile?.gst_number}
+                        className={`w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all ${profile?.gst_number ? 'opacity-60 cursor-not-allowed' : ''}`}
                       />
                       <p className="text-[10px] text-[#A0A0B0] mt-1">
-                        Optional, helps build trust with buyers
+                        {profile?.gst_number ? 'GST number cannot be changed once set' : 'Optional, helps build trust with buyers'}
                       </p>
                     </div>
                   </div>

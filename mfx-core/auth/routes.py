@@ -184,7 +184,12 @@ async def get_profile(
             "business_hours": profile.get("business_hours"),
             "years_in_business": profile.get("years_in_business"),
             "gst_number": profile.get("gst_number"),
-            "is_verified": profile.get("is_verified")
+            "is_verified": profile.get("is_verified"),
+            "identity_number": profile.get("identity_number"),
+            "identity_type": profile.get("identity_type"),
+            "delivery_address": profile.get("delivery_address"),
+            "budget_range_preference": profile.get("budget_range_preference"),
+            "notification_preferences": profile.get("notification_preferences"),
         }
     except HTTPException:
         raise
