@@ -17,9 +17,10 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Get auctions that have ended but are still active
+    console.log('=== CLOSE-AUCTIONS EDGE FUNCTION STARTED ===')
     const now = new Date().toISOString()
-    
+
+    // Get auctions that have ended but are still active
     const { data: endedAuctions, error: fetchError } = await supabase
       .from('auctions')
       .select('*')
@@ -32,8 +33,12 @@ Deno.serve(async (req) => {
 
     let closedCount = 0
     let expiredCount = 0
+    let soldCount = 0
+    let reserveNotMetCount = 0
 
     for (const auction of endedAuctions || []) {
+      console.log(`Processing auction: ${auction.id} - ${auction.item_name}`)
+
       // Get highest bid for this auction
       const { data: bids, error: bidError } = await supabase
         .from('auction_bids')
@@ -48,17 +53,39 @@ Deno.serve(async (req) => {
       }
 
       const highestBid = bids && bids.length > 0 ? bids[0] : null
+      const highestBidAmount = highestBid ? highestBid.bid_amount : 0
+      
+      // ====== CHECK RESERVE PRICE ======
+      const reservePrice = auction.reserve_price || 0
 
-      // Update auction status
-      const updateData: any = {
-        status: highestBid ? 'sold' : 'expired',
+      // Determine final status
+      let finalStatus: string
+      let updateData: any = {
         closed_at: now
       }
 
-      if (highestBid) {
+      if (!highestBid) {
+        // No bids - expired
+        finalStatus = 'expired'
+        expiredCount++
+        console.log(`Auction ${auction.id}: No bids → expired`)
+      } else if (reservePrice > 0 && highestBidAmount < reservePrice) {
+        // Reserve not met - expired (not sold)
+        finalStatus = 'expired'
+        reserveNotMetCount++
+        console.log(`Auction ${auction.id}: Highest bid ${highestBidAmount} < reserve price ${reservePrice} → expired (reserve not met)`)
+      } else {
+        // Reserve met (or no reserve) - sold
+        finalStatus = 'sold'
+        soldCount++
         updateData.winning_bid_id = highestBid.id
-        updateData.current_highest_bid = highestBid.bid_amount
+        updateData.current_highest_bid = highestBidAmount
+        updateData.current_highest_bidder = highestBid.buyer_id
+        console.log(`Auction ${auction.id}: Highest bid ${highestBidAmount} → sold to ${highestBid.buyer_id}`)
       }
+
+      // Update auction status
+      updateData.status = finalStatus
 
       const { error: updateError } = await supabase
         .from('auctions')
@@ -70,19 +97,24 @@ Deno.serve(async (req) => {
         continue
       }
 
-      if (highestBid) {
-        closedCount++
-      } else {
-        expiredCount++
-      }
+      closedCount++
+      console.log(`Auction ${auction.id}: Status updated to ${finalStatus}`)
     }
+
+    console.log(`=== SUMMARY ===`)
+    console.log(`Total closed: ${closedCount}`)
+    console.log(`Sold: ${soldCount}`)
+    console.log(`Expired (no bids): ${expiredCount}`)
+    console.log(`Expired (reserve not met): ${reserveNotMetCount}`)
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Closed ${closedCount} auctions, expired ${expiredCount} auctions`,
+        message: `Closed ${closedCount} auctions (${soldCount} sold, ${expiredCount + reserveNotMetCount} expired)`,
         closed: closedCount,
-        expired: expiredCount
+        sold: soldCount,
+        expired_no_bids: expiredCount,
+        expired_reserve_not_met: reserveNotMetCount
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
