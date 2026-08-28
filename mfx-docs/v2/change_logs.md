@@ -112,6 +112,36 @@ changes:
 - Added bid history with buyer names
 
 
+date: 8/29/2026
+changes:
+- Added identity_number, identity_type, delivery_address, budget_range_preference, notification_preferences columns to profiles table
+- Extended ProfileUpdate schema with new buyer fields
+- Added immutability checks for identity_number (once set, cannot be changed)
+- Added role-specific field validation in profile update (buyers can't set shop fields, shops can't set buyer fields)
+- Updated GET /auth/profiles/{user_id} to return new buyer fields
+- Extended Profile.jsx to display identity_number, identity_type, delivery_address, budget_range_preference with locked badge
+- Extended ProfileForm.jsx to edit identity_number, identity_type, delivery_address, budget_range_preference
+- Added GST locked badge for shop owners in Profile.jsx
+- Added Verified Shop badge on shop dashboard (conditional on gst_number)
+- Added verification_code, verification_attempts, completed_via_override columns to requests table
+- Added verification_code, verification_attempts, completed_via_override, reserve_price columns to auctions table
+- Created utils/verification.py with generate_verification_code() function
+- Updated confirm_delivery endpoint to generate OTP on delivery confirmation
+- Updated deny_delivery endpoint to clear verification_code and verification_attempts
+- Updated switch-to-pickup endpoint to generate OTP on pickup switch
+- Updated set_delivery_method endpoint to generate OTP for pickup selection
+- Updated select_bid endpoint to generate OTP for pickup requests when bid is selected
+- Added POST /requests/{id}/verify-otp endpoint for shop to verify OTP (max 5 attempts)
+- Added PATCH /requests/{id}/override-complete endpoint for buyer override after max attempts
+- Updated RequestResponse schema to include verification fields
+- Updated DeliveryConfirmResponse schema to include verification_code
+- Extended BidDetail.jsx with OTP verification section (works for both home delivery and pickup)
+- Extended MyPurchases.jsx with OTP code display (show/hide, copy, attempts remaining, max attempts warning)
+- Added OTP code display in Completed tab for record keeping
+- Fixed pickup OTP generation flow (OTP now generated when bid is selected for pickup requests)
+- Fixed showOtpVerification condition to work for both home delivery and pickup
+- Added delivery method badge in OTP section (Pickup/Home Delivery)
+
 ## License
 
 Copyright © 2026 Prateek Saha
