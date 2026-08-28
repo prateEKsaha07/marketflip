@@ -4,6 +4,8 @@ from uuid import UUID
 from datetime import datetime
 import logging
 
+from utils.verification import generate_verification_code
+
 logger = logging.getLogger(__name__)
 
 class RequestService:
@@ -164,13 +166,14 @@ class RequestService:
     def confirm_delivery(self, request_id: UUID, shop_id: UUID) -> Dict[str, Any]:
         """
         Shop confirms home delivery for a request.
+        Generates OTP code for the transaction.
         
         Args:
             request_id: The request ID
             shop_id: The shop owner's profile ID
             
         Returns:
-            Updated request data with delivery confirmation
+            Updated request data with delivery confirmation and OTP
             
         Raises:
             ValueError: If validation fails
@@ -206,10 +209,18 @@ class RequestService:
             if bid_result.data[0]["shop_id"] != str(shop_id):
                 raise ValueError("You are not the shop owner of the selected bid")
         
+            # ====== GENERATE OTP FOR HOME DELIVERY ======
+            verification_code = generate_verification_code()
+            logger.info(f"=== HOME DELIVERY OTP GENERATED ===")
+            logger.info(f"Request ID: {request_id}")
+            logger.info(f"Verification Code: {verification_code}")
+        
             update_result = self.supabase_admin.table("requests") \
                 .update({
                     "delivery_confirmed_by_shop": True,
-                    "delivery_response_at": datetime.utcnow().isoformat()  
+                    "delivery_response_at": datetime.utcnow().isoformat(),
+                    "verification_code": verification_code,
+                    "verification_attempts": 0
                 }) \
                 .eq("id", str(request_id)) \
                 .execute()
@@ -226,6 +237,7 @@ class RequestService:
     def deny_delivery(self, request_id: str, shop_id: str) -> Dict[str, Any]:
         """
         Shop denies home delivery for a request.
+        Clears any existing verification code.
         
         Args:
             request_id: The request ID
@@ -268,10 +280,13 @@ class RequestService:
             if bid_result.data[0]["shop_id"] != str(shop_id):
                 raise ValueError("You are not the shop owner of the selected bid")
         
+            # Clear verification code when denying delivery
             update_result = self.supabase_admin.table("requests")\
                 .update({
                     "delivery_confirmed_by_shop": False,
-                    "delivery_response_at": datetime.utcnow().isoformat()
+                    "delivery_response_at": datetime.utcnow().isoformat(),
+                    "verification_code": None,
+                    "verification_attempts": 0
                 })\
                 .eq("id", str(request_id))\
                 .execute()
@@ -283,4 +298,62 @@ class RequestService:
         
         except Exception as e:
             logger.error(f"Error while denying delivery for {request_id}: {str(e)}")
+            raise
+
+    def select_bid_with_pickup_otp(self, request_id: str, bid_id: str) -> Dict[str, Any]:
+        """
+        Select a bid and generate OTP if the request is for pickup.
+        This is called from the bid selection flow.
+        
+        Args:
+            request_id: The request ID
+            bid_id: The selected bid ID
+            
+        Returns:
+            Updated request data with OTP if applicable
+            
+        Raises:
+            ValueError: If validation fails
+        """
+        try:
+            # Get request
+            request_result = self.supabase_admin.table("requests") \
+                .select("*") \
+                .eq("id", str(request_id)) \
+                .execute()
+            
+            if not request_result.data:
+                raise ValueError("Request not found")
+            
+            request = request_result.data[0]
+            
+            # Check if delivery method is pickup
+            if request.get("delivery_method") == "pickup":
+                # Generate OTP for pickup
+                verification_code = generate_verification_code()
+                
+                logger.info(f"=== PICKUP OTP GENERATED IN SERVICE ===")
+                logger.info(f"Request ID: {request_id}")
+                logger.info(f"Verification Code: {verification_code}")
+                
+                # Update request with OTP and auto-confirm delivery
+                update_result = self.supabase_admin.table("requests") \
+                    .update({
+                        "verification_code": verification_code,
+                        "verification_attempts": 0,
+                        "delivery_confirmed_by_shop": True,
+                        "delivery_response_at": datetime.utcnow().isoformat()
+                    }) \
+                    .eq("id", str(request_id)) \
+                    .execute()
+                
+                if not update_result.data:
+                    raise ValueError("Failed to update request with OTP")
+                
+                return update_result.data[0]
+            
+            return request
+            
+        except Exception as e:
+            logger.error(f"Error in select_bid_with_pickup_otp for {request_id}: {str(e)}")
             raise

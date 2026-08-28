@@ -23,7 +23,14 @@ import {
   Loader2,
   XCircle,
   Shield,
-  User
+  User,
+  Key,
+  Lock,
+  Eye,
+  EyeOff,
+  Check,
+  X,
+  History
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -42,6 +49,7 @@ const MyPurchases = () => {
   const [showConfirmButton, setShowConfirmButton] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
+  const [showOtpCode, setShowOtpCode] = useState(false);
 
   useEffect(() => {
     fetchAllPurchases();
@@ -55,6 +63,7 @@ const MyPurchases = () => {
       
       const purchasedResponse = await api.get('/requests?status=purchased');
       const purchasedData = purchasedResponse.data || [];
+      console.log('Purchased data:', purchasedData);
       
       let completedData = [];
       try {
@@ -70,24 +79,27 @@ const MyPurchases = () => {
       const verification = [];
       
       for (const req of purchasedData) {
-        // Check if delivery is confirmed or it's a pickup
+        // Check if delivery is confirmed (for home delivery) or pickup (auto-confirmed)
         const isDeliveryConfirmed = req.delivery_confirmed_by_shop === true;
         const isPickup = req.delivery_method === 'pickup';
         const isPending = req.delivery_confirmed_by_shop === null && req.delivery_method === 'home_delivery';
         const isDenied = req.delivery_confirmed_by_shop === false;
         
-        // If pickup, or home_delivery confirmed → can verify
+        // For pickup, always put in verification tab since OTP should be generated
+        // For home delivery, only if shop confirmed
         if (isPickup || isDeliveryConfirmed) {
           verification.push(req);
         } 
-        // If home_delivery pending or denied → stay in selected tab
         else if (isPending || isDenied || !req.delivery_method) {
           selected.push(req);
         } else {
-          // Fallback
           selected.push(req);
         }
       }
+      
+      console.log('Selected (pending):', selected.length);
+      console.log('Verification (ready):', verification.length);
+      console.log('Completed:', completedData.length);
       
       const selectedWithDetails = await processRequests(selected);
       const verificationWithDetails = await processRequests(verification);
@@ -111,6 +123,7 @@ const MyPurchases = () => {
     return await Promise.all(
       requests.map(async (req) => {
         try {
+          // Get bid details
           const bidsResponse = await api.get(`/requests/${req.id}/bids`);
           const selectedBid = bidsResponse.data.find(b => b.status === 'selected');
           
@@ -122,6 +135,11 @@ const MyPurchases = () => {
             } catch (err) {
               shopDetails = selectedBid.profiles || null;
             }
+          }
+          
+          // Log verification code for debugging
+          if (req.verification_code) {
+            console.log(`Request ${req.id} has verification code:`, req.verification_code);
           }
           
           return {
@@ -144,27 +162,26 @@ const MyPurchases = () => {
   // ============================================
   
   const handleSwitchToPickup = async (requestId) => {
-  if (!window.confirm('Switch this order to pickup? The shop cannot deliver to your address.')) return;
-  
-  setActionLoading(prev => ({ ...prev, [requestId]: 'pickup' }));
-  try {
-    // Use the dedicated switch-to-pickup endpoint
-    await api.patch(`/requests/${requestId}/switch-to-pickup`);
+    if (!window.confirm('Switch this order to pickup? The shop cannot deliver to your address.')) return;
     
-    await fetchAllPurchases();
-    if (selectedPurchase && selectedPurchase.id === requestId) {
-      setSelectedPurchase(null);
+    setActionLoading(prev => ({ ...prev, [requestId]: 'pickup' }));
+    try {
+      const response = await api.patch(`/requests/${requestId}/switch-to-pickup`);
+      console.log('Switch to pickup response:', response.data);
+      
+      await fetchAllPurchases();
+      if (selectedPurchase && selectedPurchase.id === requestId) {
+        setSelectedPurchase(null);
+      }
+      alert('Switched to pickup! An OTP code has been generated. Share it with the shop to complete the transaction.');
+    } catch (err) {
+      console.error('Switch to pickup error:', err);
+      const errorMsg = err.response?.data?.detail || 'Failed to switch to pickup';
+      alert('Failed to switch to pickup: ' + errorMsg);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [requestId]: false }));
     }
-    alert('✅ Switched to pickup! You can now verify the transaction.');
-  } catch (err) {
-    console.error('Switch to pickup error:', err);
-    const errorMsg = err.response?.data?.detail || 'Failed to switch to pickup';
-    alert('❌ ' + errorMsg);
-  } finally {
-    setActionLoading(prev => ({ ...prev, [requestId]: false }));
-  }
-};
-
+  };
 
   const handleCancelOrder = async (requestId) => {
     if (!window.confirm('Are you sure you want to cancel this order?')) return;
@@ -178,10 +195,10 @@ const MyPurchases = () => {
       if (selectedPurchase && selectedPurchase.id === requestId) {
         setSelectedPurchase(null);
       }
-      alert('✅ Order cancelled successfully.');
+      alert('Order cancelled successfully.');
     } catch (err) {
       console.error('Cancel order error:', err);
-      alert('❌ Failed to cancel order: ' + (err.response?.data?.detail || 'Unknown error'));
+      alert('Failed to cancel order: ' + (err.response?.data?.detail || 'Unknown error'));
     } finally {
       setActionLoading(prev => ({ ...prev, [requestId]: false }));
     }
@@ -192,7 +209,6 @@ const MyPurchases = () => {
   // ============================================
   
   const getDeliveryStatusDisplay = (request) => {
-    // If no delivery method set yet
     if (!request.delivery_method) {
       return {
         icon: <AlertCircle size={14} className="text-amber-600" />,
@@ -204,37 +220,49 @@ const MyPurchases = () => {
       };
     }
     
-    // If pickup - can verify immediately
     if (request.delivery_method === 'pickup') {
+      // Check if pickup has OTP code generated
+      if (request.verification_code) {
+        return {
+          icon: <Key size={14} className="text-violet-600" />,
+          text: 'Pickup - OTP Ready',
+          color: 'text-violet-600',
+          bg: 'bg-violet-50/50 border-violet-100',
+          subtext: 'Share the OTP code with the shop to complete the transaction',
+          showActions: false,
+          canVerify: false,
+          hasVerificationCode: true
+        };
+      }
       return {
         icon: <Home size={14} className="text-blue-600" />,
-        text: '📍 Pickup',
+        text: 'Pickup',
         color: 'text-blue-600',
         bg: 'bg-blue-50/50 border-blue-100',
         subtext: 'You selected pickup from shop',
         showActions: false,
-        canVerify: true
+        canVerify: false
       };
     }
     
-    // Home delivery - check shop response
     if (request.delivery_method === 'home_delivery') {
       if (request.delivery_confirmed_by_shop === true) {
         return {
           icon: <ThumbsUp size={14} className="text-emerald-600" />,
-          text: '✅ Delivery Confirmed',
+          text: 'Delivery Confirmed',
           color: 'text-emerald-600',
           bg: 'bg-emerald-50/50 border-emerald-100',
-          subtext: `Shop confirmed delivery on ${new Date(request.delivery_response_at).toLocaleString()}`,
+          subtext: `Shop confirmed delivery on ${request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'}`,
           showActions: false,
-          canVerify: true
+          canVerify: false,
+          hasVerificationCode: !!request.verification_code
         };
       }
       
       if (request.delivery_confirmed_by_shop === false) {
         return {
           icon: <ThumbsDown size={14} className="text-rose-600" />,
-          text: '❌ Delivery Denied',
+          text: 'Delivery Denied',
           color: 'text-rose-600',
           bg: 'bg-rose-50/50 border-rose-100',
           subtext: 'Shop cannot deliver to your address.',
@@ -244,10 +272,9 @@ const MyPurchases = () => {
         };
       }
       
-      // null/undefined = awaiting shop response
       return {
         icon: <Clock size={14} className="text-amber-600" />,
-        text: '⏳ Awaiting Shop Response',
+        text: 'Awaiting Shop Response',
         color: 'text-amber-600',
         bg: 'bg-amber-50/50 border-amber-100',
         subtext: 'Shop is deciding whether they can deliver to your address.',
@@ -270,7 +297,7 @@ const MyPurchases = () => {
       if (address) {
         setDeliveryAddress(address);
         setShowConfirmButton(true);
-        alert('✅ Home Delivery selected! The shop will confirm or deny delivery.');
+        alert('Home Delivery selected! The shop will confirm or deny delivery.');
       } else {
         setDeliveryMethod(null);
         alert('Delivery address is required for home delivery.');
@@ -278,63 +305,31 @@ const MyPurchases = () => {
     } else {
       setDeliveryAddress('Pickup from shop');
       setShowConfirmButton(true);
-      alert('✅ Pickup selected! You can verify the transaction immediately.');
+      alert('Pickup selected! An OTP code will be generated. Share it with the shop to complete the transaction.');
     }
   };
 
   const handleConfirmDelivery = async () => {
-  if (!window.confirm('Confirm delivery method?')) return;
-  
-  setUpdating(true);
-  try {
-    console.log('Confirming delivery for:', selectedPurchase.id);
-    
-    const isPickup = deliveryMethod === 'pickup';
-    
-    // Use the dedicated delivery endpoint
-    await api.patch(`/requests/${selectedPurchase.id}/delivery`, {
-      delivery_method: isPickup ? 'pickup' : 'home_delivery',
-      delivery_address: deliveryAddress
-    });
-    
-    if (isPickup) {
-      alert('✅ Pickup confirmed! You can now verify the transaction.');
-    } else {
-      alert('✅ Home Delivery selected! Waiting for shop to confirm delivery.');
-    }
-    
-    setSelectedPurchase(null);
-    setDeliveryMethod(null);
-    setDeliveryAddress('');
-    setShowConfirmButton(false);
-    
-    await fetchAllPurchases();
-    
-  } catch (err) {
-    console.error('Confirm delivery error:', err);
-    alert('❌ Failed to confirm delivery: ' + (err.response?.data?.detail || 'Unknown error'));
-  } finally {
-    setUpdating(false);
-  }
-};
-
-  const handleVerifyTransaction = async () => {
-    // Check if verification is allowed
-    const deliveryStatus = getDeliveryStatusDisplay(selectedPurchase);
-    if (deliveryStatus && !deliveryStatus.canVerify) {
-      alert('❌ You cannot verify this transaction yet. Please wait for the shop to confirm delivery or switch to pickup.');
-      return;
-    }
-    
-    if (!window.confirm('Have you received the product and completed the transaction?')) return;
+    if (!window.confirm('Confirm delivery method?')) return;
     
     setUpdating(true);
     try {
-      console.log('Verifying transaction for:', selectedPurchase.id);
+      console.log('Confirming delivery for:', selectedPurchase.id);
       
-      await api.patch(`/requests/${selectedPurchase.id}/verify`);
+      const isPickup = deliveryMethod === 'pickup';
       
-      alert('🎉 Transaction verified successfully! The order is now complete.');
+      const response = await api.patch(`/requests/${selectedPurchase.id}/delivery`, {
+        delivery_method: isPickup ? 'pickup' : 'home_delivery',
+        delivery_address: deliveryAddress
+      });
+      
+      console.log('Delivery confirmation response:', response.data);
+      
+      if (isPickup) {
+        alert('Pickup confirmed! An OTP code has been generated. Share it with the shop to complete the transaction.');
+      } else {
+        alert('Home Delivery selected! Waiting for shop to confirm delivery.');
+      }
       
       setSelectedPurchase(null);
       setDeliveryMethod(null);
@@ -344,8 +339,8 @@ const MyPurchases = () => {
       await fetchAllPurchases();
       
     } catch (err) {
-      console.error('Verify transaction error:', err);
-      alert('❌ Failed to verify transaction: ' + (err.response?.data?.detail || 'Unknown error'));
+      console.error('Confirm delivery error:', err);
+      alert('Failed to confirm delivery: ' + (err.response?.data?.detail || 'Unknown error'));
     } finally {
       setUpdating(false);
     }
@@ -356,6 +351,7 @@ const MyPurchases = () => {
     setDeliveryMethod(null);
     setDeliveryAddress('');
     setShowConfirmButton(false);
+    setShowOtpCode(false);
   };
 
   const handleBack = () => {
@@ -363,6 +359,7 @@ const MyPurchases = () => {
     setDeliveryMethod(null);
     setDeliveryAddress('');
     setShowConfirmButton(false);
+    setShowOtpCode(false);
   };
 
   const getCurrentList = () => {
@@ -438,6 +435,84 @@ const MyPurchases = () => {
         color: 'gray'
       };
     }
+  };
+
+  // ====== Helper to render OTP Code Display ======
+  const renderOtpCodeDisplay = (purchase, isCompleted = false) => {
+    if (!purchase.verification_code) return null;
+    
+    return (
+      <div className={`mt-3 p-3 ${isCompleted ? 'bg-blue-50/80' : 'bg-violet-50/80'} rounded-xl border ${isCompleted ? 'border-blue-200' : 'border-violet-200'}`}>
+        <div className="flex items-center gap-2 mb-1.5">
+          <Key size={14} className={isCompleted ? 'text-blue-600' : 'text-violet-600'} />
+          <span className={`text-xs font-medium ${isCompleted ? 'text-blue-700' : 'text-violet-700'}`}>
+            {isCompleted ? 'Verification Code (Record)' : 'Verification Code'}
+          </span>
+          {isCompleted && (
+            <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+              <History size={10} />
+              Archived
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <p className="text-xl font-bold tracking-[0.5em] text-[#1A1A2E] font-mono bg-white p-2 rounded-lg text-center">
+              {showOtpCode ? purchase.verification_code : '••••'}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowOtpCode(!showOtpCode)}
+            className="p-2 bg-white rounded-lg hover:bg-[#F8F6F0] transition-colors border border-[#EEECE6]"
+          >
+            {showOtpCode ? <EyeOff size={16} className="text-[#4A4A5A]" /> : <Eye size={16} className="text-[#4A4A5A]" />}
+          </button>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(purchase.verification_code);
+              alert('Verification code copied to clipboard!');
+            }}
+            className="p-2 bg-white rounded-lg hover:bg-[#F8F6F0] transition-colors border border-[#EEECE6]"
+          >
+            <Check size={16} className="text-violet-600" />
+          </button>
+        </div>
+        {!isCompleted && (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-[10px] text-amber-600">
+              Attempts remaining: {5 - (purchase.verification_attempts || 0)}
+            </span>
+            {(purchase.verification_attempts || 0) > 0 && (
+              <span className="text-[10px] text-amber-600">
+                ({purchase.verification_attempts} used)
+              </span>
+            )}
+          </div>
+        )}
+        {(purchase.verification_attempts || 0) >= 5 && !isCompleted && (
+          <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-200">
+            <p className="text-[10px] text-amber-700 flex items-center gap-1">
+              <AlertCircle size={12} />
+              Maximum attempts reached. Please contact support to complete the transaction.
+            </p>
+          </div>
+        )}
+        {isCompleted && purchase.completed_via_override && (
+          <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-200">
+            <p className="text-[10px] text-amber-700 flex items-center gap-1">
+              <AlertCircle size={12} />
+              Completed via manual override
+            </p>
+          </div>
+        )}
+        {!isCompleted && (
+          <p className="text-[10px] text-violet-600 mt-2 flex items-center gap-1">
+            <Key size={12} />
+            Share this code with the shop. The transaction will auto-complete when they enter it.
+          </p>
+        )}
+      </div>
+    );
   };
 
   if (loading) {
@@ -569,9 +644,9 @@ const MyPurchases = () => {
               className="bg-white/60 backdrop-blur-sm rounded-2xl border border-[#FFDDB0]/50 p-8 md:p-12 text-center"
             >
               <div className="text-4xl mb-3">
-                {activeTab === 'selected' && '📋'}
-                {activeTab === 'verification' && '⏳'}
-                {activeTab === 'completed' && '✅'}
+                {activeTab === 'selected' && <Package size={48} className="mx-auto text-[#4A4A5A]" />}
+                {activeTab === 'verification' && <Clock size={48} className="mx-auto text-[#4A4A5A]" />}
+                {activeTab === 'completed' && <CheckCircle size={48} className="mx-auto text-[#4A4A5A]" />}
               </div>
               <p className="text-[#4A4A5A] text-base">
                 {activeTab === 'selected' && 'No pending orders.'}
@@ -600,6 +675,8 @@ const MyPurchases = () => {
                 const deliveryDisplay = getDeliveryStatusDisplay(purchase);
                 const isLoading = actionLoading[purchase.id];
                 const isVerification = activeTab === 'verification';
+                const isCompleted = activeTab === 'completed';
+                const hasOtpCode = purchase.verification_code && purchase.delivery_confirmed_by_shop === true;
                 
                 return (
                   <motion.div
@@ -627,13 +704,22 @@ const MyPurchases = () => {
                             {statusConfig.icon}
                             {statusConfig.label}
                           </span>
+                          {hasOtpCode && (isVerification || isCompleted) && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-100 text-violet-700 rounded-full text-[10px] font-medium">
+                              <Key size={10} />
+                              {isCompleted ? 'OTP Archived' : 'OTP Ready'}
+                            </span>
+                          )}
                         </div>
                         <p className="text-[#4A4A5A] text-xs mt-0.5 line-clamp-1">
                           {purchase.description || 'No description'}
                         </p>
                         <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-[#4A4A5A]">
-                          <span>💰 ₹{purchase.budget_min.toLocaleString()} - ₹{purchase.budget_max.toLocaleString()}</span>
-                          <span>📍 {purchase.pincode}</span>
+                          <span>₹{purchase.budget_min.toLocaleString()} - ₹{purchase.budget_max.toLocaleString()}</span>
+                          <span className="flex items-center gap-1">
+                            <MapPin size={10} />
+                            {purchase.pincode}
+                          </span>
                           <span className="flex items-center gap-1">
                             <Calendar size={10} />
                             {new Date(purchase.created_at).toLocaleDateString()}
@@ -648,9 +734,10 @@ const MyPurchases = () => {
                               <span className={`text-xs font-medium ${deliveryDisplay.color}`}>
                                 {deliveryDisplay.text}
                               </span>
-                              {isVerification && deliveryDisplay.canVerify && (
-                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">
-                                  Ready to verify ✅
+                              {isVerification && deliveryDisplay.hasVerificationCode && (
+                                <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                                  <Key size={10} />
+                                  OTP Ready
                                 </span>
                               )}
                             </div>
@@ -800,6 +887,24 @@ const MyPurchases = () => {
                   </div>
                 )}
 
+                {/* ====== OTP Verification Code Display (Verify Tab) ====== */}
+                {activeTab === 'verification' && 
+                 selectedPurchase.verification_code && 
+                 selectedPurchase.delivery_confirmed_by_shop === true &&
+                 selectedPurchase.status !== 'completed' && (
+                  <div className="mt-4">
+                    {renderOtpCodeDisplay(selectedPurchase, false)}
+                  </div>
+                )}
+
+                {/* ====== OTP Verification Code Display (Completed Tab - for record) ====== */}
+                {activeTab === 'completed' && 
+                 selectedPurchase.verification_code && (
+                  <div className="mt-4">
+                    {renderOtpCodeDisplay(selectedPurchase, true)}
+                  </div>
+                )}
+
                 {/* Delivery Status in Detail */}
                 {selectedPurchase.delivery_method && (
                   <div className="mt-4 p-4 bg-white/60 rounded-xl border border-[#FFDDB0]/30">
@@ -811,7 +916,11 @@ const MyPurchases = () => {
                       <p className="text-sm">
                         <span className="text-[#4A4A5A]">Method:</span>
                         <span className="font-medium text-[#1A1A2E] ml-1">
-                          {selectedPurchase.delivery_method === 'home_delivery' ? '🏠 Home Delivery' : '📍 Pickup'}
+                          {selectedPurchase.delivery_method === 'home_delivery' ? (
+                            <span className="flex items-center gap-1"><Home size={14} /> Home Delivery</span>
+                          ) : (
+                            <span className="flex items-center gap-1"><MapPin size={14} /> Pickup</span>
+                          )}
                         </span>
                       </p>
                       
@@ -821,11 +930,17 @@ const MyPurchases = () => {
                             <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-100">
                               <p className="text-xs text-emerald-700 flex items-center gap-1">
                                 <ThumbsUp size={14} />
-                                ✅ Shop confirmed delivery
+                                Shop confirmed delivery
                               </p>
                               {selectedPurchase.delivery_response_at && (
                                 <p className="text-[10px] text-emerald-600 mt-0.5">
                                   Confirmed on: {new Date(selectedPurchase.delivery_response_at).toLocaleString()}
+                                </p>
+                              )}
+                              {selectedPurchase.verification_code && (
+                                <p className="text-[10px] text-violet-600 mt-1 flex items-center gap-1">
+                                  <Key size={12} />
+                                  OTP code generated. Share it with the shop to complete the transaction.
                                 </p>
                               )}
                             </div>
@@ -835,7 +950,7 @@ const MyPurchases = () => {
                             <div className="p-2 bg-rose-50 rounded-lg border border-rose-100">
                               <p className="text-xs text-rose-700 flex items-center gap-1">
                                 <ThumbsDown size={14} />
-                                ❌ Shop denied delivery
+                                Shop denied delivery
                               </p>
                               <p className="text-[10px] text-rose-600 mt-0.5">
                                 Please choose pickup or cancel this order.
@@ -876,7 +991,7 @@ const MyPurchases = () => {
                             <div className="p-2 bg-amber-50 rounded-lg border border-amber-100">
                               <p className="text-xs text-amber-700 flex items-center gap-1">
                                 <Clock size={14} />
-                                ⏳ Awaiting shop response
+                                Awaiting shop response
                               </p>
                               <p className="text-[10px] text-amber-600 mt-0.5">
                                 The shop is deciding whether they can deliver to your address.
@@ -889,12 +1004,18 @@ const MyPurchases = () => {
                       {selectedPurchase.delivery_method === 'pickup' && (
                         <div className="p-2 bg-blue-50 rounded-lg border border-blue-100">
                           <p className="text-xs text-blue-700 flex items-center gap-1">
-                            <Home size={14} />
-                            📍 Pickup selected
+                            <MapPin size={14} />
+                            Pickup selected
                           </p>
                           <p className="text-[10px] text-blue-600 mt-0.5">
                             You will pick up the item from the shop.
                           </p>
+                          {selectedPurchase.verification_code && (
+                            <p className="text-[10px] text-violet-600 mt-1 flex items-center gap-1">
+                              <Key size={12} />
+                              OTP code generated. Share it with the shop to complete the transaction.
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -921,10 +1042,10 @@ const MyPurchases = () => {
                           onClick={() => handleDeliverySelection('delivery')}
                           className="flex-1 min-w-[120px] p-3 bg-white rounded-xl border-2 border-emerald-200 hover:border-emerald-400 transition-all text-center"
                         >
-                          <div className="text-2xl mb-1">🏠</div>
+                          <div className="text-2xl mb-1"><Home size={28} className="mx-auto text-emerald-600" /></div>
                           <div className="text-sm font-medium text-[#1A1A2E]">Home Delivery</div>
                           <div className="text-[10px] text-[#4A4A5A]">Shop delivers to you</div>
-                          <div className="text-[10px] text-amber-600 mt-1">⏳ Needs shop confirmation</div>
+                          <div className="text-[10px] text-amber-600 mt-1 flex items-center justify-center gap-1"><Clock size={10} /> Needs shop confirmation</div>
                         </motion.button>
                         <motion.button
                           whileHover={{ scale: 1.02 }}
@@ -932,10 +1053,10 @@ const MyPurchases = () => {
                           onClick={() => handleDeliverySelection('pickup')}
                           className="flex-1 min-w-[120px] p-3 bg-white rounded-xl border-2 border-blue-200 hover:border-blue-400 transition-all text-center"
                         >
-                          <div className="text-2xl mb-1">📍</div>
+                          <div className="text-2xl mb-1"><MapPin size={28} className="mx-auto text-blue-600" /></div>
                           <div className="text-sm font-medium text-[#1A1A2E]">Pickup</div>
                           <div className="text-[10px] text-[#4A4A5A]">Collect from shop</div>
-                          <div className="text-[10px] text-emerald-600 mt-1">✅ Instant verification</div>
+                          <div className="text-[10px] text-violet-600 mt-1 flex items-center justify-center gap-1"><Key size={10} /> OTP auto-completes</div>
                         </motion.button>
                       </div>
                     ) : (
@@ -945,15 +1066,16 @@ const MyPurchases = () => {
                         className="p-4 bg-white rounded-xl border-2 border-emerald-200 text-center"
                       >
                         <p className="text-sm font-medium text-[#1A1A2E]">
-                          ✅ You selected <strong>{deliveryMethod === 'delivery' ? 'Home Delivery' : 'Pickup'}</strong>
+                          <CheckCircle size={16} className="inline mr-1 text-emerald-600" />
+                          You selected <strong>{deliveryMethod === 'delivery' ? 'Home Delivery' : 'Pickup'}</strong>
                         </p>
                         {deliveryMethod === 'delivery' && (
-                          <p className="text-xs text-[#4A4A5A] mt-1">📍 {deliveryAddress}</p>
+                          <p className="text-xs text-[#4A4A5A] mt-1 flex items-center justify-center gap-1"><MapPin size={12} /> {deliveryAddress}</p>
                         )}
-                        <p className="text-xs text-amber-600 mt-1.5">
+                        <p className="text-xs text-amber-600 mt-1.5 flex items-center justify-center gap-1">
                           {deliveryMethod === 'delivery' 
-                            ? '⏳ Waiting for shop to confirm delivery before you can verify' 
-                            : '✅ You can verify immediately after confirming'}
+                            ? <><Clock size={12} /> Waiting for shop to confirm delivery</>
+                            : <><Key size={12} /> OTP will auto-complete the transaction</>}
                         </p>
                         <motion.button
                           whileHover={{ scale: 1.02 }}
@@ -962,14 +1084,14 @@ const MyPurchases = () => {
                           disabled={updating}
                           className="mt-3 px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
                         >
-                          {updating ? 'Confirming...' : 'Confirm Delivery →'}
+                          {updating ? 'Confirming...' : 'Confirm Delivery'}
                         </motion.button>
                       </motion.div>
                     )}
                   </motion.div>
                 )}
 
-                {/* Verification Tab - Two-Way Settlement */}
+                {/* Verification Tab - Transaction Status (NO VERIFY BUTTON) */}
                 {activeTab === 'verification' && selectedPurchase.delivery_method && (
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
@@ -978,85 +1100,79 @@ const MyPurchases = () => {
                   >
                     <h4 className="font-semibold text-amber-800 text-sm flex items-center gap-2 mb-2">
                       <Shield size={16} />
-                      Two-Way Settlement
+                      Transaction Status
                     </h4>
                     
-                    {/* Show settlement status */}
                     <div className="bg-white rounded-xl p-3 text-sm space-y-2">
-                      {/* Shop confirmation status */}
                       <div className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${selectedPurchase.delivery_confirmed_by_shop === true ? 'bg-emerald-500' : selectedPurchase.delivery_confirmed_by_shop === false ? 'bg-rose-500' : 'bg-amber-500'}`} />
                         <span className="text-[#4A4A5A]">Shop:</span>
                         <span className="font-medium">
                           {selectedPurchase.delivery_method === 'pickup' ? (
-                            <span className="text-emerald-600">✅ Pickup confirmed</span>
+                            <span className="text-emerald-600 flex items-center gap-1"><CheckCircle size={14} /> Pickup confirmed</span>
                           ) : selectedPurchase.delivery_confirmed_by_shop === true ? (
-                            <span className="text-emerald-600">✅ Delivery confirmed</span>
+                            <span className="text-emerald-600 flex items-center gap-1"><ThumbsUp size={14} /> Delivery confirmed</span>
                           ) : selectedPurchase.delivery_confirmed_by_shop === false ? (
-                            <span className="text-rose-600">❌ Delivery denied</span>
+                            <span className="text-rose-600 flex items-center gap-1"><ThumbsDown size={14} /> Delivery denied</span>
                           ) : (
-                            <span className="text-amber-600">⏳ Awaiting confirmation</span>
+                            <span className="text-amber-600 flex items-center gap-1"><Clock size={14} /> Awaiting confirmation</span>
                           )}
                         </span>
                       </div>
                       
-                      {/* Delivery method */}
                       <div className="flex items-center gap-2">
                         <Truck size={14} className="text-[#4A4A5A]" />
                         <span className="text-[#4A4A5A]">Method:</span>
                         <span className="font-medium text-[#1A1A2E]">
-                          {selectedPurchase.delivery_method === 'home_delivery' ? '🏠 Home Delivery' : '📍 Pickup'}
+                          {selectedPurchase.delivery_method === 'home_delivery' ? (
+                            <span className="flex items-center gap-1"><Home size={14} /> Home Delivery</span>
+                          ) : (
+                            <span className="flex items-center gap-1"><MapPin size={14} /> Pickup</span>
+                          )}
                         </span>
                       </div>
                       
-                      {/* Can verify? */}
-                      <div className="mt-2 pt-2 border-t border-[#FFDDB0]/30">
+                      {/* OTP Status */}
+                      {selectedPurchase.verification_code && selectedPurchase.delivery_confirmed_by_shop === true && (
                         <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${getDeliveryStatusDisplay(selectedPurchase)?.canVerify ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                          <span className="text-[#4A4A5A]">Status:</span>
-                          <span className={`font-medium ${getDeliveryStatusDisplay(selectedPurchase)?.canVerify ? 'text-emerald-600' : 'text-amber-600'}`}>
-                            {getDeliveryStatusDisplay(selectedPurchase)?.canVerify 
-                              ? '✅ Ready to verify' 
-                              : '⏳ Waiting for shop confirmation'}
+                          <Key size={14} className="text-violet-600" />
+                          <span className="text-[#4A4A5A]">Verification:</span>
+                          <span className="font-medium text-violet-600 flex items-center gap-1">
+                            <CheckCircle size={14} />
+                            OTP Ready - Share code with shop
                           </span>
                         </div>
-                        {!getDeliveryStatusDisplay(selectedPurchase)?.canVerify && (
-                          <p className="text-[10px] text-amber-600 mt-1">
-                            Please wait for the shop to confirm delivery before verifying.
-                          </p>
-                        )}
+                      )}
+                      
+                      <div className="mt-2 pt-2 border-t border-[#FFDDB0]/30">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${selectedPurchase.delivery_confirmed_by_shop === true ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                          <span className="text-[#4A4A5A]">Status:</span>
+                          <span className="font-medium text-emerald-600 flex items-center gap-1">
+                            <Clock size={14} />
+                            Awaiting shop OTP entry
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-[#4A4A5A] mt-1">
+                          The transaction will auto-complete when the shop enters the correct OTP code.
+                        </p>
                       </div>
                     </div>
                     
-                    {/* Verify button - only enabled if canVerify */}
-                    <motion.button
-                      whileHover={{ scale: getDeliveryStatusDisplay(selectedPurchase)?.canVerify ? 1.02 : 1 }}
-                      whileTap={{ scale: getDeliveryStatusDisplay(selectedPurchase)?.canVerify ? 0.95 : 1 }}
-                      onClick={handleVerifyTransaction}
-                      disabled={updating || !getDeliveryStatusDisplay(selectedPurchase)?.canVerify}
-                      className={`
-                        mt-3 w-full py-2.5 rounded-lg text-sm font-medium transition-all
-                        ${getDeliveryStatusDisplay(selectedPurchase)?.canVerify 
-                          ? 'bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer' 
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
-                      `}
-                    >
-                      {updating ? (
-                        <Loader2 size={16} className="animate-spin mx-auto" />
-                      ) : getDeliveryStatusDisplay(selectedPurchase)?.canVerify ? (
-                        '✅ Verify Transaction'
-                      ) : (
-                        '⏳ Awaiting Shop Confirmation'
-                      )}
-                    </motion.button>
-                    {!getDeliveryStatusDisplay(selectedPurchase)?.canVerify && selectedPurchase.delivery_method === 'home_delivery' && selectedPurchase.delivery_confirmed_by_shop === null && (
+                    {selectedPurchase.verification_code && selectedPurchase.delivery_confirmed_by_shop === true && (
+                      <p className="text-[10px] text-violet-600 mt-2 text-center flex items-center justify-center gap-1">
+                        <Key size={12} />
+                        Share the OTP code with the shop to complete the transaction
+                      </p>
+                    )}
+                    {!selectedPurchase.verification_code && selectedPurchase.delivery_method === 'home_delivery' && selectedPurchase.delivery_confirmed_by_shop === null && (
                       <p className="text-[10px] text-[#4A4A5A] mt-1.5 text-center">
                         The shop will confirm or deny delivery. You'll be notified when they respond.
                       </p>
                     )}
-                    {selectedPurchase.delivery_method === 'pickup' && (
-                      <p className="text-[10px] text-[#4A4A5A] mt-1.5 text-center">
-                        Click to verify after picking up the item from the shop.
+                    {selectedPurchase.delivery_method === 'pickup' && !selectedPurchase.verification_code && selectedPurchase.delivery_confirmed_by_shop === true && (
+                      <p className="text-[10px] text-amber-600 mt-1.5 text-center">
+                        OTP code pending. Please wait a moment.
                       </p>
                     )}
                   </motion.div>
@@ -1074,12 +1190,15 @@ const MyPurchases = () => {
                       Transaction Complete
                     </h4>
                     <div className="bg-white rounded-xl p-3 text-sm space-y-1">
-                      <p><span className="text-[#4A4A5A]">Status:</span> <span className="font-medium text-emerald-600">✅ COMPLETED</span></p>
-                      <p><span className="text-[#4A4A5A]">Delivery:</span> <span className="font-medium text-[#1A1A2E]">{selectedPurchase.delivery_method === 'home_delivery' ? '🏠 Home Delivery' : '📍 Pickup'}</span></p>
+                      <p className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-600" /> <span className="text-[#4A4A5A]">Status:</span> <span className="font-medium text-emerald-600">COMPLETED</span></p>
+                      <p><span className="text-[#4A4A5A]">Delivery:</span> <span className="font-medium text-[#1A1A2E]">{selectedPurchase.delivery_method === 'home_delivery' ? <span className="flex items-center gap-1"><Home size={14} /> Home Delivery</span> : <span className="flex items-center gap-1"><MapPin size={14} /> Pickup</span>}</span></p>
                       {selectedPurchase.delivery_method === 'home_delivery' && selectedPurchase.delivery_address && (
                         <p><span className="text-[#4A4A5A]">Address:</span> <span className="font-medium text-[#1A1A2E]">{selectedPurchase.delivery_address}</span></p>
                       )}
                       <p><span className="text-[#4A4A5A]">Completed:</span> <span className="font-medium text-[#1A1A2E]">{new Date(selectedPurchase.completed_at).toLocaleDateString()}</span></p>
+                      {selectedPurchase.completed_via_override && (
+                        <p className="text-amber-600 text-xs flex items-center gap-1"><AlertCircle size={12} /> Completed via manual override</p>
+                      )}
                     </div>
                   </motion.div>
                 )}

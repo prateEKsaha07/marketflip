@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from typing import Optional, List
 from uuid import UUID
 import logging
@@ -12,11 +12,15 @@ from requests.schemas import (
     RequestQueryParams,
     DeliveryUpdate,
     RequestUpdate,
-    DeliveryConfirmResponse
+    DeliveryConfirmResponse,
+    VerifyOTPRequest, 
+    VerifyOTPResponse,
+    OverrideCompleteResponse
 )
 
 from requests.services import RequestService
 from auth.dependencies import supabase_anon, supabase_admin
+from utils.verification import generate_verification_code
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/requests", tags=["requests"])
@@ -26,7 +30,7 @@ request_service = RequestService(supabase_admin, supabase_anon)
 
 # ----- Routes -----
 
-@router.post("", response_model=RequestResponse)  # Fixed: removed /requests (router already has prefix)
+@router.post("", response_model=RequestResponse)
 async def create_request(
     request_data: RequestCreate,
     current_user: dict = Depends(get_current_user)
@@ -46,7 +50,6 @@ async def create_request(
             request_data=request_dict
         )
         
-        # Ensure image_urls is included
         if "image_urls" not in result:
             result["image_urls"] = []
         elif result["image_urls"] is None:
@@ -59,7 +62,8 @@ async def create_request(
         logger.error(f"Create request error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create request")
 
-@router.get("")  # Fixed: removed /
+
+@router.get("")
 async def get_requests(
     status: Optional[str] = Query("open", regex="^(open|purchased|completed|deleted|expired|all)$"),
     pincode: Optional[str] = None,
@@ -117,6 +121,7 @@ async def get_requests(
         logger.error(f"Get requests error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @router.get("/{request_id}", response_model=RequestDetailResponse)
 async def get_request_detail(
     request_id: UUID,
@@ -127,7 +132,6 @@ async def get_request_detail(
     Bids are only shown if the current user is the buyer.
     """
     try:
-        # Get request with all fields
         request_result = supabase_admin.table("requests")\
             .select("*")\
             .eq("id", str(request_id))\
@@ -138,7 +142,7 @@ async def get_request_detail(
         
         request = request_result.data[0]
         
-        #ALL delivery fields are included
+        # ALL delivery fields are included
         delivery_fields = [
             "delivery_method",
             "delivery_address",
@@ -150,16 +154,22 @@ async def get_request_detail(
             if field not in request:
                 request[field] = None
         
-        #image_urls is always included
+        # image_urls is always included
         if "image_urls" not in request:
             request["image_urls"] = []
         elif request["image_urls"] is None:
             request["image_urls"] = []
         
-        # Log the delivery status for debugging
+        # Include verification fields
+        if "verification_code" not in request:
+            request["verification_code"] = None
+        if "verification_attempts" not in request:
+            request["verification_attempts"] = 0
+        if "completed_via_override" not in request:
+            request["completed_via_override"] = False
+        
         logger.info(f"Request {request_id} delivery_confirmed_by_shop: {request.get('delivery_confirmed_by_shop')}")
         
-        # If user is the buyer, get bids too
         if current_user["id"] == request["buyer_id"]:
             bids_result = supabase_admin.table("bids")\
                 .select("*, profiles!bids_shop_id_fkey(shop_name, phone, address)")\
@@ -175,7 +185,8 @@ async def get_request_detail(
     except Exception as e:
         logger.error(f"Get request detail error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
-    
+
+
 @router.delete("/{request_id}", status_code=204)
 async def delete_request(
     request_id: UUID,
@@ -230,6 +241,9 @@ async def delete_request(
         logger.error(f"Delete request error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
+
+# ====== OTP VERIFICATION ENDPOINTS ======
+
 @router.patch("/{request_id}/delivery/confirm", response_model=DeliveryConfirmResponse)
 async def confirm_delivery(
     request_id: str,
@@ -240,6 +254,7 @@ async def confirm_delivery(
     - Only the shop owner whose bid was selected can confirm
     - Request must be in 'purchased' state
     - Delivery method must be 'home_delivery'
+    - Generates a 4-digit verification code for the transaction
     """
     if current_user.get("role") != "shop_owner":
         raise HTTPException(
@@ -248,25 +263,80 @@ async def confirm_delivery(
         )
 
     try:
-        service = RequestService(supabase_admin, supabase_anon)
-        updated_request = service.confirm_delivery(
-            request_id=request_id,
-            shop_id=current_user["id"]
+        # Get request
+        request_result = supabase_admin.table("requests")\
+            .select("*")\
+            .eq("id", request_id)\
+            .execute()
+        
+        if not request_result.data:
+            raise HTTPException(status_code=404, detail="Request not found")
+        
+        request = request_result.data[0]
+        
+        if request["status"] != "purchased":
+            raise HTTPException(
+                status_code=400,
+                detail="Request must be in purchased state"
+            )
+        
+        # Verify shop is the selected one
+        if request.get("selected_bid_id"):
+            bid_result = supabase_admin.table("bids")\
+                .select("shop_id")\
+                .eq("id", request["selected_bid_id"])\
+                .execute()
+            
+            if not bid_result.data:
+                raise HTTPException(status_code=400, detail="Selected bid not found")
+            
+            if bid_result.data[0]["shop_id"] != current_user["id"]:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only the selected shop can confirm delivery"
+                )
+        else:
+            raise HTTPException(status_code=400, detail="No bid selected for this request")
+        
+        # Generate verification code
+        verification_code = generate_verification_code()
+        
+        # Update request
+        result = supabase_admin.table("requests")\
+            .update({
+                "delivery_confirmed_by_shop": True,
+                "delivery_response_at": datetime.utcnow().isoformat(),
+                "verification_code": verification_code,
+                "verification_attempts": 0
+            })\
+            .eq("id", request_id)\
+            .execute()
+        
+        if not result.data:
+            raise HTTPException(
+                status_code=400,
+                detail="Failed to confirm delivery"
+            )
+        
+        updated_request = result.data[0]
+        
+        logger.info(f"Delivery confirmed for request {request_id}. Verification code generated.")
+        
+        return DeliveryConfirmResponse(
+            request_id=updated_request["id"],
+            delivery_confirmed_by_shop=updated_request["delivery_confirmed_by_shop"],
+            delivery_response_at=updated_request["delivery_response_at"],
+            verification_code=verification_code  # Include for logging/response
         )
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=str(e)
-        )
-    
-    return DeliveryConfirmResponse(
-        request_id=updated_request["id"],
-        delivery_confirmed_by_shop=updated_request["delivery_confirmed_by_shop"],
-        delivery_response_at=updated_request["delivery_response_at"]
-    )
+        logger.error(f"Confirm delivery error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.patch("/{request_id}/delivery/deny", response_model=DeliveryConfirmResponse)  # Fixed: added response_model
+@router.patch("/{request_id}/delivery/deny", response_model=DeliveryConfirmResponse)
 async def deny_delivery(
     request_id: str,
     current_user: dict = Depends(get_current_user)
@@ -284,22 +354,71 @@ async def deny_delivery(
         )
     
     try:
-        service = RequestService(supabase_admin, supabase_anon)
-        updated_request = service.deny_delivery(
-            request_id=request_id,
-            shop_id=current_user["id"]
+        # Get request
+        request_result = supabase_admin.table("requests")\
+            .select("*")\
+            .eq("id", request_id)\
+            .execute()
+        
+        if not request_result.data:
+            raise HTTPException(status_code=404, detail="Request not found")
+        
+        request = request_result.data[0]
+        
+        if request["status"] != "purchased":
+            raise HTTPException(
+                status_code=400,
+                detail="Request must be in purchased state"
+            )
+        
+        # Verify shop is the selected one
+        if request.get("selected_bid_id"):
+            bid_result = supabase_admin.table("bids")\
+                .select("shop_id")\
+                .eq("id", request["selected_bid_id"])\
+                .execute()
+            
+            if not bid_result.data:
+                raise HTTPException(status_code=400, detail="Selected bid not found")
+            
+            if bid_result.data[0]["shop_id"] != current_user["id"]:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only the selected shop can deny delivery"
+                )
+        else:
+            raise HTTPException(status_code=400, detail="No bid selected for this request")
+        
+        # Update request - clear verification code if exists
+        result = supabase_admin.table("requests")\
+            .update({
+                "delivery_confirmed_by_shop": False,
+                "delivery_response_at": datetime.utcnow().isoformat(),
+                "verification_code": None,
+                "verification_attempts": 0
+            })\
+            .eq("id", request_id)\
+            .execute()
+        
+        if not result.data:
+            raise HTTPException(
+                status_code=400,
+                detail="Failed to deny delivery"
+            )
+        
+        updated_request = result.data[0]
+        
+        return DeliveryConfirmResponse(
+            request_id=updated_request["id"],
+            delivery_confirmed_by_shop=updated_request["delivery_confirmed_by_shop"],
+            delivery_response_at=updated_request["delivery_response_at"]
         )
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=str(e)
-        )
-    
-    return DeliveryConfirmResponse(  # Fixed: correct spelling
-        request_id=updated_request["id"],
-        delivery_confirmed_by_shop=updated_request["delivery_confirmed_by_shop"],
-        delivery_response_at=updated_request["delivery_response_at"]
-    )
+        logger.error(f"Deny delivery error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.patch("/{request_id}/switch-to-pickup")
@@ -315,7 +434,7 @@ async def switch_to_pickup(
     2. Buyer chooses to pickup instead
     
     This sets delivery_method to 'pickup' and auto-confirms delivery
-    so the buyer can immediately verify the transaction.
+    and generates a verification code.
     """
     if current_user.get("role") != "buyer":
         raise HTTPException(
@@ -351,12 +470,17 @@ async def switch_to_pickup(
             detail="Request is already set to pickup or no delivery method selected"
         )
     
+    # Generate verification code
+    verification_code = generate_verification_code()
+    
     try:
         result = supabase_admin.table("requests")\
             .update({
                 "delivery_method": "pickup",
                 "delivery_confirmed_by_shop": True,
-                "delivery_response_at": datetime.utcnow().isoformat()
+                "delivery_response_at": datetime.utcnow().isoformat(),
+                "verification_code": verification_code,
+                "verification_attempts": 0
             })\
             .eq("id", request_id)\
             .execute()
@@ -369,14 +493,17 @@ async def switch_to_pickup(
         
         updated_request = result.data[0]
         
+        logger.info(f"Switched to pickup for request {request_id}. Verification code generated.")
+        
         return {
-            "message": "Successfully switched to pickup",
+            "message": "Successfully switched to pickup. Verification code generated.",
             "request": {
                 "id": updated_request["id"],
                 "delivery_method": updated_request["delivery_method"],
                 "delivery_confirmed_by_shop": updated_request["delivery_confirmed_by_shop"],
                 "delivery_response_at": updated_request["delivery_response_at"],
-                "status": updated_request["status"]
+                "status": updated_request["status"],
+                "verification_code": verification_code  # For logging only
             }
         }
         
@@ -390,7 +517,7 @@ async def switch_to_pickup(
         )
 
 
-# REMOVED DUPLICATE /delivery endpoint - keep only this one
+# ====== FIXED: Set Delivery Method ======
 @router.patch("/{request_id}/delivery")
 async def set_delivery_method(
     request_id: str,
@@ -410,6 +537,7 @@ async def set_delivery_method(
             detail="Only buyers can set delivery method"
         )
     
+    # Get request
     request_result = supabase_admin.table("requests")\
         .select("*")\
         .eq("id", request_id)\
@@ -439,20 +567,37 @@ async def set_delivery_method(
             detail="delivery_method must be 'home_delivery' or 'pickup'"
         )
     
-    update_data = {
-        "delivery_method": delivery_method,
-        "delivery_address": delivery_data.get("delivery_address")
-    }
+    # ====== BUILD UPDATE DATA ======
+    update_data = {}
+    
+    # Always include these
+    update_data["delivery_method"] = delivery_method
+    update_data["delivery_address"] = delivery_data.get("delivery_address")
     
     if delivery_method == "pickup":
+        # Generate verification code for pickup
+        verification_code = generate_verification_code()
+        
+        logger.info(f"=== PICKUP OTP GENERATED ===")
+        logger.info(f"Request ID: {request_id}")
+        logger.info(f"Verification Code: {verification_code}")
+        
+        # For pickup, auto-confirm and generate OTP
         update_data["delivery_confirmed_by_shop"] = True
         update_data["delivery_response_at"] = datetime.utcnow().isoformat()
+        update_data["verification_code"] = verification_code
+        update_data["verification_attempts"] = 0
+        
+        logger.info(f"Update data for pickup: {update_data}")
     
     try:
+        # ====== PERFORM UPDATE ======
         result = supabase_admin.table("requests")\
             .update(update_data)\
             .eq("id", request_id)\
             .execute()
+        
+        logger.info(f"Result data: {result.data}")
         
         if not result.data:
             raise HTTPException(
@@ -461,17 +606,25 @@ async def set_delivery_method(
             )
         
         updated_request = result.data[0]
+        logger.info(f"Updated request: {updated_request}")
         
-        return {
+        # ====== RETURN RESPONSE ======
+        response_data = {
             "message": f"Delivery method set to {delivery_method}",
             "request": {
                 "id": updated_request["id"],
-                "delivery_method": updated_request["delivery_method"],
+                "delivery_method": updated_request.get("delivery_method"),
                 "delivery_address": updated_request.get("delivery_address"),
                 "delivery_confirmed_by_shop": updated_request.get("delivery_confirmed_by_shop"),
-                "status": updated_request["status"]
+                "delivery_response_at": updated_request.get("delivery_response_at"),
+                "status": updated_request.get("status"),
+                "verification_code": updated_request.get("verification_code")
             }
         }
+        
+        logger.info(f"Response: {response_data}")
+        
+        return response_data
         
     except HTTPException:
         raise
@@ -483,12 +636,225 @@ async def set_delivery_method(
         )
 
 
+# ====== NEW: OTP Verification Endpoints ======
+
+@router.post("/{request_id}/verify-otp")
+async def verify_otp(
+    request_id: UUID,
+    payload: dict = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Shop verifies transaction with OTP code.
+    Max 5 attempts. Buyer can override after cap.
+    
+    Request body: {"code": "1234"}
+    """
+    if current_user.get("role") != "shop_owner":
+        raise HTTPException(
+            status_code=403,
+            detail="Only shop owners can verify OTP"
+        )
+    
+    code = payload.get("code")
+    if not code or len(code) != 4 or not code.isdigit():
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid code format. Must be 4 digits."
+        )
+    
+    try:
+        # Get request
+        request_result = supabase_admin.table("requests")\
+            .select("*")\
+            .eq("id", str(request_id))\
+            .execute()
+        
+        if not request_result.data:
+            raise HTTPException(status_code=404, detail="Request not found")
+        
+        request = request_result.data[0]
+        
+        if request["status"] != "purchased":
+            raise HTTPException(
+                status_code=400,
+                detail="Request must be in purchased state"
+            )
+        
+        # Verify shop is the selected one
+        if request.get("selected_bid_id"):
+            bid_result = supabase_admin.table("bids")\
+                .select("shop_id")\
+                .eq("id", request["selected_bid_id"])\
+                .execute()
+            
+            if not bid_result.data:
+                raise HTTPException(status_code=400, detail="Selected bid not found")
+            
+            if bid_result.data[0]["shop_id"] != current_user["id"]:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only the selected shop can verify the transaction"
+                )
+        else:
+            raise HTTPException(status_code=400, detail="No bid selected for this request")
+        
+        # Check if already completed
+        if request["status"] == "completed":
+            raise HTTPException(status_code=400, detail="Transaction already completed")
+        
+        # Check attempts
+        attempts = request.get("verification_attempts", 0)
+        if attempts >= 5:
+            raise HTTPException(
+                status_code=400,
+                detail="Maximum verification attempts exceeded. Buyer must override."
+            )
+        
+        # Verify code
+        stored_code = request.get("verification_code")
+        if not stored_code:
+            raise HTTPException(
+                status_code=400,
+                detail="No verification code generated. Delivery must be confirmed first."
+            )
+        
+        if code == stored_code:
+            # Success!
+            result = supabase_admin.table("requests")\
+                .update({
+                    "status": "completed",
+                    "completed_at": datetime.utcnow().isoformat(),
+                    "verification_code": None  # Clear the code after success
+                })\
+                .eq("id", str(request_id))\
+                .execute()
+            
+            if not result.data:
+                raise HTTPException(status_code=400, detail="Failed to complete transaction")
+            
+            logger.info(f"Transaction {request_id} verified by shop {current_user['id']}")
+            
+            return {
+                "message": "Transaction verified successfully!",
+                "status": "completed"
+            }
+        else:
+            # Failed attempt
+            new_attempts = attempts + 1
+            result = supabase_admin.table("requests")\
+                .update({
+                    "verification_attempts": new_attempts
+                })\
+                .eq("id", str(request_id))\
+                .execute()
+            
+            remaining = 5 - new_attempts
+            if remaining <= 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Verification failed. Maximum attempts reached. Buyer must override."
+                )
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Incorrect code. {remaining} attempt(s) remaining."
+                )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Verify OTP error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{request_id}/override-complete")
+async def override_complete(
+    request_id: UUID,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Buyer manually marks transaction as completed after max attempts exceeded.
+    Sets completed_via_override = true for audit trail.
+    """
+    if current_user.get("role") != "buyer":
+        raise HTTPException(
+            status_code=403,
+            detail="Only buyers can override"
+        )
+    
+    try:
+        # Get request
+        request_result = supabase_admin.table("requests")\
+            .select("*")\
+            .eq("id", str(request_id))\
+            .execute()
+        
+        if not request_result.data:
+            raise HTTPException(status_code=404, detail="Request not found")
+        
+        request = request_result.data[0]
+        
+        if request["status"] != "purchased":
+            raise HTTPException(
+                status_code=400,
+                detail="Request must be in purchased state"
+            )
+        
+        if request["buyer_id"] != current_user["id"]:
+            raise HTTPException(
+                status_code=403,
+                detail="Only the buyer can override"
+            )
+        
+        attempts = request.get("verification_attempts", 0)
+        if attempts < 5:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Must exhaust all 5 attempts before override. {5 - attempts} remaining."
+            )
+        
+        result = supabase_admin.table("requests")\
+            .update({
+                "status": "completed",
+                "completed_at": datetime.utcnow().isoformat(),
+                "completed_via_override": True,
+                "verification_code": None
+            })\
+            .eq("id", str(request_id))\
+            .execute()
+        
+        if not result.data:
+            raise HTTPException(status_code=400, detail="Failed to complete transaction")
+        
+        logger.info(f"Transaction {request_id} completed via override by buyer {current_user['id']}")
+        
+        return {
+            "message": "Transaction completed via override.",
+            "completed_via_override": True,
+            "status": "completed"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Override complete error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ====== END OTP Verification Endpoints ======
+
+
 @router.patch("/{request_id}/verify")
 async def verify_transaction(
     request_id: UUID,
     current_user: dict = Depends(get_current_user)
 ):
-    """Verify transaction completion. Buyers only."""
+    """
+    [DEPRECATED] Verify transaction completion. Buyers only.
+    This is being replaced by the OTP flow.
+    Kept for backward compatibility.
+    """
     if current_user.get("role") != "buyer":
         raise HTTPException(status_code=403, detail="Only buyers can verify transactions")
     

@@ -54,6 +54,11 @@ class RequestResponse(BaseModel):
     created_at: datetime
     expires_at: datetime
     
+    # OTP Verification fields
+    verification_code: Optional[str] = None
+    verification_attempts: Optional[int] = 0
+    completed_via_override: Optional[bool] = False
+    
     model_config = {
         "from_attributes": True
     }
@@ -121,5 +126,37 @@ class DeliveryConfirmResponse(BaseModel):
     request_id: UUID
     delivery_confirmed_by_shop: bool
     delivery_response_at: datetime
+    verification_code: Optional[str] = None  # <-- ADDED THIS
+    
+    model_config = {"from_attributes": True}
+
+
+# ====== NEW OTP Verification Schemas ======
+
+class VerifyOTPRequest(BaseModel):
+    """Schema for OTP verification request"""
+    code: str = Field(..., min_length=4, max_length=4, description="4-digit verification code")
+    
+    @field_validator('code')
+    @classmethod
+    def validate_code(cls, v: str) -> str:
+        if not v.isdigit():
+            raise ValueError('Code must contain only digits')
+        return v
+
+
+class VerifyOTPResponse(BaseModel):
+    """Schema for OTP verification response"""
+    message: str
+    status: str
+    
+    model_config = {"from_attributes": True}
+
+
+class OverrideCompleteResponse(BaseModel):
+    """Schema for override completion response"""
+    message: str
+    completed_via_override: bool
+    status: str
     
     model_config = {"from_attributes": True}

@@ -31,6 +31,10 @@ export const denyDelivery = (requestId) => {
   return api.patch(`/requests/${requestId}/delivery/deny`);
 };
 
+export const verifyOtp = (requestId, code) => {
+  return api.post(`/requests/${requestId}/verify-otp`, { code });
+};
+
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');

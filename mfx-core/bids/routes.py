@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
 from uuid import UUID
 import logging
+from datetime import datetime
 
 from auth.dependencies import get_current_user
 from bids.schemas import (
@@ -13,6 +14,7 @@ from bids.schemas import (
 )
 from bids.services import BidService
 from auth.dependencies import supabase_anon, supabase_admin
+from utils.verification import generate_verification_code
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +151,7 @@ async def get_bids(
         logger.error(f"Get bids error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
-# ====== NEW: GET SINGLE BID BY ID ======
+# ====== GET SINGLE BID BY ID ======
 @bid_router.get("/{bid_id}")
 async def get_bid_by_id(
     bid_id: UUID,
@@ -247,13 +249,16 @@ async def delete_bid(
             raise HTTPException(status_code=400, detail="Only pending bids can be deleted")
         raise HTTPException(status_code=400, detail=str(e))
 
-# ====== SELECT BID ======
-@bid_router.patch("/{bid_id}/select", response_model=BidSelectionResponse)
+# ====== SELECT BID (UPDATED WITH OTP FOR PICKUP) ======
+@bid_router.patch("/{bid_id}/select")
 async def select_bid(
     bid_id: UUID,
     current_user: dict = Depends(get_current_user)
 ):
-    """Select a bid. Buyers only."""
+    """
+    Select a bid. Buyers only.
+    If the request has delivery_method = 'pickup', generates OTP code immediately.
+    """
     print(f"=== SELECT BID ROUTE HIT ===")
     print(f"Bid ID: {bid_id}")
     print(f"User: {current_user}")
@@ -262,22 +267,128 @@ async def select_bid(
         raise HTTPException(status_code=403, detail="Only buyers can select bids")
     
     try:
-        result = bid_service.select_bid(
-            bid_id=str(bid_id),
-            buyer_id=current_user["id"]
-        )
-        return result
+        # Get the bid
+        bid_result = supabase_admin.table("bids") \
+            .select("*") \
+            .eq("id", str(bid_id)) \
+            .execute()
+        
+        if not bid_result.data:
+            raise HTTPException(status_code=404, detail="Bid not found")
+        
+        bid = bid_result.data[0]
+        
+        # Get the request
+        request_result = supabase_admin.table("requests") \
+            .select("*") \
+            .eq("id", bid["request_id"]) \
+            .execute()
+        
+        if not request_result.data:
+            raise HTTPException(status_code=404, detail="Request not found")
+        
+        request = request_result.data[0]
+        
+        # Verify buyer owns the request
+        if str(request["buyer_id"]) != current_user["id"]:
+            raise HTTPException(
+                status_code=403,
+                detail="You don't own this request"
+            )
+        
+        # Verify request is open
+        if request["status"] != "open":
+            raise HTTPException(
+                status_code=400,
+                detail="Request is not open for bidding"
+            )
+        
+        # Verify bid is pending
+        if bid["status"] != "pending":
+            raise HTTPException(
+                status_code=400,
+                detail="Bid is no longer pending"
+            )
+        
+        # ====== CHECK IF PICKUP - GENERATE OTP ======
+        verification_code = None
+        
+        if request.get("delivery_method") == "pickup":
+            verification_code = generate_verification_code()
+            logger.info(f"=== PICKUP OTP GENERATED ON BID SELECTION ===")
+            logger.info(f"Request ID: {request['id']}")
+            logger.info(f"Verification Code: {verification_code}")
+        
+        # Update the bid status to selected
+        bid_update = supabase_admin.table("bids") \
+            .update({
+                "status": "selected",
+                "selected_at": datetime.utcnow().isoformat()
+            }) \
+            .eq("id", str(bid_id)) \
+            .execute()
+        
+        if not bid_update.data:
+            raise HTTPException(status_code=400, detail="Failed to select bid")
+        
+        # Update the request status to purchased
+        request_update_data = {
+            "status": "purchased",
+            "purchased_at": datetime.utcnow().isoformat(),
+            "selected_bid_id": str(bid_id)
+        }
+        
+        # If pickup, add verification code and auto-confirm delivery
+        if verification_code:
+            request_update_data["verification_code"] = verification_code
+            request_update_data["verification_attempts"] = 0
+            request_update_data["delivery_confirmed_by_shop"] = True
+            request_update_data["delivery_response_at"] = datetime.utcnow().isoformat()
+            logger.info(f"Pickup auto-confirmed with OTP: {verification_code}")
+        
+        request_update = supabase_admin.table("requests") \
+            .update(request_update_data) \
+            .eq("id", request["id"]) \
+            .execute()
+        
+        if not request_update.data:
+            # Revert bid status if request update fails
+            supabase_admin.table("bids") \
+                .update({"status": "pending", "selected_at": None}) \
+                .eq("id", str(bid_id)) \
+                .execute()
+            raise HTTPException(status_code=400, detail="Failed to update request")
+        
+        updated_request = request_update.data[0]
+        
+        # Get shop details for response
+        shop_result = supabase_admin.table("profiles") \
+            .select("shop_name, phone, address") \
+            .eq("id", bid["shop_id"]) \
+            .execute()
+        
+        shop_details = shop_result.data[0] if shop_result.data else {}
+        
+        # Build response
+        response_data = {
+            "message": "Bid selected successfully!" if not verification_code else "Bid selected successfully! Pickup OTP code generated.",
+            "bid": bid_update.data[0],
+            "request": updated_request,
+            "shop": shop_details
+        }
+        
+        if verification_code:
+            response_data["verification_code"] = verification_code
+        
+        logger.info(f"Bid {bid_id} selected for request {request['id']}")
+        
+        return response_data
+        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Select bid error: {str(e)}")
-        if "Bid not found" in str(e):
-            raise HTTPException(status_code=404, detail="Bid not found")
-        if "You don't have permission" in str(e):
-            raise HTTPException(status_code=403, detail=str(e))
-        if "Cannot select a bid on a request that is not open" in str(e):
-            raise HTTPException(status_code=400, detail="Request is not open for selection")
-        if "Cannot select a bid that is not pending" in str(e):
-            raise HTTPException(status_code=400, detail="Bid is no longer pending")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ====== GET BUYER DETAILS ======
 @bid_router.get("/{bid_id}/buyer")
@@ -309,7 +420,7 @@ async def get_buyer_details(
 
         # Get request details
         request_details = supabase_admin.table("requests") \
-            .select("id, buyer_id, item_name, description, budget_min, budget_max, pincode, status, delivery_method, delivery_address, completed_at, delivery_confirmed_by_shop, delivery_response_at") \
+            .select("id, buyer_id, item_name, description, budget_min, budget_max, pincode, status, delivery_method, delivery_address, completed_at, delivery_confirmed_by_shop, delivery_response_at, verification_code, verification_attempts, completed_via_override") \
             .eq("id", str(bid["request_id"])) \
             .execute()
 
@@ -358,7 +469,10 @@ async def get_buyer_details(
                 "delivery_address": request.get("delivery_address"),
                 "completed_at": request.get("completed_at"),
                 "delivery_confirmed_by_shop": request.get("delivery_confirmed_by_shop"),
-                "delivery_response_at": request.get("delivery_response_at")
+                "delivery_response_at": request.get("delivery_response_at"),
+                "verification_code": request.get("verification_code"),
+                "verification_attempts": request.get("verification_attempts"),
+                "completed_via_override": request.get("completed_via_override")
             },
             "buyer": {
                 "id": request.get("buyer_id"),

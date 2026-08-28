@@ -29,7 +29,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   Image as ImageIcon,
-  PartyPopper
+  PartyPopper,
+  Shield 
 } from 'lucide-react';
 import api from '../../api/client';
 import { confirmDelivery, denyDelivery } from '../../api/client';
@@ -48,6 +49,12 @@ const BidDetail = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [successSubtext, setSuccessSubtext] = useState('');
   const [deliveryResolved, setDeliveryResolved] = useState(false);
+  
+  // ====== OTP Verification States ======
+  const [otpCode, setOtpCode] = useState('');
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [otpSuccess, setOtpSuccess] = useState(false);
 
   useEffect(() => {
     fetchBidDetails();
@@ -100,13 +107,16 @@ const BidDetail = () => {
       
       setData(combinedData);
       
-      // Check if delivery has been resolved (confirmed or denied)
       const deliveryStatus = requestResponse.data.delivery_confirmed_by_shop;
       if (deliveryStatus === true || deliveryStatus === false) {
         setDeliveryResolved(true);
       } else {
         setDeliveryResolved(false);
       }
+      
+      setOtpCode('');
+      setOtpError('');
+      setOtpSuccess(false);
     } catch (err) {
       console.error('Fetch error:', err);
       setError(err.response?.data?.detail || 'Failed to fetch bid details');
@@ -126,7 +136,7 @@ const BidDetail = () => {
       await fetchBidDetails();
       showSuccess(
         'Delivery Confirmed!',
-        'You have confirmed home delivery. The buyer will be notified.'
+        'You have confirmed home delivery. A verification code has been generated.'
       );
     } catch (err) {
       console.error('Confirm delivery error:', err);
@@ -155,6 +165,45 @@ const BidDetail = () => {
     } finally {
       setDeliveryAction(false);
     }
+  };
+
+  // ====== OTP Verification Handlers ======
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.length !== 4) {
+      setOtpError('Please enter a valid 4-digit code');
+      return;
+    }
+
+    setVerifyingOtp(true);
+    setOtpError('');
+    
+    try {
+      const response = await api.post(`/requests/${data.request.id}/verify-otp`, {
+        code: otpCode
+      });
+      
+      if (response.data.status === 'completed') {
+        setOtpSuccess(true);
+        showSuccess(
+          'Transaction Verified! 🎉',
+          'The transaction has been successfully completed.'
+        );
+        setTimeout(() => {
+          fetchBidDetails();
+        }, 1500);
+      }
+    } catch (err) {
+      console.error('OTP verification error:', err);
+      setOtpError(err.response?.data?.detail || 'Failed to verify code');
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  const handleOtpChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+    setOtpCode(value);
+    if (otpError) setOtpError('');
   };
 
   const getStatusConfig = (status) => {
@@ -234,8 +283,18 @@ const BidDetail = () => {
     request.delivery_method === 'home_delivery' &&
     !deliveryResolved;
 
+  // ====== FIXED: Check if OTP verification is needed (works for both home delivery AND pickup) ======
+  const showOtpVerification = 
+    isBidSelected && 
+    request.status === 'purchased' && 
+    request.verification_code &&
+    request.status !== 'completed';
+
   const hasImages = request.image_urls && request.image_urls.length > 0;
   const deliveryStatus = request.delivery_confirmed_by_shop;
+  const verificationAttempts = request.verification_attempts || 0;
+  const maxAttempts = 5;
+  const attemptsRemaining = maxAttempts - verificationAttempts;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
@@ -525,9 +584,124 @@ const BidDetail = () => {
                     <p className="text-xs text-blue-600 mt-1 ml-6">
                       The buyer has selected pickup. No delivery confirmation needed.
                     </p>
+                    {request.verification_code && (
+                      <p className="text-[10px] text-violet-600 mt-1 ml-6 flex items-center gap-1">
+                        <CheckCircle size={12} />
+                        OTP code generated. Enter it below to complete the transaction.
+                      </p>
+                    )}
                   </div>
                 )}
               </>
+            )}
+
+            {/* ====== FIXED: OTP Verification Section (Works for both Home Delivery AND Pickup) ====== */}
+            {showOtpVerification && (
+              <div className="mt-4 p-4 bg-violet-50/80 rounded-xl border border-violet-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded-lg bg-violet-100 flex items-center justify-center">
+                    <Shield size={14} className="text-violet-600" />
+                  </div>
+                  <h4 className="text-xs font-semibold text-violet-800 uppercase tracking-wider">
+                    Complete Transaction
+                  </h4>
+                  {/* Delivery method badge */}
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                    request.delivery_method === 'pickup' 
+                      ? 'bg-blue-100 text-blue-700' 
+                      : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    {request.delivery_method === 'pickup' ? 'Pickup' : 'Home Delivery'}
+                  </span>
+                </div>
+                
+                <p className="text-xs text-violet-700 mb-3">
+                  {request.delivery_method === 'pickup' 
+                    ? 'Enter the 4-digit verification code provided by the buyer to confirm pickup and complete the transaction.'
+                    : 'Enter the 4-digit verification code provided by the buyer to complete this transaction.'}
+                </p>
+
+                {request.completed_via_override ? (
+                  <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <p className="text-xs text-amber-700 flex items-center gap-2">
+                      <AlertCircle size={14} />
+                      This transaction was completed via buyer override.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <input
+                        type="text"
+                        maxLength="4"
+                        placeholder="0000"
+                        value={otpCode}
+                        onChange={handleOtpChange}
+                        disabled={verifyingOtp || otpSuccess}
+                        className="w-32 px-3 py-2 text-center text-lg font-bold tracking-[0.3em] bg-white border-2 border-violet-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-violet-200 focus:border-violet-500 transition-all disabled:opacity-50"
+                      />
+                      <Button
+                        onClick={handleVerifyOtp}
+                        disabled={otpCode.length !== 4 || verifyingOtp || otpSuccess}
+                        className="bg-violet-600 hover:bg-violet-700 text-white text-xs px-5 py-2 h-auto flex items-center gap-2"
+                      >
+                        {verifyingOtp ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Check size={14} />
+                        )}
+                        {verifyingOtp ? 'Verifying...' : 'Verify'}
+                      </Button>
+                    </div>
+
+                    {/* Attempts remaining */}
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-[10px] text-violet-600">
+                        Attempts remaining: {attemptsRemaining}
+                      </span>
+                      {verificationAttempts > 0 && (
+                        <span className="text-[10px] text-amber-600">
+                          ({verificationAttempts} used)
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Error message */}
+                    {otpError && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-xs text-rose-600 mt-2 flex items-center gap-1"
+                      >
+                        <AlertCircle size={12} />
+                        {otpError}
+                      </motion.p>
+                    )}
+
+                    {/* Success message */}
+                    {otpSuccess && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-xs text-emerald-600 mt-2 flex items-center gap-1"
+                      >
+                        <CheckCircle size={12} />
+                        Transaction verified successfully!
+                      </motion.p>
+                    )}
+
+                    {/* Max attempts reached warning */}
+                    {verificationAttempts >= 5 && !otpSuccess && (
+                      <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-200">
+                        <p className="text-[10px] text-amber-700 flex items-center gap-1">
+                          <AlertCircle size={12} />
+                          Maximum attempts reached. Please contact the buyer to complete the transaction manually.
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </motion.div>
 

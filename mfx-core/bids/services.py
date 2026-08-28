@@ -4,6 +4,8 @@ from uuid import UUID
 from datetime import datetime
 import logging
 
+from utils.verification import generate_verification_code
+
 logger = logging.getLogger(__name__)
 
 class BidService:
@@ -135,14 +137,9 @@ class BidService:
         except Exception as e:
             logger.error(f"Error deleting bid: {str(e)}")
             raise
-
-
-
-
-
     
     def select_bid(self, bid_id: str, buyer_id: str) -> Dict[str, Any]:
-        """Select a bid (buyer only)"""
+        """Select a bid (buyer only) - generates OTP for pickup requests"""
         try:
             print(f"=== SELECT BID SERVICE ===")
             print(f"Bid ID: {bid_id}")
@@ -161,9 +158,9 @@ class BidService:
             request_id = bid["request_id"]
             shop_id = bid["shop_id"]
             
-            # Get the request
+            # Get the request with delivery_method
             request_response = self.supabase_admin.table("requests") \
-                .select("id, buyer_id, status, item_name, description, budget_min, budget_max, pincode, category, created_at") \
+                .select("id, buyer_id, status, item_name, description, budget_min, budget_max, pincode, category, created_at, delivery_method") \
                 .eq("id", request_id) \
                 .execute()
             print(f"Request response: {request_response.data}")
@@ -195,6 +192,16 @@ class BidService:
                             .execute()
             shop_info = shop_response.data[0] if shop_response.data else {}
             
+            # ====== CHECK IF PICKUP - GENERATE OTP ======
+            verification_code = None
+            delivery_method = request.get("delivery_method")
+            
+            if delivery_method == "pickup":
+                verification_code = generate_verification_code()
+                print(f"=== PICKUP OTP GENERATED IN BID SERVICE ===")
+                print(f"Request ID: {request_id}")
+                print(f"Verification Code: {verification_code}")
+            
             # Update selected bid to 'selected'
             selected_response = self.supabase_admin.table("bids") \
                 .update(
@@ -224,25 +231,35 @@ class BidService:
                 .execute()
             print("all other bids are auto selected rejected")
             
-            # Update request status to 'purchased'
+            # ====== UPDATE REQUEST STATUS TO PURCHASED ======
+            request_update_data = {
+                "status": "purchased",
+                "purchased_at": datetime.now().isoformat(),
+                "selected_bid_id": bid_id
+            }
+            
+            # If pickup, add verification code and auto-confirm delivery
+            if verification_code:
+                request_update_data["verification_code"] = verification_code
+                request_update_data["verification_attempts"] = 0
+                request_update_data["delivery_confirmed_by_shop"] = True
+                request_update_data["delivery_response_at"] = datetime.now().isoformat()
+                print(f"Pickup auto-confirmed with OTP: {verification_code}")
+            
+            # Update request
             self.supabase_admin.table("requests") \
-                .update(
-                    {
-                        "status": "purchased",
-                        "purchased_at": datetime.now().isoformat(),
-                        "selected_bid_id": bid_id
-                    }
-                ) \
+                .update(request_update_data) \
                 .eq("id", request_id) \
                 .execute()
-            print("changed purchased status and updated purchages at and selected bid id")
+            print("changed purchased status and updated purchased at and selected bid id")
     
             # Build response
             selected_bid = selected_response.data[0]
-            return {
+            
+            response_data = {
                 "status": "selected",
                 "request_status": "purchased",
-                "bid_id" : bid_id,
+                "bid_id": bid_id,
                 "request_id": request_id, 
                 "selected_bid": {
                     **selected_bid,
@@ -250,18 +267,18 @@ class BidService:
                     "phone": shop_info.get('phone'),
                     "shop_address": shop_info.get('address')
                 },
-                "shop_contact":{
+                "shop_contact": {
                     "name": shop_info.get('shop_name'),
                     "phone": shop_info.get('phone'),
                     "address": shop_info.get('address')
                 },
-                "buyer_contact":{
-                    "name": buyer_info.get("shop_name")or "buyer",
-                    "phone":buyer_info.get('phone'),
-                    "address":buyer_info.get('address')
+                "buyer_contact": {
+                    "name": buyer_info.get("shop_name") or "buyer",
+                    "phone": buyer_info.get('phone'),
+                    "address": buyer_info.get('address')
                 },
-                "request_details":{
-                    "item_name":request.get('item_name'),
+                "request_details": {
+                    "item_name": request.get('item_name'),
                     "description": request.get('description'),
                     "budget_min": request.get('budget_min'),
                     "budget_max": request.get('budget_max'),
@@ -269,8 +286,14 @@ class BidService:
                     "category": request.get('category'),
                     "created_at": request.get('created_at')
                 },
-                "message":"Bid selected successfully! The request is now purchased"
+                "message": "Bid selected successfully! The request is now purchased"
             }
+            
+            if verification_code:
+                response_data["verification_code"] = verification_code
+                response_data["message"] = "Bid selected successfully! Pickup OTP code generated. Share it with the shop."
+            
+            return response_data
             
         except Exception as e:
             print(f"Error in select_bid: {str(e)}")
