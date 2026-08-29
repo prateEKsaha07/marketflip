@@ -22,35 +22,56 @@ class ChatService:
         Returns the conversation object.
         """
         try:
+            print(f"\n{'='*50}")
+            print(f"🔍 GET_OR_CREATE_CONVERSATION CALLED")
+            print(f"   Buyer ID: {buyer_id}")
+            print(f"   Shop ID: {shop_id}")
+            print(f"{'='*50}\n")
+            
             # Check if conversation exists
+            print("1. Checking if conversation exists...")
             response = self.supabase_admin.table("conversations") \
                 .select("*") \
                 .eq("buyer_id", buyer_id) \
                 .eq("shop_id", shop_id) \
                 .execute()
             
+            print(f"   Response data: {response.data}")
+            
             if response.data:
-                logger.info(f"Found existing conversation: {response.data[0]['id']}")
-                return response.data[0]
+                conv = response.data[0]
+                print(f"   ✅ Found existing conversation: {conv['id']}")
+                print(f"   Current state: locked={conv.get('locked', 'N/A')}, active_source_type={conv.get('active_source_type', 'N/A')}")
+                logger.info(f"Found existing conversation: {conv['id']}")
+                return conv
             
             # Create new conversation
+            print("2. No conversation found. Creating new one...")
             data = {
                 "buyer_id": buyer_id,
                 "shop_id": shop_id,
                 "locked": True
             }
+            print(f"   Insert data: {data}")
             
             result = self.supabase_admin.table("conversations") \
                 .insert(data) \
                 .execute()
             
+            print(f"   Result: {result.data}")
+            
             if not result.data:
                 raise Exception("Failed to create conversation")
             
-            logger.info(f"Created new conversation: {result.data[0]['id']}")
-            return result.data[0]
+            conv = result.data[0]
+            print(f"   ✅ Created new conversation: {conv['id']}")
+            logger.info(f"Created new conversation: {conv['id']}")
+            return conv
             
         except Exception as e:
+            print(f"❌ Error in get_or_create_conversation: {e}")
+            import traceback
+            traceback.print_exc()
             logger.error(f"Error getting/creating conversation: {str(e)}")
             raise
     
@@ -78,24 +99,30 @@ class ChatService:
                 "active_source_id": source_id,
                 "updated_at": datetime.utcnow().isoformat()
             }
-            print(f"Update data: {update_data}")
+            print(f"   Update data: {update_data}")
             
             response = self.supabase_admin.table("conversations") \
                 .update(update_data) \
                 .eq("id", conversation_id) \
                 .execute()
             
-            print(f"Response data: {response.data}")
+            print(f"   Response: {response.data}")
             
             if not response.data:
                 raise Exception("Failed to unlock conversation")
             
+            conv = response.data[0]
+            print(f"   ✅ Unlocked conversation {conversation_id}")
+            print(f"   New state: locked={conv.get('locked', 'N/A')}, active_source_type={conv.get('active_source_type', 'N/A')}")
+            
             logger.info(f"Unlocked conversation {conversation_id} with source {source_type}/{source_id}")
-            return response.data[0]
+            return conv
             
         except Exception as e:
+            print(f"❌ Error unlocking conversation: {e}")
+            import traceback
+            traceback.print_exc()
             logger.error(f"Error unlocking conversation: {str(e)}")
-            print(f"❌ Error: {e}")
             raise
     
     def lock_conversation(self, conversation_id: str) -> Dict[str, Any]:
@@ -120,12 +147,17 @@ class ChatService:
             if not response.data:
                 raise Exception("Failed to lock conversation")
             
+            conv = response.data[0]
+            print(f"   ✅ Locked conversation {conversation_id}")
+            
             logger.info(f"Locked conversation {conversation_id}")
-            return response.data[0]
+            return conv
             
         except Exception as e:
+            print(f"❌ Error locking conversation: {e}")
+            import traceback
+            traceback.print_exc()
             logger.error(f"Error locking conversation: {str(e)}")
-            print(f"❌ Error: {e}")
             raise
     
     def send_message(
@@ -138,6 +170,13 @@ class ChatService:
         Send a message in a conversation.
         """
         try:
+            print(f"\n{'='*50}")
+            print(f"💬 SEND_MESSAGE CALLED")
+            print(f"   Conversation ID: {conversation_id}")
+            print(f"   Sender ID: {sender_id}")
+            print(f"   Content: {content[:50]}...")
+            print(f"{'='*50}\n")
+            
             # Check if conversation is locked
             conv_response = self.supabase_admin.table("conversations") \
                 .select("locked") \
@@ -175,6 +214,9 @@ class ChatService:
             return response.data[0]
             
         except Exception as e:
+            print(f"❌ Error sending message: {e}")
+            import traceback
+            traceback.print_exc()
             logger.error(f"Error sending message: {str(e)}")
             raise
     
@@ -199,6 +241,8 @@ class ChatService:
             else:
                 field = "shop_id"
             
+            print(f"   Querying by field: {field}")
+            
             response = self.supabase_admin.table("conversations") \
                 .select("*") \
                 .eq(field, user_id) \
@@ -206,7 +250,7 @@ class ChatService:
                 .execute()
             
             conversations = response.data if response.data else []
-            print(f"Found {len(conversations)} conversations")
+            print(f"   Found {len(conversations)} conversations")
             
             # Enrich with additional data
             for conv in conversations:
@@ -280,8 +324,10 @@ class ChatService:
             return conversations
             
         except Exception as e:
+            print(f"❌ Error getting conversations: {e}")
+            import traceback
+            traceback.print_exc()
             logger.error(f"Error getting conversations: {str(e)}")
-            print(f"❌ Error: {e}")
             raise
     
     def get_messages(

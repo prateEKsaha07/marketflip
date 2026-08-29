@@ -141,29 +141,33 @@ class BidService:
     def select_bid(self, bid_id: str, buyer_id: str) -> Dict[str, Any]:
         """Select a bid (buyer only) - generates OTP for pickup requests and unlocks chat"""
         try:
-            print(f"=== SELECT BID SERVICE ===")
-            print(f"Bid ID: {bid_id}")
-            print(f"Buyer ID: {buyer_id}")
+            print(f"\n{'='*60}")
+            print(f"🔵 SELECT BID SERVICE CALLED")
+            print(f"   Bid ID: {bid_id}")
+            print(f"   Buyer ID: {buyer_id}")
+            print(f"{'='*60}\n")
             
             # Get the bid
             bid_response = self.supabase_admin.table("bids") \
                 .select("*") \
                 .eq("id", bid_id) \
                 .execute()       
-            print(f"Bid response: {bid_response.data}")         
+            print(f"📋 Bid response: {bid_response.data}")         
             if not bid_response.data:
                 raise Exception("Bid not found")
             
             bid = bid_response.data[0]
             request_id = bid["request_id"]
             shop_id = bid["shop_id"]
+            print(f"   Request ID: {request_id}")
+            print(f"   Shop ID: {shop_id}")
             
             # Get the request with delivery_method
             request_response = self.supabase_admin.table("requests") \
                 .select("id, buyer_id, status, item_name, description, budget_min, budget_max, pincode, category, created_at, delivery_method") \
                 .eq("id", request_id) \
                 .execute()
-            print(f"Request response: {request_response.data}")
+            print(f"📋 Request response: {request_response.data}")
             if not request_response.data:
                 raise Exception("Request not found")
             request = request_response.data[0]
@@ -198,9 +202,7 @@ class BidService:
             
             if delivery_method == "pickup":
                 verification_code = generate_verification_code()
-                print(f"=== PICKUP OTP GENERATED IN BID SERVICE ===")
-                print(f"Request ID: {request_id}")
-                print(f"Verification Code: {verification_code}")
+                print(f"🔑 PICKUP OTP GENERATED: {verification_code}")
             
             # Update selected bid to 'selected'
             selected_response = self.supabase_admin.table("bids") \
@@ -212,7 +214,7 @@ class BidService:
                 ) \
                 .eq("id", bid_id) \
                 .execute()
-            print(f"Selected response: {selected_response.data}")
+            print(f"📋 Selected response: {selected_response.data}")
             
             if not selected_response.data:
                 raise Exception("Failed to select bid")
@@ -229,7 +231,7 @@ class BidService:
                 .eq("status", "pending") \
                 .neq("id", bid_id) \
                 .execute()
-            print("all other bids are auto selected rejected")
+            print("✅ All other bids rejected")
             
             # ====== UPDATE REQUEST STATUS TO PURCHASED ======
             request_update_data = {
@@ -244,30 +246,49 @@ class BidService:
                 request_update_data["verification_attempts"] = 0
                 request_update_data["delivery_confirmed_by_shop"] = True
                 request_update_data["delivery_response_at"] = datetime.now().isoformat()
-                print(f"Pickup auto-confirmed with OTP: {verification_code}")
+                print(f"📦 Pickup auto-confirmed with OTP: {verification_code}")
             
             # Update request
+            print(f"📝 Updating request {request_id} to purchased...")
             self.supabase_admin.table("requests") \
                 .update(request_update_data) \
                 .eq("id", request_id) \
                 .execute()
-            print("changed purchased status and updated purchased at and selected bid id")
+            print("✅ Request status updated to purchased")
 
             # ====== UNLOCK CHAT ======
+            print(f"\n{'='*50}")
+            print(f"🔓 ATTEMPTING TO UNLOCK CHAT")
+            print(f"   Buyer ID: {buyer_id}")
+            print(f"   Shop ID: {shop_id}")
+            print(f"   Request ID: {request_id}")
+            print(f"{'='*50}\n")
+            
             try:
+                print("🔄 Creating ChatService...")
                 chat_service = ChatService(self.supabase_admin, self.supabase_anon)
+                
+                print(f"🔄 Getting or creating conversation for buyer={buyer_id}, shop={shop_id}")
                 conversation = chat_service.get_or_create_conversation(
                     buyer_id=buyer_id,
                     shop_id=shop_id
                 )
-                chat_service.unlock_conversation(
+                print(f"✅ Conversation found/created: {conversation['id']}")
+                print(f"   Current state: locked={conversation.get('locked', 'N/A')}")
+                
+                print(f"🔄 Unlocking conversation {conversation['id']} with source_type=request, source_id={request_id}")
+                result = chat_service.unlock_conversation(
                     conversation_id=conversation["id"],
                     source_type="request",
                     source_id=request_id
                 )
-                print(f"Chat unlocked for conversation {conversation['id']}")
+                print(f"✅ Chat unlocked successfully!")
+                print(f"   Result: locked={result.get('locked', 'N/A')}, active_source_type={result.get('active_source_type', 'N/A')}")
+                
             except Exception as e:
-                print(f"Error unlocking chat: {e}")
+                print(f"❌ ERROR unlocking chat: {e}")
+                import traceback
+                traceback.print_exc()
                 # Don't fail the bid selection if chat fails
     
             # Build response
@@ -310,9 +331,14 @@ class BidService:
                 response_data["verification_code"] = verification_code
                 response_data["message"] = "Bid selected successfully! Pickup OTP code generated. Share it with the shop."
             
+            print(f"\n✅ SELECT BID COMPLETE")
+            print(f"{'='*60}\n")
+            
             return response_data
             
         except Exception as e:
-            print(f"Error in select_bid: {str(e)}")
+            print(f"❌ ERROR in select_bid: {str(e)}")
+            import traceback
+            traceback.print_exc()
             logger.error(f"Error selecting bid: {str(e)}")
             raise
