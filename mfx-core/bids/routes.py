@@ -31,6 +31,69 @@ bid_service = BidService(supabase_admin, supabase_anon)
 async def test_bids_route():
     return {"message": "Bids router is working!"}
 
+
+# ====== GET AUCTION BIDS FOR CURRENT USER ======
+# MUST be placed BEFORE /{bid_id} to avoid route conflict
+@bid_router.get("/auction-bids")
+async def get_auction_bids(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get all auction bids placed by the current user.
+    Used for the buyer's transaction history.
+    Only buyers can access this endpoint.
+    """
+    if current_user.get("role") != "buyer":
+        raise HTTPException(
+            status_code=403,
+            detail="Only buyers can view their auction bids"
+        )
+    
+    try:
+        response = supabase_admin.table("auction_bids") \
+            .select("*") \
+            .eq("buyer_id", current_user["id"]) \
+            .order("created_at", desc=True) \
+            .execute()
+        
+        return response.data if response.data else []
+        
+    except Exception as e:
+        logger.error(f"Get auction bids error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ====== GET SHOP OWNER'S BIDS ======
+# MUST be placed BEFORE /{bid_id} to avoid route conflict
+@bid_router.get("/shop-bids")
+async def get_shop_bids(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get all bids placed by the current shop owner.
+    Used for shop owner's transaction history.
+    Only shop owners can access this endpoint.
+    """
+    if current_user.get("role") != "shop_owner":
+        raise HTTPException(
+            status_code=403,
+            detail="Only shop owners can view their bids"
+        )
+    
+    try:
+        response = supabase_admin.table("bids") \
+            .select("*, requests!bids_request_id_fkey(*, profiles!requests_buyer_id_fkey(full_name, phone))") \
+            .eq("shop_id", current_user["id"]) \
+            .order("created_at", desc=True) \
+            .execute()
+        
+        return response.data if response.data else []
+        
+    except Exception as e:
+        logger.error(f"Get shop bids error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ====== /requests/... ENDPOINTS ======
 
 @router.post("/{request_id}/bids", response_model=BidResponse, status_code=201)
@@ -101,6 +164,7 @@ async def get_bids_for_request(
         logger.error(f"Get bids for request error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
+
 # ====== /bids/... ENDPOINTS ======
 
 @bid_router.get("")
@@ -151,7 +215,9 @@ async def get_bids(
         logger.error(f"Get bids error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
+
 # ====== GET SINGLE BID BY ID ======
+# This MUST come AFTER /auction-bids and /shop-bids
 @bid_router.get("/{bid_id}")
 async def get_bid_by_id(
     bid_id: UUID,
@@ -193,6 +259,7 @@ async def get_bid_by_id(
         logger.error(f"Get bid by ID error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
+
 # ====== UPDATE BID ======
 @bid_router.patch("/{bid_id}", response_model=BidResponse)
 async def update_bid(
@@ -222,6 +289,7 @@ async def update_bid(
             raise HTTPException(status_code=400, detail="Only pending bids can be updated")
         raise HTTPException(status_code=400, detail=str(e))
 
+
 # ====== DELETE BID ======
 @bid_router.delete("/{bid_id}", status_code=204)
 async def delete_bid(
@@ -248,6 +316,7 @@ async def delete_bid(
         if "Cannot delete a bid that is not pending" in str(e):
             raise HTTPException(status_code=400, detail="Only pending bids can be deleted")
         raise HTTPException(status_code=400, detail=str(e))
+
 
 # ====== SELECT BID (UPDATED WITH OTP FOR PICKUP) ======
 @bid_router.patch("/{bid_id}/select")
@@ -390,6 +459,7 @@ async def select_bid(
         logger.error(f"Select bid error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # ====== GET BUYER DETAILS ======
 @bid_router.get("/{bid_id}/buyer")
 async def get_buyer_details(
@@ -487,6 +557,7 @@ async def get_buyer_details(
     except Exception as e:
         logger.error(f"Get buyer details error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
+
 
 # ====== GET BID STATS ======
 @bid_router.get("/stats")

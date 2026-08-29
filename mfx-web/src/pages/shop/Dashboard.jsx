@@ -37,7 +37,8 @@ import {
   Briefcase,
   Shield,
   Clock as ClockIcon,
-  Smile
+  Smile,
+  History
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -291,6 +292,16 @@ const Dashboard = () => {
               <Gavel size={15} className="mr-1.5" />
               Auctions
             </Button>
+
+            <Button
+              onClick={() => navigate('/shop/history')}
+              variant="outline"
+              className="border-[#FFDDB0] text-[#1A1A2E] hover:bg-[#FFDDB0]/30 text-xs px-4 py-2"
+            >
+              <History size={16} className="mr-1.5" />
+                Transaction History
+            </Button>
+
             <Button 
               onClick={() => navigate('/shop/completed')}
               variant="outline"

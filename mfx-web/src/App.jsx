@@ -25,6 +25,7 @@ import BrowseAuctions from './pages/buyer/BrowseAuctions';
 import AuctionDetail from './pages/buyer/AuctionDetail';
 import Profile from './pages/profile/Profile';
 import ProfileFormPage from './pages/profile/ProfileForm';
+import TransactionHistory from './pages/history/TransactionHistory';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -220,8 +221,23 @@ const AnimatedRoutes = () => {
           </PageTransition>
         } />
 
+        {/* transaction history */}
+        <Route path="/buyer/history" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <TransactionHistory />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
 
-        
+        <Route path="/shop/history" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="shop_owner">
+              <TransactionHistory />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>

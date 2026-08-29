@@ -35,6 +35,10 @@ export const verifyOtp = (requestId, code) => {
   return api.post(`/requests/${requestId}/verify-otp`, { code });
 };
 
+export const getAuctionBids = () => {
+  return api.get('/bids/auction-bids');
+};
+
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');

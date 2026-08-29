@@ -17,7 +17,8 @@ import {
   Sparkles,
   Zap,
   Gavel,
-  User  // ADD THIS
+  User,
+  History  // <-- ADD THIS
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -214,7 +215,6 @@ const Dashboard = () => {
               </Button>
             </motion.div>
 
-            {/* FIXED: Changed from /shop/profile to /buyer/profile */}
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}>
               <Button 
                 onClick={() => navigate('/buyer/profile')}
@@ -223,6 +223,18 @@ const Dashboard = () => {
               >
                 <User size={14} className="mr-1.5" />
                 Profile
+              </Button>
+            </motion.div>
+            
+            {/* ====== TRANSACTION HISTORY BUTTON ====== */}
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                onClick={() => navigate('/buyer/history')}
+                variant="outline"
+                className="border-[#FFDDB0] text-[#1A1A2E] hover:bg-[#FFDDB0]/30 text-xs px-4 py-2 flex items-center gap-1.5"
+              >
+                <History size={16} />
+                History
               </Button>
             </motion.div>
 
