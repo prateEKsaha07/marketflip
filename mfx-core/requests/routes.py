@@ -21,6 +21,7 @@ from requests.schemas import (
 from requests.services import RequestService
 from auth.dependencies import supabase_anon, supabase_admin
 from utils.verification import generate_verification_code
+from chat.services import ChatService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/requests", tags=["requests"])
@@ -735,6 +736,27 @@ async def verify_otp(
             
             logger.info(f"Transaction {request_id} verified by shop {current_user['id']}")
             
+            # ====== LOCK CHAT ======
+            try:
+                bid_result = supabase_admin.table("bids") \
+                    .select("shop_id") \
+                    .eq("id", request["selected_bid_id"]) \
+                    .execute()
+                
+                if bid_result.data:
+                    shop_id = bid_result.data[0]["shop_id"]
+                    buyer_id = request["buyer_id"]
+                    
+                    chat_service = ChatService(supabase_admin, supabase_anon)
+                    conversation = chat_service.get_or_create_conversation(
+                        buyer_id=buyer_id,
+                        shop_id=shop_id
+                    )
+                    chat_service.lock_conversation(conversation["id"])
+                    logger.info(f"Chat locked for conversation {conversation['id']}")
+            except Exception as e:
+                logger.error(f"Error locking chat: {e}")
+            
             return {
                 "message": "Transaction verified successfully!",
                 "status": "completed"
@@ -828,6 +850,27 @@ async def override_complete(
             raise HTTPException(status_code=400, detail="Failed to complete transaction")
         
         logger.info(f"Transaction {request_id} completed via override by buyer {current_user['id']}")
+        
+        # ====== LOCK CHAT ======
+        try:
+            bid_result = supabase_admin.table("bids") \
+                .select("shop_id") \
+                .eq("id", request["selected_bid_id"]) \
+                .execute()
+            
+            if bid_result.data:
+                shop_id = bid_result.data[0]["shop_id"]
+                buyer_id = request["buyer_id"]
+                
+                chat_service = ChatService(supabase_admin, supabase_anon)
+                conversation = chat_service.get_or_create_conversation(
+                    buyer_id=buyer_id,
+                    shop_id=shop_id
+                )
+                chat_service.lock_conversation(conversation["id"])
+                logger.info(f"Chat locked for conversation {conversation['id']}")
+        except Exception as e:
+            logger.error(f"Error locking chat: {e}")
         
         return {
             "message": "Transaction completed via override.",

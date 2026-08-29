@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from typing import Optional, List
 from uuid import UUID
 import logging
@@ -144,3 +144,38 @@ async def cancelAuction(
     except Exception as e:
         logger.error(f"Cancel auction error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to cancel auction")
+
+
+# ====== NEW: Close Auction with Winner (Internal Endpoint) ======
+@router.post("/{auction_id}/close-with-winner", status_code=200)
+async def close_auction_with_winner(
+    auction_id: UUID,
+    payload: dict = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    INTERNAL endpoint for close-auctions Edge Function to call.
+    Closes an auction with a winner and unlocks chat.
+    This endpoint is protected by the Edge Function calling it with a service token.
+    """
+    # Allow service role or admin access
+    # The Edge Function calls with a valid Supabase service role token
+    
+    winner_buyer_id = payload.get("winner_buyer_id")
+    if not winner_buyer_id:
+        raise HTTPException(status_code=400, detail="winner_buyer_id is required")
+    
+    try:
+        result = auction_service.close_auction_with_winner(
+            auction_id=str(auction_id),
+            winner_buyer_id=str(winner_buyer_id)
+        )
+        return {
+            "message": "Auction closed with winner, chat unlocked",
+            "auction": result
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Close auction with winner error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

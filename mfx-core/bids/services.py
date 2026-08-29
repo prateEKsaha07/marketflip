@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
 import logging
-
+from chat.services import ChatService
 from utils.verification import generate_verification_code
 
 logger = logging.getLogger(__name__)
@@ -139,7 +139,7 @@ class BidService:
             raise
     
     def select_bid(self, bid_id: str, buyer_id: str) -> Dict[str, Any]:
-        """Select a bid (buyer only) - generates OTP for pickup requests"""
+        """Select a bid (buyer only) - generates OTP for pickup requests and unlocks chat"""
         try:
             print(f"=== SELECT BID SERVICE ===")
             print(f"Bid ID: {bid_id}")
@@ -252,6 +252,23 @@ class BidService:
                 .eq("id", request_id) \
                 .execute()
             print("changed purchased status and updated purchased at and selected bid id")
+
+            # ====== UNLOCK CHAT ======
+            try:
+                chat_service = ChatService(self.supabase_admin, self.supabase_anon)
+                conversation = chat_service.get_or_create_conversation(
+                    buyer_id=buyer_id,
+                    shop_id=shop_id
+                )
+                chat_service.unlock_conversation(
+                    conversation_id=conversation["id"],
+                    source_type="request",
+                    source_id=request_id
+                )
+                print(f"Chat unlocked for conversation {conversation['id']}")
+            except Exception as e:
+                print(f"Error unlocking chat: {e}")
+                # Don't fail the bid selection if chat fails
     
             # Build response
             selected_bid = selected_response.data[0]

@@ -18,7 +18,8 @@ import {
   Zap,
   Gavel,
   User,
-  History  // <-- ADD THIS
+  History,
+  MessageCircle  // <-- ADD THIS
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -29,9 +30,11 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('open');
+  const [unreadCount, setUnreadCount] = useState(0);  // <-- NEW
 
   useEffect(() => {
     fetchAllRequests();
+    fetchUnreadCount();  // <-- NEW
   }, []);
 
   const fetchAllRequests = async () => {
@@ -53,6 +56,17 @@ const Dashboard = () => {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ====== NEW: Fetch unread count ======
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await api.get('/chat/unread-count');
+      setUnreadCount(response.data.unread_count || 0);
+    } catch (err) {
+      console.error('Failed to fetch unread count:', err);
+      // Don't show error to user, just keep count at 0
     }
   };
 
@@ -212,6 +226,23 @@ const Dashboard = () => {
               >
                 <Gavel size={15} className="mr-1.5" />
                 Auctions
+              </Button>
+            </motion.div>
+
+            {/* ====== CHAT BUTTON WITH UNREAD BADGE ====== */}
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                onClick={() => navigate('/buyer/chat')}
+                variant="outline"
+                className="border-[#CFEBFF] text-[#1A1A2E] hover:bg-[#CFEBFF]/20 hover:border-[#CFEBFF] text-sm px-4 py-2 relative"
+              >
+                <MessageCircle size={16} className="mr-1.5" />
+                Chats
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-[#FFBE91] text-[#1A1A2E] text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </Button>
             </motion.div>
 

@@ -1,6 +1,23 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import api from '../api/client';
 
+// ====== SUPABASE CLIENT ======
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Check if credentials exist
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase credentials not found. Please check your environment variables.');
+}
+
+// Create the supabase client
+const supabaseClient = createClient(supabaseUrl || '', supabaseAnonKey || '');
+
+// Export the supabase client for use in other hooks
+export const supabase = supabaseClient;
+
+// ====== AUTH CONTEXT ======
 const AuthContext = createContext();
 
 export const useAuth = () => {

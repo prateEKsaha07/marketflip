@@ -3,6 +3,7 @@ from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
 import logging
+from chat.services import ChatService
 
 logger = logging.getLogger(__name__)
 
@@ -232,4 +233,60 @@ class AuctionService:
             
         except Exception as e:
             logger.error(f"Error placing bid on auction {auction_id}: {str(e)}")
+            raise
+
+    def close_auction_with_winner(self, auction_id: str, winner_buyer_id: str) -> Dict[str, Any]:
+        """
+        Close an auction with a winner.
+        This should be called when an auction ends and a winner is selected.
+        Unlocks the chat between buyer and shop.
+        """
+        try:
+            # Get auction details
+            auction_response = self.supabase_admin.table("auctions") \
+                .select("*") \
+                .eq("id", auction_id) \
+                .execute()
+            
+            if not auction_response.data:
+                raise ValueError("Auction not found")
+            
+            auction = auction_response.data[0]
+            shop_id = auction["shop_id"]
+            
+            # Update auction status to sold
+            update_data = {
+                "status": "sold",
+                "closed_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            result = self.supabase_admin.table("auctions") \
+                .update(update_data) \
+                .eq("id", auction_id) \
+                .execute()
+            
+            if not result.data:
+                raise Exception("Failed to close auction")
+            
+            # ====== UNLOCK CHAT ======
+            try:
+                chat_service = ChatService(self.supabase_admin, self.supabase_anon)
+                conversation = chat_service.get_or_create_conversation(
+                    buyer_id=winner_buyer_id,
+                    shop_id=shop_id
+                )
+                chat_service.unlock_conversation(
+                    conversation_id=conversation["id"],
+                    source_type="auction",
+                    source_id=auction_id
+                )
+                logger.info(f"Chat unlocked for auction {auction_id}, conversation {conversation['id']}")
+            except Exception as e:
+                logger.error(f"Error unlocking chat for auction {auction_id}: {e}")
+                # Don't fail the auction close if chat fails
+            
+            return result.data[0]
+            
+        except Exception as e:
+            logger.error(f"Error closing auction with winner: {str(e)}")
             raise

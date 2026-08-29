@@ -7,6 +7,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Backend API URL - uses the deployed backend URL
+const API_URL = Deno.env.get('MARKETFLIP_API_URL') || 'https://marketflip.onrender.com'
+// For local development, you can set this to http://localhost:8000
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -55,7 +59,7 @@ Deno.serve(async (req) => {
       const highestBid = bids && bids.length > 0 ? bids[0] : null
       const highestBidAmount = highestBid ? highestBid.bid_amount : 0
       
-      // ====== CHECK RESERVE PRICE ======
+      // Check reserve price
       const reservePrice = auction.reserve_price || 0
 
       // Determine final status
@@ -82,6 +86,30 @@ Deno.serve(async (req) => {
         updateData.current_highest_bid = highestBidAmount
         updateData.current_highest_bidder = highestBid.buyer_id
         console.log(`Auction ${auction.id}: Highest bid ${highestBidAmount} → sold to ${highestBid.buyer_id}`)
+
+        // ====== CALL BACKEND API TO UNLOCK CHAT ======
+        try {
+          const response = await fetch(`${API_URL}/auctions/${auction.id}/close-with-winner`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseServiceKey}`
+            },
+            body: JSON.stringify({
+              winner_buyer_id: highestBid.buyer_id
+            })
+          })
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error(`Failed to close auction with winner: ${response.status} - ${errorText}`)
+          } else {
+            console.log(`Auction ${auction.id} closed with winner, chat unlocked`)
+          }
+        } catch (err) {
+          console.error(`Error calling close-with-winner API for ${auction.id}:`, err)
+          // Continue even if chat unlock fails - auction still closes
+        }
       }
 
       // Update auction status

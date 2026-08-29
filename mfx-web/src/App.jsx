@@ -26,6 +26,9 @@ import AuctionDetail from './pages/buyer/AuctionDetail';
 import Profile from './pages/profile/Profile';
 import ProfileFormPage from './pages/profile/ProfileForm';
 import TransactionHistory from './pages/history/TransactionHistory';
+// ====== NEW: Chat Imports ======
+import ChatList from './pages/chat/ChatList';
+import ChatView from './pages/chat/ChatView';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -190,7 +193,6 @@ const AnimatedRoutes = () => {
         } />
 
         {/* profile routes */}
-
         <Route path="/buyer/profile" element={
           <PageTransition>
             <ProtectedRoute requiredRole="buyer">
@@ -234,6 +236,36 @@ const AnimatedRoutes = () => {
           <PageTransition>
             <ProtectedRoute requiredRole="shop_owner">
               <TransactionHistory />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+
+        {/* ====== NEW: Chat Routes ====== */}
+        <Route path="/buyer/chat" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <ChatList />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/buyer/chat/:conversationId" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <ChatView />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/shop/chat" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="shop_owner">
+              <ChatList />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/shop/chat/:conversationId" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="shop_owner">
+              <ChatView />
             </ProtectedRoute>
           </PageTransition>
         } />
