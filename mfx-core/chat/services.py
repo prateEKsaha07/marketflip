@@ -41,7 +41,6 @@ class ChatService:
             if response.data:
                 conv = response.data[0]
                 print(f"   ✅ Found existing conversation: {conv['id']}")
-                print(f"   Current state: locked={conv.get('locked', 'N/A')}, active_source_type={conv.get('active_source_type', 'N/A')}")
                 logger.info(f"Found existing conversation: {conv['id']}")
                 return conv
             
@@ -50,7 +49,7 @@ class ChatService:
             data = {
                 "buyer_id": buyer_id,
                 "shop_id": shop_id,
-                "locked": True
+                "locked": True  # Keep for backward compatibility
             }
             print(f"   Insert data: {data}")
             
@@ -75,14 +74,53 @@ class ChatService:
             logger.error(f"Error getting/creating conversation: {str(e)}")
             raise
     
+    def is_conversation_locked(self, conversation_id: str) -> bool:
+        """
+        Check if a conversation is locked (no active transactions)
+        """
+        try:
+            response = self.supabase_admin.table("conversation_active_transactions") \
+                .select("id") \
+                .eq("conversation_id", conversation_id) \
+                .eq("status", "active") \
+                .limit(1) \
+                .execute()
+            
+            is_locked = len(response.data) == 0
+            print(f"🔒 Conversation {conversation_id} is {'locked' if is_locked else 'unlocked'}")
+            return is_locked
+            
+        except Exception as e:
+            logger.error(f"Error checking if conversation is locked: {str(e)}")
+            return True  # Default to locked if error
+    
+    def get_active_transaction(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get the active transaction for a conversation
+        """
+        try:
+            response = self.supabase_admin.table("conversation_active_transactions") \
+                .select("*") \
+                .eq("conversation_id", conversation_id) \
+                .eq("status", "active") \
+                .limit(1) \
+                .execute()
+            
+            return response.data[0] if response.data else None
+            
+        except Exception as e:
+            logger.error(f"Error getting active transaction: {str(e)}")
+            return None
+    
     def unlock_conversation(
         self,
         conversation_id: str,
         source_type: str,
-        source_id: str
+        source_id: str,
+        item_name: str = None
     ) -> Dict[str, Any]:
         """
-        Unlock a conversation and set active source.
+        Unlock a conversation by adding an active transaction
         """
         try:
             print(f"\n{'='*50}")
@@ -90,33 +128,45 @@ class ChatService:
             print(f"   Conversation ID: {conversation_id}")
             print(f"   Source Type: {source_type}")
             print(f"   Source ID: {source_id}")
+            print(f"   Item Name: {item_name}")
             print(f"{'='*50}\n")
             
-            # Update conversation
-            update_data = {
-                "locked": False,
-                "active_source_type": source_type,
-                "active_source_id": source_id,
-                "updated_at": datetime.utcnow().isoformat()
+            # Check if already has active transaction
+            existing = self.get_active_transaction(conversation_id)
+            if existing:
+                print(f"   ⚠️ Already has active transaction: {existing['id']}")
+                return existing
+            
+            # Insert active transaction
+            data = {
+                "conversation_id": conversation_id,
+                "source_type": source_type,
+                "source_id": source_id,
+                "item_name": item_name,
+                "status": "active"
             }
-            print(f"   Update data: {update_data}")
             
-            response = self.supabase_admin.table("conversations") \
-                .update(update_data) \
-                .eq("id", conversation_id) \
+            print(f"   Inserting: {data}")
+            response = self.supabase_admin.table("conversation_active_transactions") \
+                .insert(data) \
                 .execute()
-            
-            print(f"   Response: {response.data}")
             
             if not response.data:
                 raise Exception("Failed to unlock conversation")
             
-            conv = response.data[0]
-            print(f"   ✅ Unlocked conversation {conversation_id}")
-            print(f"   New state: locked={conv.get('locked', 'N/A')}, active_source_type={conv.get('active_source_type', 'N/A')}")
+            # Update conversation updated_at and locked status
+            self.supabase_admin.table("conversations") \
+                .update({
+                    "updated_at": datetime.utcnow().isoformat(),
+                    "locked": False  # Keep for backward compatibility
+                }) \
+                .eq("id", conversation_id) \
+                .execute()
             
-            logger.info(f"Unlocked conversation {conversation_id} with source {source_type}/{source_id}")
-            return conv
+            result = response.data[0]
+            print(f"   ✅ Unlocked conversation {conversation_id}")
+            logger.info(f"Unlocked conversation {conversation_id} with {source_type}/{source_id}")
+            return result
             
         except Exception as e:
             print(f"❌ Error unlocking conversation: {e}")
@@ -127,8 +177,7 @@ class ChatService:
     
     def lock_conversation(self, conversation_id: str) -> Dict[str, Any]:
         """
-        Lock a conversation after transaction completion.
-        Keeps the active_source fields for reference.
+        Lock a conversation by completing all active transactions
         """
         try:
             print(f"\n{'='*50}")
@@ -136,22 +185,30 @@ class ChatService:
             print(f"   Conversation ID: {conversation_id}")
             print(f"{'='*50}\n")
             
-            response = self.supabase_admin.table("conversations") \
+            # Update all active transactions to completed
+            response = self.supabase_admin.table("conversation_active_transactions") \
                 .update({
-                    "locked": True,
-                    "updated_at": datetime.utcnow().isoformat()
+                    "status": "completed",
+                    "completed_at": datetime.utcnow().isoformat()
+                }) \
+                .eq("conversation_id", conversation_id) \
+                .eq("status", "active") \
+                .execute()
+            
+            count = len(response.data) if response.data else 0
+            print(f"   Completed {count} active transactions")
+            
+            # Update conversation updated_at and locked status
+            self.supabase_admin.table("conversations") \
+                .update({
+                    "updated_at": datetime.utcnow().isoformat(),
+                    "locked": True  # Keep for backward compatibility
                 }) \
                 .eq("id", conversation_id) \
                 .execute()
             
-            if not response.data:
-                raise Exception("Failed to lock conversation")
-            
-            conv = response.data[0]
-            print(f"   ✅ Locked conversation {conversation_id}")
-            
             logger.info(f"Locked conversation {conversation_id}")
-            return conv
+            return {"completed_count": count}
             
         except Exception as e:
             print(f"❌ Error locking conversation: {e}")
@@ -177,16 +234,8 @@ class ChatService:
             print(f"   Content: {content[:50]}...")
             print(f"{'='*50}\n")
             
-            # Check if conversation is locked
-            conv_response = self.supabase_admin.table("conversations") \
-                .select("locked") \
-                .eq("id", conversation_id) \
-                .execute()
-            
-            if not conv_response.data:
-                raise ValueError("Conversation not found")
-            
-            if conv_response.data[0].get("locked", True):
+            # Check if conversation is locked using active transactions
+            if self.is_conversation_locked(conversation_id):
                 raise ValueError("Conversation is locked")
             
             # Insert message
@@ -294,32 +343,43 @@ class ChatService:
                 
                 conv["unread_count"] = len(unread_response.data) if unread_response.data else 0
                 
-                # Get active source details
-                if conv.get("active_source_id") and conv.get("active_source_type"):
-                    source_type = conv["active_source_type"]
-                    source_id = conv["active_source_id"]
+                # ====== CHECK ACTIVE TRANSACTION (New Logic) ======
+                active_tx = self.get_active_transaction(conv["id"])
+                
+                if active_tx:
+                    conv["locked"] = False
+                    conv["active_source_type"] = active_tx.get("source_type")
+                    conv["active_source_id"] = active_tx.get("source_id")
+                    conv["active_item_name"] = active_tx.get("item_name")
                     
-                    if source_type == "request":
+                    # Get price and image from source
+                    if active_tx.get("source_type") == "request":
                         src_response = self.supabase_admin.table("requests") \
-                            .select("item_name, budget_min, budget_max, image_urls") \
-                            .eq("id", source_id) \
+                            .select("budget_max, image_urls") \
+                            .eq("id", active_tx["source_id"]) \
                             .execute()
-                    else:
-                        src_response = self.supabase_admin.table("auctions") \
-                            .select("item_name, starting_price, image_urls") \
-                            .eq("id", source_id) \
-                            .execute()
-                    
-                    if src_response.data:
-                        conv["active_item_name"] = src_response.data[0].get("item_name")
-                        if source_type == "request":
+                        if src_response.data:
                             conv["active_item_price"] = src_response.data[0].get("budget_max")
-                        else:
+                            images = src_response.data[0].get("image_urls")
+                            if images and isinstance(images, list) and len(images) > 0:
+                                conv["active_item_image"] = images[0]
+                    elif active_tx.get("source_type") == "auction":
+                        src_response = self.supabase_admin.table("auctions") \
+                            .select("starting_price, image_urls") \
+                            .eq("id", active_tx["source_id"]) \
+                            .execute()
+                        if src_response.data:
                             conv["active_item_price"] = src_response.data[0].get("starting_price")
-                        
-                        images = src_response.data[0].get("image_urls")
-                        if images and isinstance(images, list) and len(images) > 0:
-                            conv["active_item_image"] = images[0]
+                            images = src_response.data[0].get("image_urls")
+                            if images and isinstance(images, list) and len(images) > 0:
+                                conv["active_item_image"] = images[0]
+                else:
+                    conv["locked"] = True
+                    conv["active_source_type"] = None
+                    conv["active_source_id"] = None
+                    conv["active_item_name"] = None
+                    conv["active_item_price"] = None
+                    conv["active_item_image"] = None
             
             return conversations
             

@@ -142,6 +142,37 @@ changes:
 - Fixed showOtpVerification condition to work for both home delivery and pickup
 - Added delivery method badge in OTP section (Pickup/Home Delivery)
 
+
+date: 8/30/2026
+changes:
+- Created conversation_active_transactions table for active transaction tracking
+- Added RLS policies for conversations, messages, and conversation_active_transactions
+- Updated ChatService with active transaction methods:
+  - is_conversation_locked() - checks active transactions
+  - get_active_transaction() - gets active transaction for conversation
+  - unlock_conversation() - inserts active transaction
+  - lock_conversation() - completes active transactions
+- Updated send_message() to check active transactions instead of locked column
+- Updated get_conversations_for_user() to compute lock state from active transactions
+- Updated unlock_conversation() to include item_name parameter
+- Updated bids/services.py select_bid() to call chat unlock with item_name
+- Updated auctions/service.py close_auction_with_winner() to call chat unlock with item_name
+- Added chat lock in requests/routes.py verify-otp endpoint
+- Added chat lock in requests/routes.py override-complete endpoint
+- Fixed bids/routes.py select_bid endpoint to call bid_service.select_bid() instead of inline logic
+- Fixed route bypass issue (chat unlock wasn't executing because route was doing all logic)
+- Extended ChatList.jsx with smaller font sizes and compact UI
+- Extended ChatView.jsx with smaller font sizes and compact UI
+- Fixed isOwner check in ChatView.jsx to use user.user_id instead of user.id
+- Added proper debug logs for chat unlock flow
+- Added realtime message subscription via useChat hook
+- Added chat routes to App.jsx (/buyer/chat, /shop/chat, /chat/:conversationId)
+- Added chat button to Buyer Dashboard with unread count badge
+- Added chat button to Shop Dashboard with unread count badge
+- Fixed chat navigation to use role-based paths
+- Fixed active transaction duplicate key errors
+
+
 ## License
 
 Copyright © 2026 Prateek Saha

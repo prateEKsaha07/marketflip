@@ -38,14 +38,13 @@ class MessageCreate(BaseModel):
     @field_validator('content')
     @classmethod
     def validate_content(cls, v: str) -> str:
-        # Basic profanity filter
+        # Basic profanity filter - placeholder for now
         # In production, use a proper profanity library
-        banned_words = ['badword1', 'badword2']
-        v_lower = v.lower()
-        for word in banned_words:
-            if word.lower() in v_lower:
-                raise ValueError('Message contains prohibited content')
-        return v.strip()
+        banned_words = []  # Add actual banned words when needed
+        v_clean = v.strip()
+        if not v_clean:
+            raise ValueError('Message content cannot be empty')
+        return v_clean
 
 
 class MessageResponse(BaseModel):

@@ -262,6 +262,7 @@ class BidService:
             print(f"   Buyer ID: {buyer_id}")
             print(f"   Shop ID: {shop_id}")
             print(f"   Request ID: {request_id}")
+            print(f"   Item Name: {request.get('item_name')}")
             print(f"{'='*50}\n")
             
             try:
@@ -280,10 +281,11 @@ class BidService:
                 result = chat_service.unlock_conversation(
                     conversation_id=conversation["id"],
                     source_type="request",
-                    source_id=request_id
+                    source_id=request_id,
+                    item_name=request.get("item_name")  # <-- ADDED
                 )
                 print(f"✅ Chat unlocked successfully!")
-                print(f"   Result: locked={result.get('locked', 'N/A')}, active_source_type={result.get('active_source_type', 'N/A')}")
+                print(f"   Result: active transaction created")
                 
             except Exception as e:
                 print(f"❌ ERROR unlocking chat: {e}")

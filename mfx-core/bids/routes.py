@@ -318,7 +318,7 @@ async def delete_bid(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# ====== SELECT BID (UPDATED WITH OTP FOR PICKUP) ======
+# ====== SELECT BID (UPDATED - CALLS SERVICE) ======
 @bid_router.patch("/{bid_id}/select")
 async def select_bid(
     bid_id: UUID,
@@ -336,125 +336,13 @@ async def select_bid(
         raise HTTPException(status_code=403, detail="Only buyers can select bids")
     
     try:
-        # Get the bid
-        bid_result = supabase_admin.table("bids") \
-            .select("*") \
-            .eq("id", str(bid_id)) \
-            .execute()
+        # ====== CALL THE SERVICE ======
+        result = bid_service.select_bid(
+            bid_id=str(bid_id),
+            buyer_id=current_user["id"]
+        )
+        return result
         
-        if not bid_result.data:
-            raise HTTPException(status_code=404, detail="Bid not found")
-        
-        bid = bid_result.data[0]
-        
-        # Get the request
-        request_result = supabase_admin.table("requests") \
-            .select("*") \
-            .eq("id", bid["request_id"]) \
-            .execute()
-        
-        if not request_result.data:
-            raise HTTPException(status_code=404, detail="Request not found")
-        
-        request = request_result.data[0]
-        
-        # Verify buyer owns the request
-        if str(request["buyer_id"]) != current_user["id"]:
-            raise HTTPException(
-                status_code=403,
-                detail="You don't own this request"
-            )
-        
-        # Verify request is open
-        if request["status"] != "open":
-            raise HTTPException(
-                status_code=400,
-                detail="Request is not open for bidding"
-            )
-        
-        # Verify bid is pending
-        if bid["status"] != "pending":
-            raise HTTPException(
-                status_code=400,
-                detail="Bid is no longer pending"
-            )
-        
-        # ====== CHECK IF PICKUP - GENERATE OTP ======
-        verification_code = None
-        
-        if request.get("delivery_method") == "pickup":
-            verification_code = generate_verification_code()
-            logger.info(f"=== PICKUP OTP GENERATED ON BID SELECTION ===")
-            logger.info(f"Request ID: {request['id']}")
-            logger.info(f"Verification Code: {verification_code}")
-        
-        # Update the bid status to selected
-        bid_update = supabase_admin.table("bids") \
-            .update({
-                "status": "selected",
-                "selected_at": datetime.utcnow().isoformat()
-            }) \
-            .eq("id", str(bid_id)) \
-            .execute()
-        
-        if not bid_update.data:
-            raise HTTPException(status_code=400, detail="Failed to select bid")
-        
-        # Update the request status to purchased
-        request_update_data = {
-            "status": "purchased",
-            "purchased_at": datetime.utcnow().isoformat(),
-            "selected_bid_id": str(bid_id)
-        }
-        
-        # If pickup, add verification code and auto-confirm delivery
-        if verification_code:
-            request_update_data["verification_code"] = verification_code
-            request_update_data["verification_attempts"] = 0
-            request_update_data["delivery_confirmed_by_shop"] = True
-            request_update_data["delivery_response_at"] = datetime.utcnow().isoformat()
-            logger.info(f"Pickup auto-confirmed with OTP: {verification_code}")
-        
-        request_update = supabase_admin.table("requests") \
-            .update(request_update_data) \
-            .eq("id", request["id"]) \
-            .execute()
-        
-        if not request_update.data:
-            # Revert bid status if request update fails
-            supabase_admin.table("bids") \
-                .update({"status": "pending", "selected_at": None}) \
-                .eq("id", str(bid_id)) \
-                .execute()
-            raise HTTPException(status_code=400, detail="Failed to update request")
-        
-        updated_request = request_update.data[0]
-        
-        # Get shop details for response
-        shop_result = supabase_admin.table("profiles") \
-            .select("shop_name, phone, address") \
-            .eq("id", bid["shop_id"]) \
-            .execute()
-        
-        shop_details = shop_result.data[0] if shop_result.data else {}
-        
-        # Build response
-        response_data = {
-            "message": "Bid selected successfully!" if not verification_code else "Bid selected successfully! Pickup OTP code generated.",
-            "bid": bid_update.data[0],
-            "request": updated_request,
-            "shop": shop_details
-        }
-        
-        if verification_code:
-            response_data["verification_code"] = verification_code
-        
-        logger.info(f"Bid {bid_id} selected for request {request['id']}")
-        
-        return response_data
-        
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Select bid error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

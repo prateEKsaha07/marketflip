@@ -278,7 +278,8 @@ class AuctionService:
                 chat_service.unlock_conversation(
                     conversation_id=conversation["id"],
                     source_type="auction",
-                    source_id=auction_id
+                    source_id=auction_id,
+                    item_name=auction.get("item_name")  # <-- ADDED
                 )
                 logger.info(f"Chat unlocked for auction {auction_id}, conversation {conversation['id']}")
             except Exception as e:

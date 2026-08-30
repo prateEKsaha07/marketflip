@@ -65,6 +65,7 @@ const ChatView = () => {
       // Get conversations list to find this one
       const convResponse = await api.get('/chat/conversations');
       const conv = convResponse.data.find(c => c.id === conversationId);
+      console.log('Conversation found:', conv);
       setConversation(conv);
 
       // Get messages
@@ -87,20 +88,50 @@ const ChatView = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || sending || conversation?.locked) return;
+    
+    // Validate
+    if (!newMessage.trim()) {
+      setError('Please enter a message');
+      return;
+    }
+    
+    if (sending) return;
+    
+    if (conversation?.locked) {
+      setError('Conversation is locked');
+      return;
+    }
 
     setSending(true);
+    setError('');
+    
     try {
+      console.log('Sending message:', {
+        conversationId,
+        content: newMessage.trim()
+      });
+      
       const response = await api.post(`/chat/conversations/${conversationId}/messages`, {
         content: newMessage.trim()
       });
+      
+      console.log('Message sent:', response.data);
       
       setMessages(prev => [...prev, response.data]);
       setNewMessage('');
       inputRef.current?.focus();
     } catch (err) {
       console.error('Send message error:', err);
-      setError(err.response?.data?.detail || 'Failed to send message');
+      
+      // Show the actual error message from the backend
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to send message';
+      setError(errorMsg);
+      
+      // Log more details for debugging
+      if (err.response) {
+        console.log('Error status:', err.response.status);
+        console.log('Error data:', err.response.data);
+      }
     } finally {
       setSending(false);
     }
@@ -133,27 +164,13 @@ const ChatView = () => {
     };
   };
 
-  // ====== FIX: Properly check if the current user owns the message ======
   const isOwner = (message) => {
-    if (!message || !user) {
-      console.log('isOwner: No message or user');
-      return false;
-    }
-    
-    const senderId = String(message.sender_id);
-    const userId = String(user.id);
-    const userIdAlt = String(user.user_id); // Alternative field name
-    
-    console.log('isOwner check:');
-    console.log('  message.sender_id:', message.sender_id, 'type:', typeof message.sender_id);
-    console.log('  user.id:', user.id, 'type:', typeof user.id);
-    console.log('  user.user_id:', user.user_id, 'type:', typeof user.user_id);
-    console.log('  Match (id):', senderId === userId);
-    console.log('  Match (user_id):', senderId === userIdAlt);
-    
-    // Try both possible ID fields
-    return senderId === userId || senderId === userIdAlt;
+    if (!message || !user) return false;
+    return String(message.sender_id) === String(user.user_id);
   };
+
+  // ====== FIX: Check if conversation is locked ======
+  const isConversationLocked = conversation?.locked === true;
 
   if (loading) {
     return (
@@ -183,7 +200,7 @@ const ChatView = () => {
   }
 
   const otherParty = getOtherParty();
-  const isLocked = conversation.locked;
+  const isLocked = isConversationLocked;
   const backPath = user?.role === 'shop_owner' ? '/shop/chat' : '/buyer/chat';
   const hasActiveProduct = conversation.active_item_name;
 
@@ -191,58 +208,57 @@ const ChatView = () => {
     <div className="min-h-screen bg-[#F8F6F0] flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-[#EEECE6] sticky top-0 z-10 shadow-sm">
-        <div className="max-w-3xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-3">
+        <div className="max-w-3xl mx-auto px-4 py-2.5">
+          <div className="flex items-center gap-2.5">
             <Button
               onClick={() => navigate(backPath)}
               variant="ghost"
-              className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-2 py-1.5 h-auto flex-shrink-0"
+              className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-[11px] px-2 py-1.5 h-auto flex-shrink-0"
             >
-              <ArrowLeft size={18} />
+              <ArrowLeft size={16} />
             </Button>
             
-            {/* Avatar */}
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isLocked ? 'bg-gray-100' : 'bg-[#FFBE91]/20'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isLocked ? 'bg-gray-100' : 'bg-[#FFBE91]/20'}`}>
               {user?.role === 'buyer' ? (
-                <Store size={18} className={isLocked ? 'text-gray-400' : 'text-[#FFBE91]'} />
+                <Store size={15} className={isLocked ? 'text-gray-400' : 'text-[#FFBE91]'} />
               ) : (
-                <User size={18} className={isLocked ? 'text-gray-400' : 'text-[#FFBE91]'} />
+                <User size={15} className={isLocked ? 'text-gray-400' : 'text-[#FFBE91]'} />
               )}
             </div>
             
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="font-semibold text-[#1A1A2E] truncate">
+              <div className="flex items-center gap-1.5">
+                <p className="font-semibold text-sm text-[#1A1A2E] truncate">
                   {otherParty.name || 'User'}
                 </p>
-                <span className="text-[10px] text-[#A0A0B0] bg-[#F8F6F0] px-1.5 py-0.5 rounded-full flex-shrink-0">
+                <span className="text-[9px] text-[#A0A0B0] bg-[#F8F6F0] px-1.5 py-0.5 rounded-full flex-shrink-0">
                   {otherParty.role}
                 </span>
-                <div className={`flex items-center gap-1 text-[10px] ${isLocked ? 'text-amber-500' : 'text-emerald-500'} flex-shrink-0`}>
-                  {isLocked ? <Lock size={12} /> : <Unlock size={12} />}
+                <div className={`flex items-center gap-1 text-[9px] ${isLocked ? 'text-amber-500' : 'text-emerald-500'} flex-shrink-0`}>
+                  {isLocked ? <Lock size={10} /> : <Unlock size={10} />}
                 </div>
               </div>
               {hasActiveProduct && (
                 <button
                   onClick={() => setShowProductDetails(!showProductDetails)}
-                  className="text-[10px] text-blue-600 truncate flex items-center gap-1 hover:underline focus:outline-none"
+                  className="text-[9px] text-blue-600 truncate flex items-center gap-1 hover:underline focus:outline-none"
                 >
-                  <Package size={10} />
+                  <Package size={9} />
                   {conversation.active_item_name}
                   {conversation.active_item_price && ` · ₹${conversation.active_item_price}`}
-                  <ChevronDown size={12} className={`transition-transform ${showProductDetails ? 'rotate-180' : ''}`} />
+                  <ChevronDown size={10} className={`transition-transform ${showProductDetails ? 'rotate-180' : ''}`} />
                 </button>
               )}
             </div>
             
             {isLocked && (
-              <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-200 flex-shrink-0">
+              <span className="text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200 flex-shrink-0">
                 Read-only
               </span>
             )}
           </div>
 
-          {/* Pinned Product Details (Expandable) */}
+          {/* Pinned Product Details */}
           <AnimatePresence>
             {showProductDetails && hasActiveProduct && (
               <motion.div
@@ -250,30 +266,30 @@ const ChatView = () => {
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.3 }}
-                className="mt-3 pt-3 border-t border-[#EEECE6]"
+                className="mt-2 pt-2 border-t border-[#EEECE6]"
               >
-                <div className="bg-[#F8F6F0] rounded-xl p-3 flex items-center gap-3">
+                <div className="bg-[#F8F6F0] rounded-xl p-2.5 flex items-center gap-2.5">
                   {conversation.active_item_image ? (
                     <img
                       src={conversation.active_item_image}
                       alt={conversation.active_item_name}
-                      className="w-12 h-12 rounded-lg object-cover"
+                      className="w-10 h-10 rounded-lg object-cover"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-lg bg-[#FFBE91]/20 flex items-center justify-center">
-                      <Package size={20} className="text-[#FFBE91]" />
+                    <div className="w-10 h-10 rounded-lg bg-[#FFBE91]/20 flex items-center justify-center">
+                      <Package size={16} className="text-[#FFBE91]" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-[#1A1A2E] text-sm truncate">
+                    <p className="font-medium text-[#1A1A2E] text-xs truncate">
                       {conversation.active_item_name}
                     </p>
                     {conversation.active_item_price && (
-                      <p className="text-xs text-emerald-600 font-medium">
+                      <p className="text-[10px] text-emerald-600 font-medium">
                         ₹{conversation.active_item_price.toLocaleString()}
                       </p>
                     )}
-                    <p className="text-[10px] text-[#A0A0B0]">
+                    <p className="text-[9px] text-[#A0A0B0]">
                       {conversation.active_source_type === 'request' ? 'Request' : 'Auction'}
                       {isLocked ? ' (Completed)' : ' (Active)'}
                     </p>
@@ -285,23 +301,32 @@ const ChatView = () => {
         </div>
       </div>
 
+      {/* Error message */}
+      {error && (
+        <div className="max-w-3xl mx-auto w-full px-3 pt-2">
+          <div className="bg-rose-50 border border-rose-200 text-rose-600 px-3 py-2 rounded-lg text-xs">
+            {error}
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-4 max-w-3xl mx-auto w-full"
+        className="flex-1 overflow-y-auto p-3 max-w-3xl mx-auto w-full"
       >
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {messages.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 rounded-full bg-[#FFBE91]/20 flex items-center justify-center mx-auto mb-3">
-                <MessageCircle size={24} className="text-[#FFBE91]" />
+            <div className="text-center py-10">
+              <div className="w-14 h-14 rounded-full bg-[#FFBE91]/20 flex items-center justify-center mx-auto mb-2.5">
+                <MessageCircle size={20} className="text-[#FFBE91]" />
               </div>
               <p className="text-[#4A4A5A] text-sm">No messages yet</p>
               {!isLocked && (
-                <p className="text-xs text-[#A0A0B0] mt-1">Start the conversation!</p>
+                <p className="text-[11px] text-[#A0A0B0] mt-1">Start the conversation!</p>
               )}
               {isLocked && (
-                <p className="text-xs text-amber-600 mt-1">This conversation is locked</p>
+                <p className="text-[11px] text-amber-600 mt-1">This conversation is locked</p>
               )}
             </div>
           ) : (
@@ -310,34 +335,30 @@ const ChatView = () => {
                 const showDate = index === 0 || formatDate(msg.created_at) !== formatDate(messages[index - 1].created_at);
                 const owned = isOwner(msg);
                 
-                // Debug log for each message
-                console.log(`Message ${index}: sender_id=${msg.sender_id}, owned=${owned}`);
-                
                 return (
                   <div key={msg.id}>
                     {showDate && (
-                      <div className="text-center my-3">
-                        <span className="text-[10px] text-[#A0A0B0] bg-white px-3 py-1 rounded-full border border-[#EEECE6] shadow-sm">
+                      <div className="text-center my-2">
+                        <span className="text-[9px] text-[#A0A0B0] bg-white px-2.5 py-0.5 rounded-full border border-[#EEECE6] shadow-sm">
                           {formatDate(msg.created_at)}
                         </span>
                       </div>
                     )}
-                    {/* Messages align to right for owner, left for others */}
-                    <div className={`flex ${owned ? 'justify-end' : 'justify-start'} mb-1`}>
-                      <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                    <div className={`flex ${owned ? 'justify-end' : 'justify-start'} mb-0.5`}>
+                      <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 ${
                         owned 
                           ? 'bg-[#FFBE91] text-[#1A1A2E]' 
                           : 'bg-white border border-[#EEECE6] text-[#1A1A2E] shadow-sm'
                       }`}>
-                        <p className="text-sm break-words">{msg.content}</p>
+                        <p className="text-sm break-words leading-relaxed">{msg.content}</p>
                         <div className={`flex items-center gap-1 mt-0.5 ${owned ? 'justify-end' : 'justify-start'}`}>
-                          <span className="text-[9px] opacity-70">{formatTime(msg.created_at)}</span>
+                          <span className="text-[9px] opacity-60">{formatTime(msg.created_at)}</span>
                           {owned && (
                             <span className="text-[9px]">
                               {msg.is_read ? (
-                                <CheckCircle size={10} className="text-emerald-500" />
+                                <CheckCircle size={8} className="text-emerald-500" />
                               ) : (
-                                <Clock size={10} className="text-[#A0A0B0]" />
+                                <Clock size={8} className="text-[#A0A0B0]" />
                               )}
                             </span>
                           )}
@@ -354,7 +375,7 @@ const ChatView = () => {
       </div>
 
       {/* Input */}
-      <div className={`bg-white border-t border-[#EEECE6] p-4 ${isLocked ? 'opacity-60' : ''}`}>
+      <div className={`bg-white border-t border-[#EEECE6] p-3 ${isLocked ? 'opacity-60' : ''}`}>
         <div className="max-w-3xl mx-auto">
           <form onSubmit={handleSendMessage} className="flex gap-2">
             <input
@@ -364,30 +385,30 @@ const ChatView = () => {
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder={isLocked ? 'Conversation is locked' : 'Type a message...'}
               disabled={isLocked || sending}
-              className="flex-1 px-4 py-2.5 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all disabled:opacity-50"
+              className="flex-1 px-3.5 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all disabled:opacity-50"
               maxLength={2000}
             />
             <Button
               type="submit"
               disabled={!newMessage.trim() || isLocked || sending}
-              className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white px-4 py-2.5 h-auto flex items-center gap-1.5 disabled:opacity-50"
+              className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white px-3.5 py-2 h-auto flex items-center gap-1.5 disabled:opacity-50 text-sm"
             >
               {sending ? (
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
               ) : (
-                <Send size={18} />
+                <Send size={16} />
               )}
             </Button>
           </form>
-          <p className="text-[9px] text-[#A0A0B0] mt-1.5 text-center flex items-center justify-center gap-1">
+          <p className="text-[8px] text-[#A0A0B0] mt-1 text-center flex items-center justify-center gap-1">
             {isLocked ? (
               <>
-                <LockIcon size={10} className="text-amber-500" />
+                <LockIcon size={8} className="text-amber-500" />
                 This conversation is locked. It will unlock when you start a new transaction.
               </>
             ) : (
               <>
-                <UnlockIcon size={10} className="text-emerald-500" />
+                <UnlockIcon size={8} className="text-emerald-500" />
                 Messages are private between you and {otherParty.name}
               </>
             )}
