@@ -566,7 +566,7 @@ const MyPurchases = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button 
-              onClick={() => navigate('/buyer/dashboard')}
+              onClick={() => navigate('/buyer/requests')}
               variant="outline"
               className="border-[#FFDDB0] text-[#1A1A2E] hover:bg-[#FFDDB0]/30 text-sm px-4 py-2"
             >

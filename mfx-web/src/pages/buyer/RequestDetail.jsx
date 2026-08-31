@@ -339,7 +339,7 @@ const RequestDetail = () => {
           <div className="flex items-center gap-3">
             <Button 
               variant="ghost" 
-              onClick={() => navigate('/buyer/dashboard')}
+              onClick={() => navigate('/buyer/requests')}
               className="text-[#4A4A5A] hover:text-[#FFBE91] hover:bg-[#FFBE91]/10"
             >
               <ArrowLeft size={18} className="mr-2" />

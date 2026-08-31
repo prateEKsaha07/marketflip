@@ -199,7 +199,7 @@ const EditRequest = () => {
           <p className="text-rose-600 mt-2">{error}</p>
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }} className="mt-4">
             <Button 
-              onClick={() => navigate('/buyer/dashboard')}
+              onClick={() => navigate('/buyer/requests')}
               className="bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E]"
             >
               <ArrowLeft size={16} className="mr-2" />

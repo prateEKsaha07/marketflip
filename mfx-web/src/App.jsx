@@ -30,11 +30,17 @@ import ChatList from './pages/chat/ChatList';
 import ChatView from './pages/chat/ChatView';
 import BuyerMyBids from './pages/buyer/MyBids';
 
-// ====== NEW: Phase 5b Auction Imports ======
+// ====== Phase 5b Auction Imports ======
 import FinalizedAuctions from './pages/shop/FinalizedAuctions';
 import ShopAuctionHistory from './pages/shop/AuctionHistory';
 import MyWonAuctions from './pages/buyer/MyWonAuctions';
 import BuyerAuctionHistory from './pages/buyer/AuctionHistory';
+
+// ====== Phase 5c Request Imports ======
+import BuyerRequestDashboard from './pages/buyer/RequestDashboard';
+import MyOpenRequests from './pages/buyer/MyOpenRequests';
+import ShopRequestDashboard from './pages/shop/RequestDashboard';
+import FinalizedBids from './pages/shop/FinalizedBids';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -75,7 +81,7 @@ const AnimatedRoutes = () => {
           </PageTransition>
         } />
         
-        {/* Buyer Routes */}
+        {/* ====== Buyer Routes ====== */}
         <Route path="/buyer/dashboard" element={
           <PageTransition>
             <ProtectedRoute requiredRole="buyer">
@@ -133,7 +139,7 @@ const AnimatedRoutes = () => {
           </PageTransition>
         } />
         
-        {/* ====== NEW: Buyer Auction Phase 5b Routes ====== */}
+        {/* ====== Buyer Auction Phase 5b Routes ====== */}
         <Route path="/buyer/my-won-auctions" element={
           <PageTransition>
             <ProtectedRoute requiredRole="buyer">
@@ -149,7 +155,30 @@ const AnimatedRoutes = () => {
           </PageTransition>
         } />
         
-        {/* Shop Routes */}
+        {/* ====== Buyer Request Phase 5c Routes ====== */}
+        <Route path="/buyer/requests" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <BuyerRequestDashboard />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/buyer/my-open-requests" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <MyOpenRequests />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/buyer/my-bids" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <BuyerMyBids />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        
+        {/* ====== Shop Routes ====== */}
         <Route path="/shop/dashboard" element={
           <PageTransition>
             <ProtectedRoute requiredRole="shop_owner">
@@ -214,7 +243,7 @@ const AnimatedRoutes = () => {
           </PageTransition>
         } />
         
-        {/* ====== NEW: Shop Auction Phase 5b Routes ====== */}
+        {/* ====== Shop Auction Phase 5b Routes ====== */}
         <Route path="/shop/finalized-auctions" element={
           <PageTransition>
             <ProtectedRoute requiredRole="shop_owner">
@@ -230,7 +259,23 @@ const AnimatedRoutes = () => {
           </PageTransition>
         } />
 
-        {/* Profile Routes */}
+        {/* ====== Shop Request Phase 5c Routes ====== */}
+        <Route path="/shop/requests" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="shop_owner">
+              <ShopRequestDashboard />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/shop/finalized-bids" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="shop_owner">
+              <FinalizedBids />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+
+        {/* ====== Profile Routes ====== */}
         <Route path="/buyer/profile" element={
           <PageTransition>
             <ProtectedRoute requiredRole="buyer">
@@ -261,7 +306,7 @@ const AnimatedRoutes = () => {
           </PageTransition>
         } />
 
-        {/* Transaction History */}
+        {/* ====== Transaction History ====== */}
         <Route path="/buyer/history" element={
           <PageTransition>
             <ProtectedRoute requiredRole="buyer">
@@ -278,7 +323,7 @@ const AnimatedRoutes = () => {
           </PageTransition>
         } />
 
-        {/* Chat Routes */}
+        {/* ====== Chat Routes ====== */}
         <Route path="/buyer/chat" element={
           <PageTransition>
             <ProtectedRoute requiredRole="buyer">
@@ -307,13 +352,7 @@ const AnimatedRoutes = () => {
             </ProtectedRoute>
           </PageTransition>
         } />
-        <Route path="/buyer/my-bids" element={
-          <PageTransition>
-            <ProtectedRoute requiredRole="buyer">
-              <BuyerMyBids />
-            </ProtectedRoute>
-          </PageTransition>
-        } />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>

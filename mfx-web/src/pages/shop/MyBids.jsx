@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -21,19 +21,39 @@ import {
   AlertCircle,
   Pencil,
   Save,
-  Loader2
+  Loader2,
+  FileCheck,
+  History,
+  Award,
+  List
 } from 'lucide-react';
 import api from '../../api/client';
 
 const MyBids = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [bids, setBids] = useState([]);
+  const [allBids, setAllBids] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(null);
   const [editData, setEditData] = useState({ price: '', note: '' });
   const [updating, setUpdating] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  // Filter bids based on selected status
+  const filteredBids = useMemo(() => {
+    if (statusFilter === 'all') {
+      return allBids;
+    } else if (statusFilter === 'selected') {
+      return allBids.filter(bid => bid.status === 'selected' && bid.requests?.status !== 'completed');
+    } else if (statusFilter === 'rejected') {
+      return allBids.filter(bid => bid.status === 'rejected');
+    } else if (statusFilter === 'completed') {
+      // A bid is "completed" when the associated request is completed
+      return allBids.filter(bid => bid.requests?.status === 'completed');
+    }
+    return allBids;
+  }, [allBids, statusFilter]);
 
   useEffect(() => {
     fetchMyBids();
@@ -48,20 +68,31 @@ const MyBids = () => {
       
       let bidsData = response.data;
       if (Array.isArray(bidsData)) {
-        setBids(bidsData);
+        // Log each bid to see the structure
+        bidsData.forEach((bid, index) => {
+          console.log(`Bid ${index}:`, {
+            id: bid.id,
+            status: bid.status,
+            'requests?.status': bid.requests?.status,
+            'request?.status': bid.request?.status,
+            requests: bid.requests,
+            request: bid.request
+          });
+        });
+        setAllBids(bidsData);
       } else if (bidsData && typeof bidsData === 'object') {
         if (bidsData.data && Array.isArray(bidsData.data)) {
-          setBids(bidsData.data);
+          setAllBids(bidsData.data);
         } else {
-          setBids([]);
+          setAllBids([]);
         }
       } else {
-        setBids([]);
+        setAllBids([]);
       }
     } catch (err) {
       console.error('Fetch bids error:', err);
       setError('Failed to fetch your bids: ' + (err.response?.data?.detail || err.message));
-      setBids([]);
+      setAllBids([]);
     } finally {
       setLoading(false);
     }
@@ -147,6 +178,15 @@ const MyBids = () => {
           label: 'Rejected',
           borderLeft: 'border-l-rose-500'
         };
+      case 'completed': 
+        return { 
+          color: '#7C3AED', 
+          bg: 'bg-violet-500/10', 
+          text: 'text-violet-600', 
+          icon: <Award size={12} />, 
+          label: 'Completed',
+          borderLeft: 'border-l-violet-500'
+        };
       default: 
         return { 
           color: '#6c757d', 
@@ -159,7 +199,16 @@ const MyBids = () => {
     }
   };
 
-  // Navigate to bid detail page
+  // Get the actual status for display (bid status vs request status)
+  const getDisplayStatus = (bid) => {
+    // Check both possible property names
+    const requestStatus = bid.requests?.status || bid.request?.status;
+    if (bid.status === 'selected' && requestStatus === 'completed') {
+      return 'completed';
+    }
+    return bid.status;
+  };
+
   const goToBidDetail = (bidId) => {
     console.log('=== goToBidDetail called ===');
     console.log('Bid ID:', bidId);
@@ -174,14 +223,12 @@ const MyBids = () => {
     navigate(url);
   };
 
-  // Handle card click
   const handleCardClick = (bid) => {
     console.log('=== Card clicked ===');
     console.log('Bid:', bid);
     console.log('Bid status:', bid.status);
     console.log('Bid ID:', bid.id);
     
-    // Navigate for all bids (selected, pending, rejected)
     goToBidDetail(bid.id);
   };
 
@@ -211,6 +258,27 @@ const MyBids = () => {
     return null;
   };
 
+  // Counts for filter tabs
+  const counts = {
+    all: allBids.length,
+    selected: allBids.filter(b => {
+      const reqStatus = b.requests?.status || b.request?.status;
+      return b.status === 'selected' && reqStatus !== 'completed';
+    }).length,
+    rejected: allBids.filter(b => b.status === 'rejected').length,
+    completed: allBids.filter(b => {
+      const reqStatus = b.requests?.status || b.request?.status;
+      return reqStatus === 'completed';
+    }).length,
+  };
+
+  const statusTabs = [
+    { id: 'all', label: 'All', count: counts.all, icon: <List size={13} /> },
+    { id: 'selected', label: 'Selected', count: counts.selected, icon: <CheckCircle size={13} /> },
+    { id: 'rejected', label: 'Rejected', count: counts.rejected, icon: <XCircle size={13} /> },
+    { id: 'completed', label: 'Completed', count: counts.completed, icon: <Award size={13} /> },
+  ];
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { 
@@ -226,6 +294,11 @@ const MyBids = () => {
       y: 0,
       transition: { duration: 0.3, ease: "easeOut" }
     }
+  };
+
+  const tabVariants = {
+    inactive: { opacity: 0.6, scale: 0.95 },
+    active: { opacity: 1, scale: 1 }
   };
 
   if (loading) {
@@ -256,9 +329,19 @@ const MyBids = () => {
               </span>
               My Bids
             </h1>
-            <p className="text-xs text-[#A0A0B0] mt-0.5">{bids.length} bids placed</p>
+            <p className="text-xs text-[#A0A0B0] mt-0.5">
+              {counts.all} total · {counts.selected} selected · {counts.rejected} rejected · {counts.completed} completed
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button 
+              onClick={() => navigate('/shop/finalized-bids')}
+              variant="outline"
+              className="border-[#FFDDB0] text-[#1A1A2E] hover:bg-[#FFDDB0]/30 text-xs px-3.5 py-1.5 h-auto"
+            >
+              <FileCheck size={13} className="mr-1.5" />
+              Finalized Bids
+            </Button>
             <Button 
               onClick={() => navigate('/shop/browse')}
               className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-3.5 py-1.5 shadow-sm hover:shadow transition-all h-auto"
@@ -267,12 +350,12 @@ const MyBids = () => {
               Browse
             </Button>
             <Button 
-              onClick={() => navigate('/shop/dashboard')}
+              onClick={() => navigate('/shop/requests')}
               variant="ghost"
               className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3.5 py-1.5 h-auto"
             >
               <ArrowLeft size={13} className="mr-1.5" />
-              Dashboard
+              Request Hub
             </Button>
           </div>
         </motion.div>
@@ -283,26 +366,76 @@ const MyBids = () => {
             {error}
           </div>
         )}
+
+        {/* Status Filter Tabs */}
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex flex-wrap gap-1 mb-4 bg-white/60 backdrop-blur-sm p-1 rounded-xl border border-[#EEECE6]"
+        >
+          {statusTabs.map((tab) => (
+            <motion.button
+              key={tab.id}
+              variants={tabVariants}
+              animate={statusFilter === tab.id ? 'active' : 'inactive'}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setStatusFilter(tab.id)}
+              className={`
+                flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all text-xs font-medium
+                ${statusFilter === tab.id 
+                  ? 'bg-[#FFBE91] text-[#1A1A2E] shadow-md' 
+                  : 'text-[#4A4A5A] hover:text-[#1A1A2E] hover:bg-[#FFDDB0]/30'
+                }
+              `}
+            >
+              {tab.icon}
+              {tab.label}
+              <span className={`
+                ml-1 px-1.5 py-0.5 rounded-full text-[9px]
+                ${statusFilter === tab.id 
+                  ? 'bg-[#1A1A2E]/10 text-[#1A1A2E]' 
+                  : 'bg-[#FFDDB0]/30 text-[#4A4A5A]'
+                }
+              `}>
+                {tab.count}
+              </span>
+            </motion.button>
+          ))}
+        </motion.div>
         
         {/* Bids List */}
-        {bids.length === 0 ? (
+        {filteredBids.length === 0 ? (
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white/60 backdrop-blur-xl rounded-xl p-8 text-center shadow-lg shadow-[#1A1A2E]/5"
           >
             <div className="w-12 h-12 rounded-xl bg-[#F5F3EF] flex items-center justify-center mx-auto mb-3">
-              <Package size={20} className="text-[#A0A0B0]" />
+              {statusFilter === 'all' && <List size={20} className="text-[#A0A0B0]" />}
+              {statusFilter === 'selected' && <CheckCircle size={20} className="text-[#A0A0B0]" />}
+              {statusFilter === 'rejected' && <XCircle size={20} className="text-[#A0A0B0]" />}
+              {statusFilter === 'completed' && <Award size={20} className="text-[#A0A0B0]" />}
             </div>
-            <h3 className="text-sm font-medium text-[#1A1A2E]">No bids yet</h3>
-            <p className="text-xs text-[#A0A0B0] mt-1">Start bidding on requests to see them here</p>
-            <Button 
-              onClick={() => navigate('/shop/browse')}
-              className="mt-3 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-5 py-1.5 h-auto"
-            >
-              <Search size={13} className="mr-1.5" />
-              Browse Requests
-            </Button>
+            <h3 className="text-sm font-medium text-[#1A1A2E]">
+              {statusFilter === 'all' && 'No bids placed yet'}
+              {statusFilter === 'selected' && 'No selected bids'}
+              {statusFilter === 'rejected' && 'No rejected bids'}
+              {statusFilter === 'completed' && 'No completed bids'}
+            </h3>
+            <p className="text-xs text-[#A0A0B0] mt-1">
+              {statusFilter === 'all' ? 'Start bidding on requests to see them here' : 'Try checking other tabs'}
+            </p>
+            {statusFilter === 'all' && (
+              <Button 
+                onClick={() => navigate('/shop/browse')}
+                className="mt-3 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-5 py-1.5 h-auto"
+              >
+                <Search size={13} className="mr-1.5" />
+                Browse Requests
+              </Button>
+            )}
           </motion.div>
         ) : (
           <motion.div 
@@ -311,11 +444,14 @@ const MyBids = () => {
             animate="visible"
             className="space-y-3"
           >
-            {bids.map((bid) => {
-              const status = getStatusConfig(bid.status);
+            {filteredBids.map((bid) => {
+              const displayStatus = getDisplayStatus(bid);
+              const status = getStatusConfig(displayStatus);
               const isEditing = editing === bid.id;
-              const isSelected = bid.status === 'selected';
+              const isSelected = bid.status === 'selected' && (bid.requests?.status || bid.request?.status) !== 'completed';
               const isPending = bid.status === 'pending';
+              const isCompleted = (bid.requests?.status || bid.request?.status) === 'completed';
+              const isRejected = bid.status === 'rejected';
               const itemName = getItemName(bid);
               const requestId = getRequestId(bid);
               
@@ -332,11 +468,9 @@ const MyBids = () => {
                   `}
                   onClick={() => handleCardClick(bid)}
                 >
-                  {/* Subtle Glow */}
                   <div className={`absolute inset-0 ${status.bg} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-xl`} />
 
                   {isEditing ? (
-                    // Edit Mode
                     <div className="relative z-10" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center">
@@ -388,7 +522,6 @@ const MyBids = () => {
                       </div>
                     </div>
                   ) : (
-                    // View Mode
                     <div className="relative z-10">
                       <div className="flex flex-wrap justify-between items-start gap-2">
                         <div className="flex-1 min-w-0">
@@ -403,6 +536,18 @@ const MyBids = () => {
                               {status.icon}
                               {status.label}
                             </span>
+                            {isPending && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">
+                                <Clock size={10} />
+                                Pending
+                              </span>
+                            )}
+                            {isCompleted && (bid.requests?.completed_via_override || bid.request?.completed_via_override) && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">
+                                <AlertCircle size={10} />
+                                Override
+                              </span>
+                            )}
                           </div>
                           <div className="flex flex-wrap items-center gap-3 text-xs text-[#A0A0B0]">
                             <span className="flex items-center gap-1 font-medium text-[#1A1A2E]">
@@ -426,6 +571,12 @@ const MyBids = () => {
                               Request #{requestId.slice(0, 8)}...
                             </p>
                           )}
+                          {isCompleted && (bid.requests?.completed_at || bid.request?.completed_at) && (
+                            <p className="text-[10px] text-violet-600 mt-0.5 flex items-center gap-1">
+                              <CheckCircle size={10} />
+                              Completed on {new Date(bid.requests?.completed_at || bid.request?.completed_at).toLocaleDateString()}
+                            </p>
+                          )}
                         </div>
                         
                         <div className="flex items-center gap-1 flex-shrink-0">
@@ -447,13 +598,20 @@ const MyBids = () => {
                               </button>
                             </>
                           )}
-                          {isSelected && (
+                          {(isSelected || isCompleted || isRejected) && (
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 console.log('View Details button clicked for bid:', bid.id);
                                 goToBidDetail(bid.id);
                               }}
-                              className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-700 rounded-lg text-[10px] font-medium transition-all hover:bg-emerald-500/20"
+                              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-medium transition-all ${
+                                isSelected 
+                                  ? 'bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20'
+                                  : isCompleted
+                                  ? 'bg-violet-500/10 text-violet-700 hover:bg-violet-500/20'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
                             >
                               <Eye size={12} />
                               View Details
@@ -463,13 +621,39 @@ const MyBids = () => {
                         </div>
                       </div>
 
-                      {/* Progress indicator for pending */}
                       {isPending && (
                         <div className="mt-2 flex items-center gap-2">
                           <div className="flex-1 h-0.5 bg-[#F5F3EF] rounded-full overflow-hidden">
                             <div className="h-full w-1/3 bg-amber-400 rounded-full animate-pulse" />
                           </div>
-                          <span className="text-[9px] text-[#A0A0B0]">Awaiting</span>
+                          <span className="text-[9px] text-[#A0A0B0]">Awaiting response</span>
+                        </div>
+                      )}
+
+                      {isSelected && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="flex-1 h-0.5 bg-[#F5F3EF] rounded-full overflow-hidden">
+                            <div className="h-full w-1/2 bg-emerald-400 rounded-full" />
+                          </div>
+                          <span className="text-[9px] text-emerald-600">Awaiting delivery</span>
+                        </div>
+                      )}
+
+                      {isCompleted && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="flex-1 h-0.5 bg-violet-200 rounded-full overflow-hidden">
+                            <div className="h-full w-full bg-violet-400 rounded-full" />
+                          </div>
+                          <span className="text-[9px] text-violet-600">Completed</span>
+                        </div>
+                      )}
+
+                      {isRejected && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="flex-1 h-0.5 bg-rose-200 rounded-full overflow-hidden">
+                            <div className="h-full w-full bg-rose-400 rounded-full" />
+                          </div>
+                          <span className="text-[9px] text-rose-600">Rejected</span>
                         </div>
                       )}
                     </div>

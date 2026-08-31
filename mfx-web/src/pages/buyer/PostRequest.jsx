@@ -216,7 +216,7 @@ const PostRequest = () => {
             <motion.button
               whileHover={{ x: -3 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/buyer/dashboard')}
+              onClick={() => navigate('/buyer/requests')}
               className="p-2 rounded-xl hover:bg-[#FFBE91]/10 text-[#4A4A5A] hover:text-[#FFBE91] transition-all"
             >
               <ArrowLeft size={18} />

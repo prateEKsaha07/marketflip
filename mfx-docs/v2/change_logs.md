@@ -173,6 +173,28 @@ changes:
 - Fixed active transaction duplicate key errors
 
 
+
+**Date:** September 1, 2026
+
+**Changes:**
+- `buyer/RequestDashboard.jsx` created - 4-card hub page (Post Request, My Open Requests, Finalized Requests, Request History)
+- `buyer/MyOpenRequests.jsx` created - shows only `status='open'` requests
+- `buyer/MyBids.jsx` created - shows auctions buyer has bid on
+- `shop/RequestDashboard.jsx` created - 4-card hub page (Browse Requests, My Bids, Finalized Bids, Bid History)
+- `shop/FinalizedBids.jsx` created - selected/rejected bids list, links to existing `BidDetail.jsx`
+- `shop/MyBids.jsx` modified - split to show pending bids only with tabs (All, Selected, Rejected, Completed)
+- `shop/BrowseRequests.jsx` modified - back button navigation changed to Request Hub
+- `shop/BidDetail.jsx` modified - added Completed section, back button conditional navigation
+- `buyer/Dashboard.jsx` modified - added Request Hub button, removed KPIs
+- `shop/Dashboard.jsx` modified - added Request Hub button, removed KPIs
+- `buyer/RequestDashboard.jsx` modified - added 4 KPI cards (Total Requests, Open Requests, Finalized, Total Bids)
+- `shop/RequestDashboard.jsx` modified - added 4 KPI cards (Total Bids, Pending, Selected, Completed)
+- `pages/profile/Profile.jsx` modified - removed KPIs, professional redesign
+- `pages/profile/ProfileFormPage.jsx` modified - professional redesign with sections
+- `App.jsx` modified - added routes: `/buyer/requests`, `/buyer/my-open-requests`, `/buyer/my-bids`, `/shop/requests`, `/shop/finalized-bids`
+- Zero backend changes - all existing endpoints and business logic remain unchanged
+
+
 ## License
 
 Copyright © 2026 Prateek Saha

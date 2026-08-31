@@ -30,7 +30,8 @@ import {
   ThumbsDown,
   Image as ImageIcon,
   PartyPopper,
-  Shield 
+  Shield,
+  ShieldCheck
 } from 'lucide-react';
 import api from '../../api/client';
 import { confirmDelivery, denyDelivery } from '../../api/client';
@@ -50,7 +51,7 @@ const BidDetail = () => {
   const [successSubtext, setSuccessSubtext] = useState('');
   const [deliveryResolved, setDeliveryResolved] = useState(false);
   
-  // ====== OTP Verification States ======
+  // OTP Verification States
   const [otpCode, setOtpCode] = useState('');
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [otpError, setOtpError] = useState('');
@@ -167,7 +168,6 @@ const BidDetail = () => {
     }
   };
 
-  // ====== OTP Verification Handlers ======
   const handleVerifyOtp = async () => {
     if (!otpCode || otpCode.length !== 4) {
       setOtpError('Please enter a valid 4-digit code');
@@ -185,7 +185,7 @@ const BidDetail = () => {
       if (response.data.status === 'completed') {
         setOtpSuccess(true);
         showSuccess(
-          'Transaction Verified! 🎉',
+          'Transaction Verified!',
           'The transaction has been successfully completed.'
         );
         setTimeout(() => {
@@ -259,7 +259,7 @@ const BidDetail = () => {
           <h2 className="text-lg font-semibold text-rose-700">Error</h2>
           <p className="text-sm text-rose-600 mt-1">{error}</p>
           <Button 
-            onClick={() => navigate('/shop/dashboard')}
+            onClick={() => navigate('/shop/requests')}
             className="mt-4 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-sm px-5 py-1.5 h-auto"
           >
             <ArrowLeft size={14} className="mr-1.5" />
@@ -276,6 +276,8 @@ const BidDetail = () => {
   const bidStatus = getStatusConfig(bid.status);
   const requestStatus = getStatusConfig(request.status);
   const isBidSelected = bid.status === 'selected';
+  const isCompleted = request.status === 'completed';
+  const isOverridden = request.completed_via_override === true;
 
   const needsDeliveryConfirmation = 
     isBidSelected && 
@@ -283,7 +285,6 @@ const BidDetail = () => {
     request.delivery_method === 'home_delivery' &&
     !deliveryResolved;
 
-  // ====== FIXED: Check if OTP verification is needed (works for both home delivery AND pickup) ======
   const showOtpVerification = 
     isBidSelected && 
     request.status === 'purchased' && 
@@ -342,21 +343,41 @@ const BidDetail = () => {
         >
           <div className="flex items-center gap-3">
             <Button 
-              onClick={() => navigate('/shop/my-bids')}
+              onClick={() => {
+                if (isCompleted) {
+                  navigate('/shop/finalized-bids');
+                } else {
+                  navigate('/shop/my-bids');
+                }
+              }}
               variant="ghost"
               className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
             >
               <ArrowLeft size={14} className="mr-1.5" />
-              My Bids
+              {isCompleted ? 'Finalized Bids' : 'My Bids'}
             </Button>
             <h1 className="text-lg font-semibold text-[#1A1A2E] tracking-tight">Bid Details</h1>
           </div>
-          {isBidSelected && (
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-200">
-              <Sparkles size={12} className="text-emerald-600" />
-              <span className="text-[10px] font-medium text-emerald-600">Selected</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {isBidSelected && !isCompleted && (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-200">
+                <Sparkles size={12} className="text-emerald-600" />
+                <span className="text-[10px] font-medium text-emerald-600">Selected</span>
+              </div>
+            )}
+            {isCompleted && (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-violet-500/10 rounded-full border border-violet-200">
+                <CheckCircle size={12} className="text-violet-600" />
+                <span className="text-[10px] font-medium text-violet-600">Completed</span>
+              </div>
+            )}
+            {isOverridden && (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 rounded-full border border-amber-200">
+                <ShieldCheck size={12} className="text-amber-600" />
+                <span className="text-[10px] font-medium text-amber-600">Override</span>
+              </div>
+            )}
+          </div>
         </motion.div>
 
         <motion.div 
@@ -366,7 +387,7 @@ const BidDetail = () => {
           className="space-y-4"
         >
           {/* Success Banner */}
-          {isBidSelected && (
+          {isBidSelected && !isCompleted && (
             <motion.div 
               variants={itemVariants}
               className="relative overflow-hidden bg-gradient-to-r from-emerald-50/80 to-emerald-100/30 backdrop-blur-sm rounded-xl p-4 border border-emerald-200"
@@ -381,6 +402,50 @@ const BidDetail = () => {
                   <p className="text-xs text-emerald-700">Your bid has been selected by the buyer</p>
                 </div>
               </div>
+            </motion.div>
+          )}
+
+          {/* ====== COMPLETED SECTION ====== */}
+          {isCompleted && (
+            <motion.div 
+              variants={itemVariants}
+              className="relative overflow-hidden bg-gradient-to-r from-violet-50/80 to-violet-100/30 backdrop-blur-sm rounded-xl p-4 border border-violet-200"
+            >
+              <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-violet-200/20 blur-2xl" />
+              <div className="flex items-center gap-3 relative z-10">
+                <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle size={20} className="text-violet-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-violet-800">Transaction Completed</h3>
+                  <p className="text-xs text-violet-700">
+                    This transaction has been successfully completed
+                    {isOverridden && ' via buyer override'}
+                  </p>
+                  {request.completed_at && (
+                    <p className="text-[10px] text-violet-600 mt-1">
+                      Completed on {new Date(request.completed_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {isOverridden && (
+                <div className="mt-2 ml-[52px] p-2 bg-amber-50/80 rounded-lg border border-amber-200">
+                  <p className="text-[10px] text-amber-700 flex items-center gap-1.5">
+                    <ShieldCheck size={12} />
+                    Completed via buyer override after max OTP attempts
+                  </p>
+                </div>
+              )}
+              {request.delivery_method && (
+                <div className="mt-2 ml-[52px] p-2 bg-white/50 rounded-lg border border-violet-100">
+                  <p className="text-[10px] text-violet-700 flex items-center gap-1.5">
+                    <Truck size={12} />
+                    Delivery method: {request.delivery_method === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
+                    {request.delivery_address && ` · ${request.delivery_address}`}
+                  </p>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -474,23 +539,25 @@ const BidDetail = () => {
               </div>
             </div>
 
-            {/* Delivery Method */}
+            {/* Delivery Method - Only show if not completed or show as read-only */}
             {request.delivery_method && (
-              <div className="mt-3 p-3 bg-amber-50/50 rounded-lg border border-amber-100">
+              <div className={`mt-3 p-3 rounded-lg border ${isCompleted ? 'bg-violet-50/50 border-violet-100' : 'bg-amber-50/50 border-amber-100'}`}>
                 <div className="flex items-center gap-2 text-xs">
-                  <Truck size={13} className="text-amber-600" />
-                  <span className="font-medium text-amber-700">
+                  <Truck size={13} className={isCompleted ? 'text-violet-600' : 'text-amber-600'} />
+                  <span className={isCompleted ? 'font-medium text-violet-700' : 'font-medium text-amber-700'}>
                     {request.delivery_method === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
                   </span>
                   {request.delivery_address && (
-                    <span className="text-amber-600">· {request.delivery_address}</span>
+                    <span className={isCompleted ? 'text-violet-600' : 'text-amber-600'}>
+                      · {request.delivery_address}
+                    </span>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Delivery Confirmation - Show when needed */}
-            {needsDeliveryConfirmation ? (
+            {/* Delivery Confirmation - Show when needed and not completed */}
+            {!isCompleted && needsDeliveryConfirmation ? (
               <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
                 <p className="text-xs font-medium text-blue-700 mb-2">
                   Buyer requested home delivery — can you deliver?
@@ -535,68 +602,70 @@ const BidDetail = () => {
                 )}
               </div>
             ) : (
-              // Show delivery status - confirmed or denied
-              <>
-                {isBidSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && deliveryStatus === true && (
-                  <div className="mt-3 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100">
-                    <div className="flex items-center gap-2 text-xs text-emerald-700">
-                      <ThumbsUp size={16} className="text-emerald-600" />
-                      <span className="font-medium">Delivery Confirmed</span>
-                    </div>
-                    <p className="text-xs text-emerald-600 mt-1 ml-6">
-                      You confirmed home delivery on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'}. 
-                      The buyer has been notified. Please proceed with the delivery.
-                    </p>
-                    <div className="mt-2 ml-6 p-2 bg-emerald-100/50 rounded-lg border border-emerald-200">
-                      <p className="text-[10px] text-emerald-700 flex items-center gap-1">
-                        <CheckCircle size={12} />
-                        Delivery address: {request.delivery_address || 'Not specified'}
+              // Show delivery status - confirmed or denied (if not completed)
+              !isCompleted && (
+                <>
+                  {isBidSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && deliveryStatus === true && (
+                    <div className="mt-3 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100">
+                      <div className="flex items-center gap-2 text-xs text-emerald-700">
+                        <ThumbsUp size={16} className="text-emerald-600" />
+                        <span className="font-medium">Delivery Confirmed</span>
+                      </div>
+                      <p className="text-xs text-emerald-600 mt-1 ml-6">
+                        You confirmed home delivery on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'}. 
+                        The buyer has been notified. Please proceed with the delivery.
                       </p>
+                      <div className="mt-2 ml-6 p-2 bg-emerald-100/50 rounded-lg border border-emerald-200">
+                        <p className="text-[10px] text-emerald-700 flex items-center gap-1">
+                          <CheckCircle size={12} />
+                          Delivery address: {request.delivery_address || 'Not specified'}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {isBidSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && deliveryStatus === false && (
-                  <div className="mt-3 p-3 bg-rose-50/50 rounded-lg border border-rose-100">
-                    <div className="flex items-center gap-2 text-xs text-rose-700">
-                      <ThumbsDown size={16} className="text-rose-600" />
-                      <span className="font-medium">Delivery Denied</span>
-                    </div>
-                    <p className="text-xs text-rose-600 mt-1 ml-6">
-                      You denied home delivery on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'}. 
-                      Waiting for buyer to choose pickup or cancel the order.
-                    </p>
-                    <div className="mt-2 ml-6 p-2 bg-rose-100/50 rounded-lg border border-rose-200">
-                      <p className="text-[10px] text-rose-700 flex items-center gap-1">
-                        <Clock size={12} />
-                        Awaiting buyer's response...
+                  {isBidSelected && request.status === 'purchased' && request.delivery_method === 'home_delivery' && deliveryStatus === false && (
+                    <div className="mt-3 p-3 bg-rose-50/50 rounded-lg border border-rose-100">
+                      <div className="flex items-center gap-2 text-xs text-rose-700">
+                        <ThumbsDown size={16} className="text-rose-600" />
+                        <span className="font-medium">Delivery Denied</span>
+                      </div>
+                      <p className="text-xs text-rose-600 mt-1 ml-6">
+                        You denied home delivery on {request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'}. 
+                        Waiting for buyer to choose pickup or cancel the order.
                       </p>
+                      <div className="mt-2 ml-6 p-2 bg-rose-100/50 rounded-lg border border-rose-200">
+                        <p className="text-[10px] text-rose-700 flex items-center gap-1">
+                          <Clock size={12} />
+                          Awaiting buyer's response...
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {isBidSelected && request.status === 'purchased' && request.delivery_method === 'pickup' && (
-                  <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
-                    <div className="flex items-center gap-2 text-xs text-blue-700">
-                      <Home size={16} className="text-blue-600" />
-                      <span className="font-medium">Pickup Selected</span>
-                    </div>
-                    <p className="text-xs text-blue-600 mt-1 ml-6">
-                      The buyer has selected pickup. No delivery confirmation needed.
-                    </p>
-                    {request.verification_code && (
-                      <p className="text-[10px] text-violet-600 mt-1 ml-6 flex items-center gap-1">
-                        <CheckCircle size={12} />
-                        OTP code generated. Enter it below to complete the transaction.
+                  {isBidSelected && request.status === 'purchased' && request.delivery_method === 'pickup' && (
+                    <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                      <div className="flex items-center gap-2 text-xs text-blue-700">
+                        <Home size={16} className="text-blue-600" />
+                        <span className="font-medium">Pickup Selected</span>
+                      </div>
+                      <p className="text-xs text-blue-600 mt-1 ml-6">
+                        The buyer has selected pickup. No delivery confirmation needed.
                       </p>
-                    )}
-                  </div>
-                )}
-              </>
+                      {request.verification_code && (
+                        <p className="text-[10px] text-violet-600 mt-1 ml-6 flex items-center gap-1">
+                          <CheckCircle size={12} />
+                          OTP code generated. Enter it below to complete the transaction.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )
             )}
 
-            {/* ====== FIXED: OTP Verification Section (Works for both Home Delivery AND Pickup) ====== */}
-            {showOtpVerification && (
+            {/* OTP Verification Section (if not completed) */}
+            {!isCompleted && showOtpVerification && (
               <div className="mt-4 p-4 bg-violet-50/80 rounded-xl border border-violet-200">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-6 h-6 rounded-lg bg-violet-100 flex items-center justify-center">
@@ -605,7 +674,6 @@ const BidDetail = () => {
                   <h4 className="text-xs font-semibold text-violet-800 uppercase tracking-wider">
                     Complete Transaction
                   </h4>
-                  {/* Delivery method badge */}
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
                     request.delivery_method === 'pickup' 
                       ? 'bg-blue-100 text-blue-700' 
@@ -654,7 +722,6 @@ const BidDetail = () => {
                       </Button>
                     </div>
 
-                    {/* Attempts remaining */}
                     <div className="mt-2 flex items-center gap-2">
                       <span className="text-[10px] text-violet-600">
                         Attempts remaining: {attemptsRemaining}
@@ -666,7 +733,6 @@ const BidDetail = () => {
                       )}
                     </div>
 
-                    {/* Error message */}
                     {otpError && (
                       <motion.p
                         initial={{ opacity: 0, y: -5 }}
@@ -678,7 +744,6 @@ const BidDetail = () => {
                       </motion.p>
                     )}
 
-                    {/* Success message */}
                     {otpSuccess && (
                       <motion.p
                         initial={{ opacity: 0, y: -5 }}
@@ -690,7 +755,6 @@ const BidDetail = () => {
                       </motion.p>
                     )}
 
-                    {/* Max attempts reached warning */}
                     {verificationAttempts >= 5 && !otpSuccess && (
                       <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-200">
                         <p className="text-[10px] text-amber-700 flex items-center gap-1">
@@ -740,7 +804,7 @@ const BidDetail = () => {
                 <p className="text-sm text-[#1A1A2E]">{buyer?.pincode || 'N/A'}</p>
               </div>
             </div>
-            {!isBidSelected && (
+            {!isBidSelected && !isCompleted && (
               <div className="mt-3 p-2 bg-amber-50/50 rounded-lg border border-amber-100">
                 <p className="text-xs text-amber-700 flex items-center gap-1.5">
                   <Clock size={12} />
@@ -756,12 +820,18 @@ const BidDetail = () => {
             className="flex flex-wrap gap-2 pt-2"
           >
             <Button 
-              onClick={() => navigate('/shop/my-bids')}
+              onClick={() => {
+                if (isCompleted) {
+                  navigate('/shop/finalized-bids');
+                } else {
+                  navigate('/shop/my-bids');
+                }
+              }}
               variant="outline"
               className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-4 py-1.5 h-auto"
             >
               <Package size={13} className="mr-1.5" />
-              My Bids
+              {isCompleted ? 'Finalized Bids' : 'My Bids'}
             </Button>
             <Button 
               onClick={() => navigate('/shop/browse')}

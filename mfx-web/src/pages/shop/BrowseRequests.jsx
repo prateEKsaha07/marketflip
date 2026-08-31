@@ -314,12 +314,12 @@ const BrowseRequests = () => {
               )}
             </Button>
             <Button 
-              onClick={() => navigate('/shop/dashboard')}
+              onClick={() => navigate('/shop/requests')}
               variant="ghost"
               className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
             >
               <ArrowLeft size={13} className="mr-1.5" />
-              Dashboard
+              Request Hub
             </Button>
           </div>
         </motion.div>

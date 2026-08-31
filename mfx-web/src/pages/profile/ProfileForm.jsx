@@ -26,7 +26,11 @@ import {
   Home,
   ChevronDown,
   ChevronUp,
-  Lock
+  Lock,
+  Mail,
+  Shield,
+  Award,
+  TrendingUp
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -61,7 +65,6 @@ const ProfileFormPage = () => {
     },
     years_in_business: '',
     gst_number: '',
-    // NEW buyer fields
     identity_number: '',
     identity_type: '',
     delivery_address: '',
@@ -129,7 +132,6 @@ const ProfileFormPage = () => {
         },
         years_in_business: data.years_in_business || '',
         gst_number: data.gst_number || '',
-        // NEW buyer fields
         identity_number: data.identity_number || '',
         identity_type: data.identity_type || '',
         delivery_address: data.delivery_address || '',
@@ -264,7 +266,6 @@ const ProfileFormPage = () => {
     }
     
     try {
-      // STEP 1: Upload photo if there's a file and it's not uploaded yet
       let finalPhotoUrl = formData.profile_photo_url || '';
       
       if (photoFile && !photoUploaded) {
@@ -281,7 +282,6 @@ const ProfileFormPage = () => {
         console.log('Photo already uploaded, using existing URL:', finalPhotoUrl);
       }
       
-      // STEP 2: Prepare data with the final photo URL
       const submitData = {
         full_name: formData.full_name,
         bio: formData.bio || '',
@@ -298,7 +298,6 @@ const ProfileFormPage = () => {
         gst_number: formData.gst_number || '',
       };
 
-      // Add buyer fields only if not a shop owner
       if (!isShopOwner) {
         submitData.identity_number = formData.identity_number || '';
         submitData.identity_type = formData.identity_type || '';
@@ -306,23 +305,19 @@ const ProfileFormPage = () => {
         submitData.budget_range_preference = formData.budget_range_preference || null;
       }
       
-      // If date_of_birth is empty, set to null
       if (submitData.date_of_birth === '') {
         submitData.date_of_birth = null;
       }
       
-      // If gender is empty, set to null
       if (submitData.gender === '') {
         submitData.gender = null;
       }
       
       console.log('Submitting profile data:', submitData);
       
-      // STEP 3: Save profile
       await api.patch(`/auth/profiles/${user?.user_id}`, submitData);
       setSuccess('Profile updated successfully!');
       
-      // STEP 4: Navigate back
       setTimeout(() => {
         navigate(isShopOwner ? '/shop/profile' : '/buyer/profile');
       }, 1500);
@@ -390,17 +385,17 @@ const ProfileFormPage = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="bg-white/80 backdrop-blur-xl rounded-2xl border border-[#EEECE6] shadow-sm overflow-hidden"
+          className="bg-white/80 backdrop-blur-xl rounded-xl border border-[#EEECE6] shadow-sm overflow-hidden"
         >
           <div className="h-1 bg-gradient-to-r from-[#FFBE91] via-[#FFDDB0] to-[#CFEBFF]" />
           
-          <div className="p-6 md:p-8">
+          <div className="p-6">
             {/* Success/Error Messages */}
             {success && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3"
+                className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-3"
               >
                 <CheckCircle size={16} className="text-emerald-600" />
                 <p className="text-sm text-emerald-700">{success}</p>
@@ -411,14 +406,14 @@ const ProfileFormPage = () => {
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-3"
+                className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-3"
               >
                 <AlertCircle size={16} className="text-rose-600" />
                 <p className="text-sm text-rose-700">{error}</p>
               </motion.div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-6">
               {/* Profile Photo */}
               <div>
                 <label className="block text-xs font-semibold text-[#1A1A2E] mb-2">
@@ -495,167 +490,182 @@ const ProfileFormPage = () => {
               </div>
 
               {/* Basic Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
-                    Full Name <span className="text-rose-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="full_name"
-                    value={formData.full_name}
-                    onChange={handleChange}
-                    placeholder="John Doe"
-                    className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
-                    required
-                  />
-                </div>
-                
-                {isShopOwner && (
+              <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
+                <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
+                  <User size={14} className="text-[#FFBE91]" />
+                  Basic Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
-                      Shop Name <span className="text-rose-400">*</span>
+                    <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                      Full Name <span className="text-rose-400">*</span>
                     </label>
                     <input
                       type="text"
-                      name="shop_name"
-                      value={formData.shop_name}
+                      name="full_name"
+                      value={formData.full_name}
                       onChange={handleChange}
-                      placeholder="Tech Store"
-                      className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                      placeholder="John Doe"
+                      className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
                       required
                     />
                   </div>
-                )}
-              </div>
+                  
+                  {isShopOwner && (
+                    <div>
+                      <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                        Shop Name <span className="text-rose-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="shop_name"
+                        value={formData.shop_name}
+                        onChange={handleChange}
+                        placeholder="Tech Store"
+                        className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                        required
+                      />
+                    </div>
+                  )}
+                </div>
 
-              {/* Bio - Auto-resizing textarea */}
-              <div>
-                <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
-                  Bio
-                </label>
-                <textarea
-                  ref={bioTextareaRef}
-                  name="bio"
-                  value={formData.bio}
-                  onChange={handleChange}
-                  placeholder={isShopOwner ? 'Tell buyers about your shop...' : 'Tell shops about yourself...'}
-                  rows={1}
-                  className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all resize-none overflow-hidden"
-                  style={{ minHeight: '60px' }}
-                />
+                <div className="mt-4">
+                  <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                    Bio
+                  </label>
+                  <textarea
+                    ref={bioTextareaRef}
+                    name="bio"
+                    value={formData.bio}
+                    onChange={handleChange}
+                    placeholder={isShopOwner ? 'Tell buyers about your shop...' : 'Tell shops about yourself...'}
+                    rows={1}
+                    className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all resize-none overflow-hidden"
+                    style={{ minHeight: '60px' }}
+                  />
+                </div>
               </div>
 
               {/* Contact Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
-                    Phone <span className="text-rose-400">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    placeholder="9876543210"
-                    className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
-                    required
-                  />
+              <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
+                <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
+                  <Phone size={14} className="text-[#FFBE91]" />
+                  Contact & Location
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                      Phone <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      placeholder="9876543210"
+                      className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                      Pincode
+                    </label>
+                    <input
+                      type="text"
+                      name="pincode"
+                      value={formData.pincode}
+                      onChange={handleChange}
+                      placeholder="110001"
+                      maxLength="6"
+                      className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
-                    Pincode
+                <div className="mt-4">
+                  <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                    Address
                   </label>
                   <input
                     type="text"
-                    name="pincode"
-                    value={formData.pincode}
+                    name="address"
+                    value={formData.address}
                     onChange={handleChange}
-                    placeholder="110001"
-                    maxLength="6"
-                    className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                    placeholder="123 Main Street, City"
+                    className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
                   />
                 </div>
-              </div>
-
-              {/* Address */}
-              <div>
-                <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
-                  Address
-                </label>
-                <input
-                  type="text"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  placeholder="123 Main Street, City"
-                  className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
-                />
               </div>
 
               {/* Buyer Specific */}
               {!isShopOwner && (
                 <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
-                        Date of Birth
-                      </label>
-                      <input
-                        type="date"
-                        name="date_of_birth"
-                        value={formData.date_of_birth}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
-                        Gender
-                      </label>
-                      <select
-                        name="gender"
-                        value={formData.gender}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all appearance-none"
-                      >
-                        <option value="">Select</option>
-                        {genderOptions.map(g => (
-                          <option key={g} value={g}>{g.replace('_', ' ').toUpperCase()}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-[#1A1A2E] mb-2">
-                      Preferred Categories
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {categories.map(cat => (
-                        <button
-                          type="button"
-                          key={cat}
-                          onClick={() => handlePreferredCategoriesChange(cat)}
-                          className={`px-3 py-1.5 text-xs rounded-full border-2 transition-all ${
-                            (formData.preferred_categories || []).includes(cat)
-                              ? 'border-[#FFBE91] bg-[#FFBE91]/10 text-[#1A1A2E]'
-                              : 'border-[#EEECE6] bg-white/50 text-[#A0A0B0] hover:border-[#FFDDB0]'
-                          }`}
-                        >
-                          {cat.replace('_', ' ').toUpperCase()}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-[#A0A0B0] mt-1">
-                      Select categories you're interested in
-                    </p>
-                  </div>
-
-                  {/* ====== NEW BUYER FIELDS: Identity & Trust ====== */}
-                  <div className="border-t border-[#EEECE6] pt-4 mt-4">
+                  <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
                     <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
-                      <FileText size={14} className="text-[#FFBE91]" />
+                      <Calendar size={14} className="text-[#FFBE91]" />
+                      Personal Details
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                          Date of Birth
+                        </label>
+                        <input
+                          type="date"
+                          name="date_of_birth"
+                          value={formData.date_of_birth}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                          Gender
+                        </label>
+                        <select
+                          name="gender"
+                          value={formData.gender}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all appearance-none"
+                        >
+                          <option value="">Select</option>
+                          {genderOptions.map(g => (
+                            <option key={g} value={g}>{g.replace('_', ' ').toUpperCase()}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-xs font-medium text-[#A0A0B0] mb-2">
+                        Preferred Categories
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {categories.map(cat => (
+                          <button
+                            type="button"
+                            key={cat}
+                            onClick={() => handlePreferredCategoriesChange(cat)}
+                            className={`px-3 py-1.5 text-xs rounded-full border-2 transition-all ${
+                              (formData.preferred_categories || []).includes(cat)
+                                ? 'border-[#FFBE91] bg-[#FFBE91]/10 text-[#1A1A2E]'
+                                : 'border-[#EEECE6] bg-white/50 text-[#A0A0B0] hover:border-[#FFDDB0]'
+                            }`}
+                          >
+                            {cat.replace('_', ' ').toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-[#A0A0B0] mt-1">
+                        Select categories you're interested in
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Identity & Trust */}
+                  <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
+                    <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
+                      <Shield size={14} className="text-[#FFBE91]" />
                       Identity & Trust
                     </h3>
                     <p className="text-[10px] text-[#A0A0B0] mb-3">
@@ -664,7 +674,7 @@ const ProfileFormPage = () => {
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
+                        <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
                           Identity Number
                           {profile?.identity_number && (
                             <span className="text-[10px] text-amber-600 ml-2">(Locked)</span>
@@ -677,25 +687,25 @@ const ProfileFormPage = () => {
                           onChange={handleChange}
                           placeholder="PAN/Aadhaar/Other ID"
                           disabled={!!profile?.identity_number}
-                          className={`w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all ${profile?.identity_number ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          className={`w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all ${profile?.identity_number ? 'opacity-60 cursor-not-allowed' : ''}`}
                         />
                         {profile?.identity_number && (
                           <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
                             <Lock size={10} />
-                            Identity number cannot be changed once set
+                            Cannot be changed once set
                           </p>
                         )}
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
+                        <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
                           Identity Type
                         </label>
                         <select
                           name="identity_type"
                           value={formData.identity_type || ''}
                           onChange={handleChange}
-                          className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all appearance-none"
+                          className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all appearance-none"
                         >
                           <option value="">Select type</option>
                           {identityTypeOptions.map(type => (
@@ -706,15 +716,15 @@ const ProfileFormPage = () => {
                     </div>
                   </div>
 
-                  {/* ====== NEW BUYER FIELDS: Delivery Preferences ====== */}
-                  <div className="border-t border-[#EEECE6] pt-4 mt-4">
+                  {/* Delivery Preferences */}
+                  <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
                     <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
                       <Home size={14} className="text-[#FFBE91]" />
                       Delivery Preferences
                     </h3>
                     
                     <div>
-                      <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
+                      <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
                         Default Delivery Address
                       </label>
                       <input
@@ -723,12 +733,12 @@ const ProfileFormPage = () => {
                         value={formData.delivery_address || ''}
                         onChange={handleChange}
                         placeholder="Enter your default delivery address"
-                        className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                        className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
                       />
                     </div>
                     
                     <div className="mt-3">
-                      <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
+                      <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
                         Budget Range Preference
                       </label>
                       <p className="text-[10px] text-[#A0A0B0] mb-2">
@@ -742,7 +752,7 @@ const ProfileFormPage = () => {
                             onChange={handleBudgetMinChange}
                             placeholder="Min budget"
                             min="0"
-                            className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                            className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
                           />
                         </div>
                         <div>
@@ -752,7 +762,7 @@ const ProfileFormPage = () => {
                             onChange={handleBudgetMaxChange}
                             placeholder="Max budget"
                             min="0"
-                            className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                            className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
                           />
                         </div>
                       </div>
@@ -764,49 +774,55 @@ const ProfileFormPage = () => {
               {/* Shop Specific */}
               {isShopOwner && (
                 <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
-                        Years in Business
-                      </label>
-                      <input
-                        type="number"
-                        name="years_in_business"
-                        value={formData.years_in_business}
-                        onChange={handleChange}
-                        placeholder="5"
-                        min="0"
-                        className="w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#1A1A2E] mb-1">
-                        GST Number
-                        {profile?.gst_number && (
-                          <span className="text-[10px] text-amber-600 ml-2">(Locked)</span>
-                        )}
-                      </label>
-                      <input
-                        type="text"
-                        name="gst_number"
-                        value={formData.gst_number || ''}
-                        onChange={handleChange}
-                        placeholder="22ABCDE1234F1Z5"
-                        disabled={!!profile?.gst_number}
-                        className={`w-full px-3 py-2 text-sm bg-[#F8F6F0] border-2 border-[#EEECE6] rounded-xl focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all ${profile?.gst_number ? 'opacity-60 cursor-not-allowed' : ''}`}
-                      />
-                      <p className="text-[10px] text-[#A0A0B0] mt-1">
-                        {profile?.gst_number ? 'GST number cannot be changed once set' : 'Optional, helps build trust with buyers'}
-                      </p>
+                  <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
+                    <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
+                      <Store size={14} className="text-[#FFBE91]" />
+                      Shop Details
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                          Years in Business
+                        </label>
+                        <input
+                          type="number"
+                          name="years_in_business"
+                          value={formData.years_in_business}
+                          onChange={handleChange}
+                          placeholder="5"
+                          min="0"
+                          className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                          GST Number
+                          {profile?.gst_number && (
+                            <span className="text-[10px] text-amber-600 ml-2">(Locked)</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          name="gst_number"
+                          value={formData.gst_number || ''}
+                          onChange={handleChange}
+                          placeholder="22ABCDE1234F1Z5"
+                          disabled={!!profile?.gst_number}
+                          className={`w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all ${profile?.gst_number ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        />
+                        <p className="text-[10px] text-[#A0A0B0] mt-1">
+                          {profile?.gst_number ? 'GST number cannot be changed once set' : 'Optional, helps build trust with buyers'}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
                   {/* Business Hours */}
-                  <div>
+                  <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
                     <button
                       type="button"
                       onClick={() => setExpandedHours(!expandedHours)}
-                      className="flex items-center justify-between w-full text-xs font-semibold text-[#1A1A2E] mb-2 p-2 bg-[#F8F6F0] rounded-xl hover:bg-[#F5F3EF] transition-colors"
+                      className="flex items-center justify-between w-full text-xs font-semibold text-[#1A1A2E]"
                     >
                       <span className="flex items-center gap-2">
                         <Clock size={14} className="text-[#FFBE91]" />
@@ -820,7 +836,7 @@ const ProfileFormPage = () => {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="space-y-3 mt-2"
+                        className="space-y-3 mt-3"
                       >
                         {/* Monday - Friday */}
                         <div>
@@ -912,25 +928,23 @@ const ProfileFormPage = () => {
               )}
 
               {/* Submit Button */}
-              <div className="pt-2">
-                <Button
-                  type="submit"
-                  disabled={saving || uploading}
-                  className="w-full bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white py-3 h-auto flex items-center justify-center gap-2 text-sm font-semibold"
-                >
-                  {saving || uploading ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      {uploading ? 'Uploading Photo...' : 'Saving...'}
-                    </>
-                  ) : (
-                    <>
-                      <Save size={16} />
-                      Save Profile
-                    </>
-                  )}
-                </Button>
-              </div>
+              <Button
+                type="submit"
+                disabled={saving || uploading}
+                className="w-full bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white py-3 h-auto flex items-center justify-center gap-2 text-sm font-semibold rounded-lg"
+              >
+                {saving || uploading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    {uploading ? 'Uploading Photo...' : 'Saving...'}
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    Save Profile
+                  </>
+                )}
+              </Button>
             </form>
           </div>
         </motion.div>

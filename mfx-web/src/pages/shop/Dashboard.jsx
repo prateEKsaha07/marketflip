@@ -10,36 +10,26 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  BarChart3,
-  TrendingUp,
-  Award,
   Copy,
   Check,
-  PieChart,
-  Users,
-  Target,
   Store,
-  Activity,
-  Zap,
-  ShoppingBag,
-  Eye,
-  MessageSquare,
   Gavel,
   User,
   Sparkles,
-  Rocket,
-  Building2,
-  AlertCircle,
   Phone,
   MapPin,
   Calendar,
-  Star,
   Briefcase,
   Shield,
-  Clock as ClockIcon,
   Smile,
   History,
-  MessageCircle  // <-- ADD THIS
+  MessageCircle,
+  FileText,
+  Award,
+  TrendingUp,
+  Mail,
+  ShoppingBag,
+  List
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -51,30 +41,36 @@ const Dashboard = () => {
   const [copiedGST, setCopiedGST] = useState(false);
   const [profile, setProfile] = useState(null);
   const [greeting, setGreeting] = useState('');
-  const [unreadCount, setUnreadCount] = useState(0);  // <-- NEW
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [stats, setStats] = useState({
+    total_bids: 0,
+    pending: 0,
+    selected: 0,
+    completed: 0
+  });
 
   useEffect(() => {
     fetchShopProfile();
     generateGreeting();
-    fetchUnreadCount();  // <-- NEW
+    fetchUnreadCount();
+    fetchBidStats();
   }, []);
 
   const generateGreeting = () => {
-    const greetings = [
-      'Good to see you again',
-      'Welcome back',
-      'Happy to have you here',
-      'Great to have you back',
-      'Welcome to your dashboard',
-      'Good to see you',
-      'Welcome back to your workspace',
-      'Ready for a productive day',
-      'Glad to have you here',
-      'Welcome to your business hub'
-    ];
+    const hour = new Date().getHours();
+    let timeGreeting = 'Good Evening';
+    if (hour < 12) timeGreeting = 'Good Morning';
+    else if (hour < 17) timeGreeting = 'Good Afternoon';
     
+    const greetings = [
+      'Welcome back',
+      'Great to see you',
+      'Happy to have you here',
+      'Ready to grow your business',
+      'Let\'s find new opportunities'
+    ];
     const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
-    setGreeting(randomGreeting);
+    setGreeting(`${timeGreeting}, ${randomGreeting}`);
   };
 
   const fetchShopProfile = async () => {
@@ -91,14 +87,59 @@ const Dashboard = () => {
     }
   };
 
-  // ====== NEW: Fetch unread count ======
   const fetchUnreadCount = async () => {
     try {
       const response = await api.get('/chat/unread-count');
       setUnreadCount(response.data.unread_count || 0);
     } catch (err) {
       console.error('Failed to fetch unread count:', err);
-      // Don't show error to user, just keep count at 0
+    }
+  };
+
+  const fetchBidStats = async () => {
+    try {
+      const response = await api.get('/bids');
+      const bids = response.data || [];
+      
+      console.log('=== BID STATS DATA ===', bids);
+      
+      // Log each bid to see structure
+      bids.forEach((bid, index) => {
+        console.log(`Bid ${index}:`, {
+          status: bid.status,
+          request_status: bid.requests?.status || bid.request?.status || 'N/A',
+          request: bid.requests || bid.request || 'N/A'
+        });
+      });
+      
+      // Calculate stats - handle both 'requests' and 'request' property names
+      const total = bids.length;
+      const pending = bids.filter(b => b.status === 'pending').length;
+      
+      // Selected bids are those with status 'selected' AND request is NOT completed
+      const selected = bids.filter(b => {
+        if (b.status !== 'selected') return false;
+        const reqStatus = b.requests?.status || b.request?.status;
+        return reqStatus !== 'completed';
+      }).length;
+      
+      // Completed bids are those where the request is completed
+      const completed = bids.filter(b => {
+        const reqStatus = b.requests?.status || b.request?.status;
+        return reqStatus === 'completed';
+      }).length;
+      
+      setStats({
+        total_bids: total,
+        pending: pending,
+        selected: selected,
+        completed: completed
+      });
+      
+      console.log('Stats calculated:', { total, pending, selected, completed });
+    } catch (err) {
+      console.error('Failed to fetch bid stats:', err);
+      // Keep default values (all 0)
     }
   };
 
@@ -123,6 +164,116 @@ const Dashboard = () => {
     }
   };
 
+  const getInitials = () => {
+    const name = profile?.shop_name || profile?.full_name || user?.email?.split('@')[0] || 'User';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const getFullName = () => {
+    return profile?.full_name || user?.email?.split('@')[0] || 'User';
+  };
+
+  const getShopName = () => {
+    return profile?.shop_name || null;
+  };
+
+  const getGSTStatus = () => {
+    return profile?.gst_number || null;
+  };
+
+  // Stats Cards
+  const statCards = [
+    { 
+      key: 'total', 
+      label: 'Total Bids', 
+      value: stats.total_bids, 
+      icon: <List size={18} className="text-[#FFBE91]" />,
+      bg: 'bg-[#FFFCE1]',
+      border: 'border-[#FFDDB0]',
+      desc: 'All bids placed'
+    },
+    { 
+      key: 'pending', 
+      label: 'Pending', 
+      value: stats.pending, 
+      icon: <Clock size={18} className="text-amber-600" />,
+      bg: 'bg-amber-50',
+      border: 'border-amber-200',
+      desc: 'Awaiting response'
+    },
+    { 
+      key: 'selected', 
+      label: 'Selected', 
+      value: stats.selected, 
+      icon: <CheckCircle size={18} className="text-emerald-600" />,
+      bg: 'bg-emerald-50',
+      border: 'border-emerald-200',
+      desc: 'Won bids'
+    },
+    { 
+      key: 'completed', 
+      label: 'Completed', 
+      value: stats.completed, 
+      icon: <Award size={18} className="text-violet-600" />,
+      bg: 'bg-violet-50',
+      border: 'border-violet-200',
+      desc: 'Transactions done'
+    },
+  ];
+
+  // Navigation cards
+  const navItems = [
+    {
+      id: 'requests',
+      label: 'Request Hub',
+      icon: <FileText size={20} />,
+      path: '/shop/requests',
+      color: 'bg-gradient-to-br from-[#FFBE91] to-[#FFDDB0] hover:from-[#FFA87A] hover:to-[#FFDDB0] text-[#1A1A2E]',
+      description: 'Manage bids & requests'
+    },
+    {
+      id: 'auctions',
+      label: 'Auction Dashboard',
+      icon: <Gavel size={20} />,
+      path: '/shop/auctions',
+      color: 'bg-gradient-to-br from-[#CFEBFF] to-[#E8F4FD] hover:from-[#B8DCF0] hover:to-[#E8F4FD] text-[#1A1A2E]',
+      description: 'Manage your auctions'
+    },
+    {
+      id: 'chat',
+      label: 'Chats',
+      icon: <MessageCircle size={20} />,
+      path: '/shop/chat',
+      color: 'bg-gradient-to-br from-[#E8F5E9] to-[#C8E6C9] hover:from-[#C8E6C9] hover:to-[#E8F5E9] text-[#1A1A2E]',
+      description: 'Messages with buyers'
+    },
+    {
+      id: 'history',
+      label: 'Transaction History',
+      icon: <History size={20} />,
+      path: '/shop/history',
+      color: 'bg-gradient-to-br from-[#F5F3EF] to-[#EEECE6] hover:from-[#E8E5DF] hover:to-[#EEECE6] text-[#1A1A2E]',
+      description: 'Complete audit log'
+    },
+  ];
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: { staggerChildren: 0.06 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { duration: 0.3, ease: "easeOut" }
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
@@ -134,72 +285,67 @@ const Dashboard = () => {
     );
   }
 
-  const getFullName = () => {
-    if (profile?.full_name) return profile.full_name;
-    return 'User';
-  };
-
-  const getShopName = () => {
-    if (profile?.shop_name) return profile.shop_name;
-    return null;
-  };
-
-  const getInitials = () => {
-    const name = getShopName() || getFullName();
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
-
-  const getGSTStatus = () => {
-    if (profile?.gst_number) {
-      return profile.gst_number;
-    }
-    return null;
-  };
-
   return (
-    <div className="min-h-screen bg-[#F8F6F0]">
-      {/* Top Bar */}
-      <div className="bg-white border-b border-[#EEECE6] px-6 py-3 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {profile?.profile_photo_url ? (
-              <img 
-                src={profile.profile_photo_url} 
-                alt={getFullName()}
-                className="w-9 h-9 rounded-xl object-cover border border-[#EEECE6]"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-xl bg-[#1A1A2E] flex items-center justify-center text-white font-bold text-sm">
-                {getInitials()}
-              </div>
-            )}
-            <div>
-              <h2 className="text-sm font-semibold text-[#1A1A2E] flex items-center gap-2">
-                {getShopName() || getFullName()}
+    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
+      <div className="max-w-6xl mx-auto">
+        {/* Header with User Profile */}
+        <motion.div 
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white/80 backdrop-blur-xl rounded-xl p-6 border border-[#EEECE6] shadow-sm mb-6"
+        >
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+            {/* Avatar */}
+            <div className="flex-shrink-0">
+              {profile?.profile_photo_url ? (
+                <img 
+                  src={profile.profile_photo_url} 
+                  alt={getFullName()}
+                  className="w-16 h-16 rounded-xl object-cover border border-[#EEECE6]"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#FFBE91] to-[#FFDDB0] flex items-center justify-center text-[#1A1A2E] font-bold text-xl">
+                  {getInitials()}
+                </div>
+              )}
+            </div>
+
+            {/* User Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl font-bold text-[#1A1A2E]">
+                  {greeting}, {getShopName() || getFullName().split(' ')[0]}
+                </h1>
+                <span className="text-xs text-[#A0A0B0] bg-[#F5F3EF] px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Shield size={10} />
+                  {profile?.role || 'Shop Owner'}
+                </span>
                 {profile?.is_verified && (
                   <span className="inline-flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full text-[10px] font-medium">
                     <Shield size={10} />
                     Verified
                   </span>
                 )}
-                {!getShopName() && (
-                  <span className="text-xs font-normal text-[#A0A0B0]">
-                    (Add shop name)
-                  </span>
-                )}
-              </h2>
-              <div className="flex items-center gap-2 text-xs text-[#A0A0B0] flex-wrap">
-                <span>ID: {user?.user_id?.slice(0, 8)}</span>
-                <button
-                  onClick={copyShopId}
-                  className="p-0.5 hover:bg-[#F5F3EF] rounded transition-colors"
-                >
-                  {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                </button>
-                {copied && <span className="text-emerald-600 text-[10px]">Copied!</span>}
-                <span className="w-px h-3 bg-[#EEECE6]" />
-                {getGSTStatus() ? (
+              </div>
+              <p className="text-sm text-[#A0A0B0] flex items-center gap-2">
+                <Mail size={14} />
+                {user?.email}
+              </p>
+              <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-[#A0A0B0]">
+                <div className="flex items-center gap-1">
+                  <span>ID: {user?.user_id?.slice(0, 8)}</span>
+                  <button
+                    onClick={copyShopId}
+                    className="p-0.5 hover:bg-[#F5F3EF] rounded transition-colors"
+                  >
+                    {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                  </button>
+                  {copied && <span className="text-emerald-600 text-[10px]">Copied!</span>}
+                </div>
+                {getGSTStatus() && (
                   <>
+                    <span className="w-px h-3 bg-[#EEECE6]" />
                     <span>GST: {getGSTStatus()}</span>
                     <button
                       onClick={copyGSTNumber}
@@ -209,164 +355,176 @@ const Dashboard = () => {
                     </button>
                     {copiedGST && <span className="text-emerald-600 text-[10px]">Copied!</span>}
                   </>
-                ) : (
-                  <>
-                    <span>GST: Not added</span>
-                    <button 
-                      onClick={() => navigate('/shop/profile')}
-                      className="text-emerald-600 hover:text-emerald-700 text-[10px] font-medium underline-offset-2 hover:underline"
-                    >
-                      Add GST
-                    </button>
-                  </>
                 )}
                 {profile?.phone && (
                   <>
                     <span className="w-px h-3 bg-[#EEECE6]" />
-                    <Phone size={12} />
-                    <span>{profile.phone}</span>
+                    <span className="flex items-center gap-1">
+                      <Phone size={11} />
+                      {profile.phone}
+                    </span>
+                  </>
+                )}
+                {profile?.pincode && (
+                  <>
+                    <span className="w-px h-3 bg-[#EEECE6]" />
+                    <span className="flex items-center gap-1">
+                      <MapPin size={11} />
+                      {profile.pincode}
+                    </span>
+                  </>
+                )}
+                {profile?.created_at && (
+                  <>
+                    <span className="w-px h-3 bg-[#EEECE6]" />
+                    <span className="flex items-center gap-1">
+                      <Calendar size={11} />
+                      Joined {new Date(profile.created_at).toLocaleDateString()}
+                    </span>
+                  </>
+                )}
+                {profile?.years_in_business && (
+                  <>
+                    <span className="w-px h-3 bg-[#EEECE6]" />
+                    <span className="flex items-center gap-1">
+                      <Briefcase size={11} />
+                      {profile.years_in_business} years
+                    </span>
                   </>
                 )}
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 text-xs text-[#A0A0B0] bg-[#F8F6F0] px-3 py-1 rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              Active
-            </span>
-          </div>
-        </div>
-      </div>
 
-      <div className="max-w-6xl mx-auto p-4 md:p-6">
-        {/* Header with Greeting */}
-        <motion.div 
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-6"
-        >
-          <div>
-            <h1 className="text-lg font-medium text-[#1A1A2E] tracking-tight flex items-center gap-2">
-              <Smile size={18} className="text-[#A0A0B0]" />
-              {greeting}, {getFullName().split(' ')[0]}
-            </h1>
-            <p className="text-sm text-[#A0A0B0] flex items-center gap-2 flex-wrap">
-              <Store size={14} className="text-[#A0A0B0]" />
-              <span>{getShopName() || 'No shop name set'}</span>
-              {profile?.role && (
-                <>
-                  <span className="text-[#D0D0D0]">·</span>
-                  <span className="text-xs bg-[#F8F6F0] px-2 py-0.5 rounded-full text-[#1A1A2E]">
-                    {profile.role}
-                  </span>
-                </>
-              )}
-              {profile?.years_in_business && (
-                <>
-                  <span className="text-[#D0D0D0]">·</span>
-                  <span className="text-xs text-[#A0A0B0] flex items-center gap-1">
-                    <Briefcase size={12} />
-                    {profile.years_in_business} years
-                  </span>
-                </>
-              )}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              onClick={() => navigate('/shop/profile')}
-              variant="outline"
-              className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] hover:border-[#D0D0D0] text-sm px-4 py-2"
-            >
-              <User size={15} className="mr-1.5" />
-              Profile
-            </Button>
-            <Button 
-              onClick={() => navigate('/shop/my-bids')}
-              variant="outline"
-              className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] hover:border-[#D0D0D0] text-sm px-4 py-2"
-            >
-              <Package size={15} className="mr-1.5" />
-              My Bids
-            </Button>
-            <Button 
-              onClick={() => navigate('/shop/browse')}
-              className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-sm px-4 py-2"
-            >
-              <Search size={15} className="mr-1.5" />
-              Browse
-            </Button>
-            <Button 
-              onClick={() => navigate('/shop/auctions')}
-              variant="outline"
-              className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] hover:border-[#D0D0D0] text-sm px-4 py-2"
-            >
-              <Gavel size={15} className="mr-1.5" />
-              Auctions
-            </Button>
-
-            {/* ====== CHAT BUTTON WITH UNREAD BADGE ====== */}
-            <Button
-              onClick={() => navigate('/shop/chat')}
-              variant="outline"
-              className="border-[#CFEBFF] text-[#1A1A2E] hover:bg-[#CFEBFF]/20 hover:border-[#CFEBFF] text-sm px-4 py-2 relative"
-            >
-              <MessageCircle size={16} className="mr-1.5" />
-              Chats
+            {/* Actions */}
+            <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-[#FFBE91] text-[#1A1A2E] text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
+                <div className="bg-[#FFBE91] text-[#1A1A2E] px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5">
+                  <MessageCircle size={14} />
+                  {unreadCount} unread
+                </div>
               )}
-            </Button>
-
-            <Button
-              onClick={() => navigate('/shop/history')}
-              variant="outline"
-              className="border-[#FFDDB0] text-[#1A1A2E] hover:bg-[#FFDDB0]/30 text-xs px-4 py-2"
-            >
-              <History size={16} className="mr-1.5" />
-                Transaction History
-            </Button>
-
-            <Button 
-              onClick={() => navigate('/shop/completed')}
-              variant="outline"
-              className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] hover:border-[#D0D0D0] text-sm px-4 py-2"
-            >
-              <CheckCircle size={15} className="mr-1.5" />
-              Completed
-            </Button>
-            <Button 
-              onClick={handleLogout}
-              variant="ghost"
-              className="text-[#A0A0B0] hover:text-rose-500 hover:bg-rose-50 text-sm px-3 py-2"
-            >
-              <LogOut size={15} />
-            </Button>
+              <Button 
+                onClick={() => navigate('/shop/profile')}
+                variant="outline"
+                className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] text-sm px-3 py-1.5 h-auto"
+              >
+                <User size={14} className="mr-1.5" />
+                Profile
+              </Button>
+              <Button 
+                onClick={handleLogout}
+                variant="ghost"
+                className="text-[#A0A0B0] hover:text-rose-500 hover:bg-rose-50 text-sm px-3 py-1.5 h-auto"
+              >
+                <LogOut size={14} />
+              </Button>
+            </div>
           </div>
         </motion.div>
 
-        {/* Coming Soon Section with Image - Warmer & Lighter */}
+        {/* Stats Grid - 4 KPIs */}
         <motion.div 
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="mt-6"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"
         >
-          <div className="bg-gradient-to-br from-[#FDF6ED] via-[#F8EDE0] to-[#F5E8D8] rounded-2xl p-8 text-center border border-[#E8DCC8] min-h-[450px] flex flex-col items-center justify-center shadow-sm">
-            <h3 className="text-3xl font-bold text-[#2A1F1A] mb-6">
-              More Updates Soon
-            </h3>
-            
-            <img 
-              src="/shop_dsb.png" 
-              alt="Coming Soon" 
-              className="max-w-full h-auto max-h-[250px] object-contain rounded-lg"
-            />
+          {statCards.map((stat) => (
+            <motion.div
+              key={stat.key}
+              variants={itemVariants}
+              className={`bg-white/80 backdrop-blur-xl rounded-xl p-4 border ${stat.border} shadow-sm hover:shadow-md transition-all`}
+            >
+              <div className="flex items-center justify-between">
+                <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center`}>
+                  {stat.icon}
+                </div>
+                <span className="text-xl font-bold text-[#1A1A2E]">{stat.value}</span>
+              </div>
+              <p className="text-xs font-medium text-[#1A1A2E] mt-1">{stat.label}</p>
+              <p className="text-[10px] text-[#A0A0B0]">{stat.desc}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* Navigation Grid - 4 cards */}
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6"
+        >
+          {navItems.map((item) => (
+            <motion.div
+              key={item.id}
+              variants={itemVariants}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Button
+                onClick={() => navigate(item.path)}
+                variant="outline"
+                className={`w-full py-6 h-auto flex flex-col items-center justify-center gap-2 ${item.color} transition-all shadow-sm hover:shadow-md border-0`}
+              >
+                <div className="flex items-center gap-2">
+                  {item.icon}
+                  <span className="text-sm font-medium">{item.label}</span>
+                </div>
+                <span className="text-[10px] text-[#A0A0B0]">{item.description}</span>
+              </Button>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* Quick Actions */}
+        <motion.div 
+          variants={itemVariants}
+          className="bg-white/80 backdrop-blur-xl rounded-xl p-4 border border-[#EEECE6] shadow-sm"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp size={16} className="text-[#FFBE91]" />
+              <span className="text-xs font-medium text-[#1A1A2E]">Quick Actions</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => navigate('/shop/browse')}
+                className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-3 py-1.5 h-auto"
+              >
+                <Search size={13} className="mr-1.5" />
+                Browse Requests
+              </Button>
+              <Button
+                onClick={() => navigate('/shop/my-bids')}
+                variant="outline"
+                className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
+              >
+                <Package size={13} className="mr-1.5" />
+                My Bids
+              </Button>
+              <Button
+                onClick={() => navigate('/shop/auctions/post')}
+                variant="outline"
+                className="border-[#CFEBFF] text-[#1A1A2E] hover:bg-[#CFEBFF]/20 text-xs px-3 py-1.5 h-auto"
+              >
+                <Gavel size={13} className="mr-1.5" />
+                Create Auction
+              </Button>
+            </div>
           </div>
+        </motion.div>
+
+        {/* Footer Note */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="mt-4 text-center text-[10px] text-[#A0A0B0]"
+        >
+          <span className="flex items-center justify-center gap-1">
+            <Sparkles size={10} className="text-[#FFBE91]" />
+            MarketFlip · Your marketplace for requests and auctions
+          </span>
         </motion.div>
       </div>
     </div>
