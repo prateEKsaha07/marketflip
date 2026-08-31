@@ -23,7 +23,9 @@ import {
   Search,
   LogOut,
   Plus,
-  Heart
+  Heart,
+  History,
+  Trophy
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -56,7 +58,7 @@ const BuyerAuctionDashboard = () => {
       let myBids = [];
       let wonAuctions = [];
       try {
-        const bidsResponse = await api.get('/bids');
+        const bidsResponse = await api.get('/bids/auction-bids');
         myBids = bidsResponse.data || [];
         // Filter won auctions (bids that are selected/won)
         wonAuctions = myBids.filter(b => b.status === 'selected');
@@ -113,7 +115,7 @@ const BuyerAuctionDashboard = () => {
       key: 'won', 
       label: 'Won Auctions', 
       value: stats.won_auctions, 
-      icon: <Award size={18} className="text-[#FFBE91]" />,
+      icon: <Trophy size={18} className="text-[#FFBE91]" />,
       bg: 'bg-[#FFFCE1]',
       border: 'border-[#FFDDB0]',
       desc: 'You won these!'
@@ -127,6 +129,42 @@ const BuyerAuctionDashboard = () => {
       border: 'border-violet-200',
       desc: 'Across all auctions'
     },
+  ];
+
+  // Navigation items for the dashboard
+  const navItems = [
+    {
+      id: 'browse',
+      label: 'Browse Auctions',
+      icon: <Search size={16} />,
+      path: '/buyer/auctions/browse',
+      color: 'bg-gradient-to-r from-[#FFBE91] to-[#FFDDB0] hover:from-[#FFA87A] hover:to-[#FFDDB0] text-[#1A1A2E]',
+      description: 'Discover items to bid on'
+    },
+    {
+      id: 'my_bids',
+      label: 'My Bids',
+      icon: <TrendingUp size={16} />,
+      path: '/buyer/my-bids',
+      color: 'border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E]',
+      description: 'Active auctions you bid on'
+    },
+    {
+      id: 'won',
+      label: 'My Won Auctions',
+      icon: <Trophy size={16} />,
+      path: '/buyer/my-won-auctions',
+      color: 'border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E]',
+      description: 'Auctions you won (delivery + OTP)'
+    },
+    {
+      id: 'history',
+      label: 'Auction History',
+      icon: <History size={16} />,
+      path: '/buyer/auction-history',
+      color: 'border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E]',
+      description: 'Complete audit log of all activity'
+    }
   ];
 
   const containerVariants = {
@@ -247,44 +285,33 @@ const BuyerAuctionDashboard = () => {
         ))}
       </motion.div>
 
-      {/* Quick Actions */}
+      {/* Navigation Grid - 4 cards */}
       <motion.div 
-        variants={itemVariants}
-        className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6"
       >
-        <Button
-          onClick={() => navigate('/buyer/auctions/browse')}
-          variant="outline"
-          className="border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E] py-3 h-auto flex items-center justify-between group"
-        >
-          <span className="flex items-center gap-2">
-            <Search size={16} className="text-[#FFBE91]" />
-            Browse Auctions
-          </span>
-          <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
-        </Button>
-        <Button
-          onClick={() => navigate('/buyer/dashboard')}
-          variant="outline"
-          className="border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E] py-3 h-auto flex items-center justify-between group"
-        >
-          <span className="flex items-center gap-2">
-            <Store size={16} className="text-[#A0A0B0]" />
-            Back to Dashboard
-          </span>
-          <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
-        </Button>
-        <Button
-          onClick={() => navigate('/buyer/requests/post')}
-          variant="outline"
-          className="border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E] py-3 h-auto flex items-center justify-between group"
-        >
-          <span className="flex items-center gap-2">
-            <Plus size={16} className="text-[#A0A0B0]" />
-            Post Request
-          </span>
-          <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
-        </Button>
+        {navItems.map((item) => (
+          <motion.div
+            key={item.id}
+            variants={itemVariants}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Button
+              onClick={() => navigate(item.path)}
+              variant="outline"
+              className={`w-full py-4 h-auto flex flex-col items-center justify-center gap-2 ${item.color} transition-all shadow-sm hover:shadow-md`}
+            >
+              <div className="flex items-center gap-2">
+                {item.icon}
+                <span className="text-sm font-medium">{item.label}</span>
+              </div>
+              <span className="text-[10px] text-[#A0A0B0]">{item.description}</span>
+            </Button>
+          </motion.div>
+        ))}
       </motion.div>
 
       {/* Recent Auctions */}
@@ -377,7 +404,7 @@ const BuyerAuctionDashboard = () => {
       >
         <span className="flex items-center justify-center gap-1">
           <Sparkles size={10} className="text-[#FFBE91]" />
-          Highest bid wins · Auctions auto-close at end time
+          Highest bid wins · Auctions auto-close at end time · Track won auctions in My Won Auctions
         </span>
       </motion.div>
     </div>

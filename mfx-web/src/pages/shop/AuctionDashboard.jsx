@@ -22,7 +22,9 @@ import {
   Sparkles,
   Store,
   Users,
-  Award
+  Award,
+  History,
+  FileCheck
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -33,6 +35,7 @@ const AuctionDashboard = () => {
   const [stats, setStats] = useState({
     active: 0,
     sold: 0,
+    completed: 0,
     expired: 0,
     cancelled: 0,
     total: 0,
@@ -56,15 +59,17 @@ const AuctionDashboard = () => {
       // Calculate stats
       const activeAuctions = auctions.filter(a => a.status === 'active');
       const soldAuctions = auctions.filter(a => a.status === 'sold');
+      const completedAuctions = auctions.filter(a => a.status === 'completed');
       
       const statsData = {
         active: activeAuctions.length,
         sold: soldAuctions.length,
+        completed: completedAuctions.length,
         expired: auctions.filter(a => a.status === 'expired').length,
         cancelled: auctions.filter(a => a.status === 'cancelled').length,
         total: auctions.length,
         total_bids: auctions.reduce((sum, a) => sum + (a.bid_count || 0), 0),
-        total_revenue: soldAuctions.reduce((sum, a) => sum + (a.current_highest_bid || a.starting_price || 0), 0)
+        total_revenue: [...soldAuctions, ...completedAuctions].reduce((sum, a) => sum + (a.current_highest_bid || a.starting_price || 0), 0)
       };
       setStats(statsData);
       
@@ -88,6 +93,8 @@ const AuctionDashboard = () => {
         return { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Active', icon: <CheckCircle size={12} /> };
       case 'sold': 
         return { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Sold', icon: <Package size={12} /> };
+      case 'completed': 
+        return { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Completed', icon: <CheckCircle size={12} /> };
       case 'expired': 
         return { bg: 'bg-rose-100', text: 'text-rose-700', label: 'Expired', icon: <XCircle size={12} /> };
       case 'cancelled': 
@@ -109,12 +116,12 @@ const AuctionDashboard = () => {
     },
     { 
       key: 'sold', 
-      label: 'Sold', 
-      value: stats.sold, 
+      label: 'Sold / Completed', 
+      value: stats.sold + stats.completed, 
       icon: <Award size={18} className="text-blue-600" />,
       bg: 'bg-blue-50',
       border: 'border-blue-200',
-      desc: 'Successfully sold'
+      desc: 'Successfully finalized'
     },
     { 
       key: 'revenue', 
@@ -123,7 +130,7 @@ const AuctionDashboard = () => {
       icon: <DollarSign size={18} className="text-emerald-600" />,
       bg: 'bg-emerald-50',
       border: 'border-emerald-200',
-      desc: 'From sold auctions'
+      desc: 'From sold/completed auctions'
     },
     { 
       key: 'bids', 
@@ -134,6 +141,42 @@ const AuctionDashboard = () => {
       border: 'border-[#FFDDB0]',
       desc: 'Across all auctions'
     },
+  ];
+
+  // Navigation items for the dashboard
+  const navItems = [
+    {
+      id: 'post',
+      label: 'Post Auction',
+      icon: <Plus size={16} />,
+      path: '/shop/auctions/post',
+      color: 'bg-gradient-to-r from-[#FFBE91] to-[#FFDDB0] hover:from-[#FFA87A] hover:to-[#FFDDB0] text-[#1A1A2E]',
+      description: 'Create a new auction listing'
+    },
+    {
+      id: 'active',
+      label: 'Active Auctions',
+      icon: <Clock size={16} />,
+      path: '/shop/auctions/my',
+      color: 'border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E]',
+      description: 'Manage active bidding auctions'
+    },
+    {
+      id: 'finalized',
+      label: 'Finalized Auctions',
+      icon: <FileCheck size={16} />,
+      path: '/shop/finalized-auctions',
+      color: 'border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E]',
+      description: 'Sold, completed & cancelled auctions'
+    },
+    {
+      id: 'history',
+      label: 'Auction History',
+      icon: <History size={16} />,
+      path: '/shop/auction-history',
+      color: 'border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E]',
+      description: 'Complete audit log of all auctions'
+    }
   ];
 
   const containerVariants = {
@@ -193,23 +236,6 @@ const AuctionDashboard = () => {
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              onClick={() => navigate('/shop/auctions/my')}
-              variant="outline"
-              className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3.5 py-1.5 h-auto"
-            >
-              <Package size={13} className="mr-1.5" />
-              My Auctions
-            </Button>
-            <Button 
-              onClick={() => navigate('/shop/auctions/post')}
-              className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-3.5 py-1.5 h-auto flex items-center gap-1.5 shadow-sm hover:shadow transition-all"
-            >
-              <Plus size={13} />
-              Create Auction
-            </Button>
-          </div>
         </motion.div>
 
         {error && (
@@ -244,43 +270,33 @@ const AuctionDashboard = () => {
           ))}
         </motion.div>
 
-        {/* Quick Actions */}
+        {/* Navigation Grid - 4 cards */}
         <motion.div 
-          variants={itemVariants}
-          className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6"
         >
-          <Button
-            onClick={() => navigate('/shop/auctions/my')}
-            variant="outline"
-            className="border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E] py-3 h-auto flex items-center justify-between group"
-          >
-            <span className="flex items-center gap-2">
-              <Package size={16} className="text-[#FFBE91]" />
-              View All Auctions
-            </span>
-            <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
-          </Button>
-          <Button
-            onClick={() => navigate('/shop/auctions/post')}
-            className="bg-gradient-to-r from-[#FFBE91] to-[#FFDDB0] hover:from-[#FFA87A] hover:to-[#FFDDB0] text-[#1A1A2E] py-3 h-auto flex items-center justify-between group"
-          >
-            <span className="flex items-center gap-2">
-              <Plus size={16} />
-              Create New Auction
-            </span>
-            <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
-          </Button>
-          <Button
-            onClick={() => navigate('/shop/dashboard')}
-            variant="outline"
-            className="border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E] py-3 h-auto flex items-center justify-between group"
-          >
-            <span className="flex items-center gap-2">
-              <Store size={16} className="text-[#A0A0B0]" />
-              Back to Dashboard
-            </span>
-            <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
-          </Button>
+          {navItems.map((item) => (
+            <motion.div
+              key={item.id}
+              variants={itemVariants}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Button
+                onClick={() => navigate(item.path)}
+                variant="outline"
+                className={`w-full py-4 h-auto flex flex-col items-center justify-center gap-2 ${item.color} transition-all shadow-sm hover:shadow-md`}
+              >
+                <div className="flex items-center gap-2">
+                  {item.icon}
+                  <span className="text-sm font-medium">{item.label}</span>
+                </div>
+                <span className="text-[10px] text-[#A0A0B0]">{item.description}</span>
+              </Button>
+            </motion.div>
+          ))}
         </motion.div>
 
         {/* Recent Auctions */}
@@ -297,7 +313,7 @@ const AuctionDashboard = () => {
               <Button
                 variant="ghost"
                 className="text-xs text-[#A0A0B0] hover:text-[#1A1A2E] px-2 py-0.5 h-auto"
-                onClick={() => navigate('/shop/auctions/my')}
+                onClick={() => navigate('/shop/auction-history')}
               >
                 View All
               </Button>
@@ -325,11 +341,16 @@ const AuctionDashboard = () => {
                   ? auction.image_urls[0] 
                   : null;
                 
+                // Determine detail path based on status
+                const detailPath = ['active'].includes(auction.status)
+                  ? `/shop/auctions/${auction.id}`
+                  : `/shop/auctions/${auction.id}`;
+                
                 return (
                   <div
                     key={auction.id}
                     className="flex flex-wrap items-center gap-3 p-3 bg-white rounded-lg border border-[#EEECE6] hover:shadow-md transition-all cursor-pointer"
-                    onClick={() => navigate(`/shop/auctions/${auction.id}`)}
+                    onClick={() => navigate(detailPath)}
                   >
                     {/* Image */}
                     {firstImage ? (
@@ -370,6 +391,12 @@ const AuctionDashboard = () => {
                             Ends: {new Date(auction.end_time).toLocaleDateString()}
                           </span>
                         )}
+                        {['sold', 'completed'].includes(auction.status) && (
+                          <span className="flex items-center gap-1 text-blue-600">
+                            <CheckCircle size={10} />
+                            {auction.delivery_method === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
+                          </span>
+                        )}
                       </div>
                     </div>
                     
@@ -388,7 +415,7 @@ const AuctionDashboard = () => {
         >
           <span className="flex items-center justify-center gap-1">
             <Sparkles size={10} className="text-[#FFBE91]" />
-            Auctions auto-close at end time · Highest bid wins
+            Auctions auto-close at end time · Highest bid wins · Manage post-sale flow in Finalized Auctions
           </span>
         </motion.div>
       </div>

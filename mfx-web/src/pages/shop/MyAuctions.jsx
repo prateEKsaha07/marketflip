@@ -30,23 +30,14 @@ const MyAuctions = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [auctions, setAuctions] = useState([]);
-  const [activeTab, setActiveTab] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [error, setError] = useState('');
   const [cancelling, setCancelling] = useState(null);
 
-  // Use useMemo to compute filtered auctions directly
+  // Filter auctions locally (only active auctions are fetched anyway)
   const filteredAuctions = useMemo(() => {
-    console.log('=== COMPUTING FILTERED AUCTIONS ===');
-    console.log('Active tab:', activeTab);
-    console.log('All auctions:', auctions);
-    
     let filtered = [...auctions];
-
-    if (activeTab !== 'all') {
-      filtered = filtered.filter(a => a.status === activeTab);
-    }
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
@@ -62,9 +53,8 @@ const MyAuctions = () => {
 
     filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    console.log('Final filtered auctions:', filtered);
     return filtered;
-  }, [auctions, activeTab, searchQuery, categoryFilter]);
+  }, [auctions, searchQuery, categoryFilter]);
 
   useEffect(() => {
     fetchAuctions();
@@ -74,10 +64,8 @@ const MyAuctions = () => {
     setLoading(true);
     setError('');
     try {
-      console.log('=== FETCHING ALL AUCTIONS ===');
-      const response = await api.get('/auctions?status=all');
-      console.log('All auctions:', response.data);
-      console.log('Number of auctions:', response.data?.length || 0);
+      // Only fetch active auctions
+      const response = await api.get('/auctions?status=active');
       setAuctions(response.data || []);
     } catch (err) {
       console.error('Fetch auctions error:', err);
@@ -147,13 +135,6 @@ const MyAuctions = () => {
     }
   };
 
-  const tabs = [
-    { id: 'active', label: 'Active', count: auctions.filter(a => a.status === 'active').length, icon: <Clock size={14} /> },
-    { id: 'sold', label: 'Sold', count: auctions.filter(a => a.status === 'sold').length, icon: <CheckCircle size={14} /> },
-    { id: 'expired', label: 'Expired', count: auctions.filter(a => a.status === 'expired').length, icon: <XCircle size={14} /> },
-    { id: 'cancelled', label: 'Cancelled', count: auctions.filter(a => a.status === 'cancelled').length, icon: <AlertCircle size={14} /> },
-  ];
-
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { 
@@ -171,17 +152,12 @@ const MyAuctions = () => {
     }
   };
 
-  const tabVariants = {
-    inactive: { opacity: 0.6, scale: 0.95 },
-    active: { opacity: 1, scale: 1 }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 size={24} className="animate-spin text-[#1A1A2E]" />
-          <p className="text-xs text-[#A0A0B0]">Loading your auctions...</p>
+          <p className="text-xs text-[#A0A0B0]">Loading your active auctions...</p>
         </div>
       </div>
     );
@@ -208,11 +184,11 @@ const MyAuctions = () => {
             </Button>
             <div>
               <h1 className="text-xl font-semibold text-[#1A1A2E] flex items-center gap-2">
-                <Package size={20} className="text-[#FFBE91]" />
-                My Auctions
+                <Gavel size={20} className="text-[#FFBE91]" />
+                Active Auctions
               </h1>
               <p className="text-xs text-[#A0A0B0] mt-0.5">
-                {auctions.length} total auctions · {auctions.filter(a => a.status === 'active').length} active
+                {auctions.length} active auctions · Bidding in progress
               </p>
             </div>
           </div>
@@ -232,56 +208,18 @@ const MyAuctions = () => {
           </div>
         )}
 
-        {/* Tabs */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="flex flex-wrap gap-1 mb-4 bg-white/60 backdrop-blur-sm p-1 rounded-xl border border-[#EEECE6]"
-        >
-          {tabs.map((tab) => (
-            <motion.button
-              key={tab.id}
-              variants={tabVariants}
-              animate={activeTab === tab.id ? 'active' : 'inactive'}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setActiveTab(tab.id)}
-              className={`
-                flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all text-xs font-medium
-                ${activeTab === tab.id 
-                  ? 'bg-[#FFBE91] text-[#1A1A2E] shadow-md' 
-                  : 'text-[#4A4A5A] hover:text-[#1A1A2E] hover:bg-[#FFDDB0]/30'
-                }
-              `}
-            >
-              {tab.icon}
-              {tab.label}
-              <span className={`
-                ml-1 px-1.5 py-0.5 rounded-full text-[9px]
-                ${activeTab === tab.id 
-                  ? 'bg-[#1A1A2E]/10 text-[#1A1A2E]' 
-                  : 'bg-[#FFDDB0]/30 text-[#4A4A5A]'
-                }
-              `}>
-                {tab.count}
-              </span>
-            </motion.button>
-          ))}
-        </motion.div>
-
         {/* Search & Filter */}
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
+          transition={{ delay: 0.1 }}
           className="flex flex-wrap gap-2 mb-4"
         >
           <div className="flex-1 min-w-[150px] relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
             <input
               type="text"
-              placeholder="Search auctions..."
+              placeholder="Search active auctions..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-xs bg-white/80 border border-[#EEECE6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
@@ -323,26 +261,17 @@ const MyAuctions = () => {
             className="bg-white/60 backdrop-blur-xl rounded-xl p-8 text-center shadow-sm border border-[#EEECE6]"
           >
             <div className="w-12 h-12 rounded-xl bg-[#F5F3EF] flex items-center justify-center mx-auto mb-3">
-              {activeTab === 'active' ? <Clock size={20} className="text-[#A0A0B0]" /> : <Package size={20} className="text-[#A0A0B0]" />}
+              <Gavel size={20} className="text-[#A0A0B0]" />
             </div>
-            <h3 className="text-sm font-medium text-[#1A1A2E]">
-              {activeTab === 'active' && 'No active auctions'}
-              {activeTab === 'sold' && 'No sold auctions'}
-              {activeTab === 'expired' && 'No expired auctions'}
-              {activeTab === 'cancelled' && 'No cancelled auctions'}
-            </h3>
-            <p className="text-xs text-[#A0A0B0] mt-1">
-              {activeTab === 'active' ? 'Create a new auction to get started' : 'Try adjusting your filters'}
-            </p>
-            {activeTab === 'active' && (
-              <Button 
-                onClick={() => navigate('/shop/auctions/post')}
-                className="mt-3 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-4 py-1.5 h-auto"
-              >
-                <Plus size={13} className="mr-1.5" />
-                Create Auction
-              </Button>
-            )}
+            <h3 className="text-sm font-medium text-[#1A1A2E]">No active auctions</h3>
+            <p className="text-xs text-[#A0A0B0] mt-1">Create a new auction to get started</p>
+            <Button 
+              onClick={() => navigate('/shop/auctions/post')}
+              className="mt-3 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-4 py-1.5 h-auto"
+            >
+              <Plus size={13} className="mr-1.5" />
+              Create Auction
+            </Button>
           </motion.div>
         ) : (
           <motion.div 
@@ -356,7 +285,6 @@ const MyAuctions = () => {
               const firstImage = auction.image_urls && auction.image_urls.length > 0 
                 ? auction.image_urls[0] 
                 : null;
-              const isActive = auction.status === 'active';
               const isCancelling = cancelling === auction.id;
 
               return (
@@ -412,19 +340,10 @@ const MyAuctions = () => {
                         </span>
                       </div>
 
-                      {isActive && (
-                        <div className="mt-1 flex items-center gap-1 text-[10px] text-emerald-600">
-                          <Clock size={10} />
-                          Ends: {new Date(auction.end_time).toLocaleString()}
-                        </div>
-                      )}
-
-                      {auction.status === 'sold' && auction.winning_bid_id && (
-                        <div className="mt-1 flex items-center gap-1 text-[10px] text-blue-600">
-                          <CheckCircle size={10} />
-                          Sold for ₹{auction.current_highest_bid?.toLocaleString() || auction.starting_price.toLocaleString()}
-                        </div>
-                      )}
+                      <div className="mt-1 flex items-center gap-1 text-[10px] text-emerald-600">
+                        <Clock size={10} />
+                        Ends: {new Date(auction.end_time).toLocaleString()}
+                      </div>
                     </div>
 
                     {/* Actions */}
@@ -437,21 +356,19 @@ const MyAuctions = () => {
                         <Eye size={13} className="mr-1" />
                         View
                       </Button>
-                      {isActive && (
-                        <Button
-                          onClick={() => handleCancelAuction(auction.id)}
-                          disabled={isCancelling}
-                          variant="ghost"
-                          className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 text-xs px-3 py-1 h-auto"
-                        >
-                          {isCancelling ? (
-                            <Loader2 size={13} className="animate-spin" />
-                          ) : (
-                            <Trash2 size={13} className="mr-1" />
-                          )}
-                          {isCancelling ? '' : 'Cancel'}
-                        </Button>
-                      )}
+                      <Button
+                        onClick={() => handleCancelAuction(auction.id)}
+                        disabled={isCancelling}
+                        variant="ghost"
+                        className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 text-xs px-3 py-1 h-auto"
+                      >
+                        {isCancelling ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={13} className="mr-1" />
+                        )}
+                        {isCancelling ? '' : 'Cancel'}
+                      </Button>
                       <ChevronRight size={16} className="text-[#A0A0B0] group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>

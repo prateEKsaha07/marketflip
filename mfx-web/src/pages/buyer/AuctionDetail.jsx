@@ -25,7 +25,12 @@ import {
   Home,
   Truck,
   Zap,
-  Send
+  Send,
+  Key,
+  Copy,
+  ShieldCheck,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import api from '../../api/client';
 import ImageCarousel from '../../components/ImageCarousel';
@@ -41,6 +46,8 @@ const AuctionDetail = () => {
   const [placingBid, setPlacingBid] = useState(false);
   const [bidError, setBidError] = useState('');
   const [bidSuccess, setBidSuccess] = useState(false);
+  const [otpCopied, setOtpCopied] = useState(false);
+  const [otpVisible, setOtpVisible] = useState(false);
 
   useEffect(() => {
     fetchAuctionDetail();
@@ -96,6 +103,24 @@ const AuctionDetail = () => {
     }
   };
 
+  const handleCopyOtp = (code) => {
+    navigator.clipboard.writeText(code);
+    setOtpCopied(true);
+    setTimeout(() => setOtpCopied(false), 2000);
+  };
+
+  const handleOverrideComplete = async () => {
+    if (!window.confirm('Override completion? This will mark the transaction as complete.')) return;
+    
+    try {
+      await api.patch(`/auctions/${id}/override-complete`);
+      await fetchAuctionDetail();
+    } catch (err) {
+      console.error('Override error:', err);
+      setError('Failed to override: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   const getStatusBadge = (status) => {
     switch(status) {
       case 'active': 
@@ -110,9 +135,17 @@ const AuctionDetail = () => {
         return { 
           bg: 'bg-blue-100', 
           text: 'text-blue-700', 
-          label: 'Sold', 
-          icon: <Award size={14} />,
+          label: 'Awaiting Delivery', 
+          icon: <Truck size={14} />,
           dot: 'bg-blue-500'
+        };
+      case 'completed': 
+        return { 
+          bg: 'bg-emerald-100', 
+          text: 'text-emerald-700', 
+          label: 'Completed', 
+          icon: <CheckCircle size={14} />,
+          dot: 'bg-emerald-500'
         };
       case 'expired': 
         return { 
@@ -181,6 +214,10 @@ const AuctionDetail = () => {
     return diff > 0 && diff < 60 * 60 * 1000 * 24;
   };
 
+  // Check if user is the winner
+  const isWinner = auction?.current_highest_bidder === user?.user_id;
+  const isBuyer = user?.role === 'buyer';
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { 
@@ -233,12 +270,20 @@ const AuctionDetail = () => {
   const status = getStatusBadge(auction.status);
   const isActive = auction.status === 'active';
   const isSold = auction.status === 'sold';
+  const isCompleted = auction.status === 'completed';
+  const isOverridden = auction.completed_via_override === true;
   const deliveryInfo = getDeliveryMethodLabel(auction.delivery_method);
   const hasImages = auction.image_urls && auction.image_urls.length > 0;
   const timeLeft = getTimeLeft(auction.end_time);
   const endingSoon = isEndingSoon(auction.end_time);
   const currentPrice = auction.current_highest_bid || auction.starting_price;
   const minBid = currentPrice + 100;
+  const hasOtp = auction.verification_code !== null && auction.verification_code !== undefined;
+  const otpCode = auction.verification_code || '';
+  const attempts = auction.verification_attempts || 0;
+  const maxAttempts = 5;
+  const attemptsRemaining = maxAttempts - attempts;
+  const showOtpSection = isSold && isWinner && isBuyer && (auction.delivery_confirmed_by_shop === true || auction.delivery_method === 'pickup');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
@@ -252,12 +297,20 @@ const AuctionDetail = () => {
         >
           <div className="flex items-center gap-3">
             <Button 
-              onClick={() => navigate('/buyer/auctions/browse')}
+              onClick={() => {
+                if (isActive) {
+                  navigate('/buyer/auctions/browse');
+                } else if (isWinner) {
+                  navigate('/buyer/my-won-auctions');
+                } else {
+                  navigate('/buyer/auction-history');
+                }
+              }}
               variant="ghost"
               className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
             >
               <ArrowLeft size={14} className="mr-1.5" />
-              Browse
+              {isActive ? 'Browse' : isWinner ? 'My Won Auctions' : 'Auction History'}
             </Button>
             <div>
               <h1 className="text-xl font-semibold text-[#1A1A2E] flex items-center gap-2">
@@ -379,6 +432,12 @@ const AuctionDetail = () => {
                     {endingSoon && <Zap size={12} className="text-rose-600" />}
                   </div>
                 )}
+                {isOverridden && (
+                  <span className="flex items-center gap-1 text-amber-600 text-xs font-medium">
+                    <ShieldCheck size={12} />
+                    Override
+                  </span>
+                )}
               </div>
               
               <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
@@ -388,7 +447,10 @@ const AuctionDetail = () => {
                 </div>
                 <div>
                   <p className="text-[10px] text-[#A0A0B0]">Current Bid</p>
-                  <p className="font-semibold text-emerald-600">₹{currentPrice.toLocaleString()}</p>
+                  <p className={`font-semibold ${isWinner ? 'text-emerald-600' : 'text-emerald-600'}`}>
+                    ₹{currentPrice.toLocaleString()}
+                    {isWinner && <span className="ml-1 text-[10px] text-emerald-600 font-medium">(You)</span>}
+                  </p>
                 </div>
               </div>
 
@@ -410,17 +472,39 @@ const AuctionDetail = () => {
                 </div>
               )}
 
-              {isSold && auction.winning_bid_id && (
-                <div className="mt-3 pt-3 border-t border-emerald-200 bg-emerald-50/50 rounded-lg p-3">
+              {isSold && isWinner && (
+                <div className="mt-3 pt-3 border-t border-blue-200 bg-blue-50/50 rounded-lg p-3">
                   <div className="flex items-center gap-2">
-                    <Award size={16} className="text-emerald-600" />
-                    <p className="text-sm font-semibold text-emerald-700">Sold!</p>
+                    <Award size={16} className="text-blue-600" />
+                    <p className="text-sm font-semibold text-blue-700">You Won This Auction!</p>
                   </div>
-                  <p className="text-xs text-emerald-600 mt-1">
+                  <p className="text-xs text-blue-600 mt-1">
+                    Won for ₹{currentPrice.toLocaleString()}
+                  </p>
+                  <p className="text-[10px] text-blue-500 mt-0.5">
+                    {auction.delivery_confirmed_by_shop === true ? 'Shop confirmed delivery' : 
+                     auction.delivery_confirmed_by_shop === false ? 'Shop denied delivery - Switch to pickup option available' :
+                     'Awaiting shop delivery confirmation'}
+                  </p>
+                  {auction.closed_at && (
+                    <p className="text-[10px] text-blue-500 mt-0.5">
+                      Closed: {formatDate(auction.closed_at)}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {isSold && !isWinner && (
+                <div className="mt-3 pt-3 border-t border-blue-200 bg-blue-50/50 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <Award size={16} className="text-blue-600" />
+                    <p className="text-sm font-semibold text-blue-700">Auction Ended</p>
+                  </div>
+                  <p className="text-xs text-blue-600 mt-1">
                     Sold for ₹{currentPrice.toLocaleString()}
                   </p>
                   {auction.closed_at && (
-                    <p className="text-[10px] text-emerald-500 mt-0.5">
+                    <p className="text-[10px] text-blue-500 mt-0.5">
                       Closed: {formatDate(auction.closed_at)}
                     </p>
                   )}
@@ -450,9 +534,97 @@ const AuctionDetail = () => {
                   </p>
                 </div>
               )}
+
+              {isCompleted && isWinner && (
+                <div className="mt-3 pt-3 border-t border-emerald-200 bg-emerald-50/50 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle size={16} className="text-emerald-600" />
+                    <p className="text-sm font-semibold text-emerald-700">Transaction Completed</p>
+                  </div>
+                  {isOverridden && (
+                    <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                      <ShieldCheck size={12} />
+                      Completed via override
+                    </p>
+                  )}
+                  {auction.closed_at && (
+                    <p className="text-[10px] text-emerald-500 mt-0.5">
+                      Closed: {formatDate(auction.closed_at)}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Place Bid Card */}
+            {/* ====== PHASE 5B: OTP Display for Won Auctions ====== */}
+            {showOtpSection && hasOtp && (
+              <div className="bg-white/80 backdrop-blur-xl rounded-xl p-4 border border-blue-200 shadow-sm">
+                <h3 className="text-sm font-medium text-[#1A1A2E] mb-3 flex items-center gap-2">
+                  <Key size={14} className="text-[#FFBE91]" />
+                  Your OTP Code
+                </h3>
+                
+                <div className="bg-[#F8F6F0] rounded-lg p-4 text-center border border-[#EEECE6]">
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="font-mono text-2xl font-bold text-[#1A1A2E] tracking-widest select-all">
+                      {otpVisible ? otpCode : '••••••'}
+                    </div>
+                    <Button
+                      onClick={() => setOtpVisible(!otpVisible)}
+                      variant="ghost"
+                      className="text-[#A0A0B0] hover:text-[#1A1A2E] px-2 py-1 h-auto"
+                    >
+                      {otpVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </Button>
+                    <Button
+                      onClick={() => handleCopyOtp(otpCode)}
+                      variant="ghost"
+                      className="text-[#A0A0B0] hover:text-[#1A1A2E] px-2 py-1 h-auto flex items-center gap-1"
+                    >
+                      {otpCopied ? (
+                        <CheckCircle size={16} className="text-emerald-500" />
+                      ) : (
+                        <Copy size={16} />
+                      )}
+                      {otpCopied ? 'Copied!' : 'Copy'}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between text-[10px] text-[#A0A0B0]">
+                  <span>Attempts remaining: {Math.max(0, attemptsRemaining)} of {maxAttempts}</span>
+                  {auction.delivery_method && (
+                    <span className="flex items-center gap-1">
+                      {auction.delivery_method === 'home_delivery' ? <Home size={12} /> : <Truck size={12} />}
+                      {auction.delivery_method === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
+                    </span>
+                  )}
+                </div>
+
+                {attempts >= maxAttempts && (
+                  <div className="mt-3 pt-3 border-t border-amber-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-amber-600 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        Max attempts reached. You can override.
+                      </span>
+                      <Button
+                        onClick={handleOverrideComplete}
+                        className="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3 py-1 h-auto"
+                      >
+                        Override Completion
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-[10px] text-[#A0A0B0] mt-2 text-center">
+                  Share this OTP with the shop to complete the transaction
+                </p>
+              </div>
+            )}
+
+            {/* Place Bid Card - Only for Active auctions */}
             {isActive && (
               <div className="bg-white/80 backdrop-blur-xl rounded-xl p-4 border border-emerald-200 shadow-sm">
                 <h3 className="text-sm font-medium text-[#1A1A2E] mb-3 flex items-center gap-2">

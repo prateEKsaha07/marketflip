@@ -25,7 +25,10 @@ import {
   ChevronRight,
   Sparkles,
   Home,
-  Truck
+  Truck,
+  Key,
+  RotateCcw,
+  ShieldCheck
 } from 'lucide-react';
 import api from '../../api/client';
 import ImageCarousel from '../../components/ImageCarousel';
@@ -38,6 +41,11 @@ const AuctionDetailShop = () => {
   const [error, setError] = useState('');
   const [auction, setAuction] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [relisting, setRelisting] = useState(false);
 
   useEffect(() => {
     fetchAuctionDetail();
@@ -46,6 +54,7 @@ const AuctionDetailShop = () => {
   const fetchAuctionDetail = async () => {
     setLoading(true);
     setError('');
+    setSuccessMessage('');
     try {
       console.log('Fetching auction detail for:', id);
       const response = await api.get(`/auctions/${id}`);
@@ -74,6 +83,97 @@ const AuctionDetailShop = () => {
     }
   };
 
+  const handleConfirmDelivery = async () => {
+    setActionLoading(true);
+    setError('');
+    setSuccessMessage('');
+    try {
+      const response = await api.patch(`/auctions/${id}/delivery/confirm`);
+      if (response.data?.verification_code) {
+        setSuccessMessage(`Delivery confirmed! OTP: ${response.data.verification_code}`);
+      } else {
+        setSuccessMessage('Delivery confirmed successfully!');
+      }
+      await fetchAuctionDetail();
+    } catch (err) {
+      console.error('Confirm delivery error:', err);
+      setError('Failed to confirm delivery: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDenyDelivery = async () => {
+    if (!window.confirm('Are you sure you want to deny delivery? The buyer can switch to pickup.')) return;
+    
+    setActionLoading(true);
+    setError('');
+    setSuccessMessage('');
+    try {
+      await api.patch(`/auctions/${id}/delivery/deny`);
+      setSuccessMessage('Delivery denied. Buyer can switch to pickup.');
+      await fetchAuctionDetail();
+    } catch (err) {
+      console.error('Deny delivery error:', err);
+      setError('Failed to deny delivery: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otpInput.length !== 6) {
+      setOtpError('Please enter a 6-digit OTP');
+      return;
+    }
+
+    setActionLoading(true);
+    setError('');
+    setSuccessMessage('');
+    setOtpError('');
+    
+    try {
+      const response = await api.post(`/auctions/${id}/verify-otp`, { 
+        verification_code: otpInput 
+      });
+      
+      if (response.data.completed) {
+        setSuccessMessage('OTP verified! Transaction completed.');
+        setOtpInput('');
+        await fetchAuctionDetail();
+      } else {
+        const remaining = response.data.max_attempts - response.data.verification_attempts;
+        setOtpError(`Invalid OTP. ${remaining} attempts remaining.`);
+        await fetchAuctionDetail();
+      }
+    } catch (err) {
+      console.error('Verify OTP error:', err);
+      setOtpError(err.response?.data?.detail || 'Failed to verify OTP');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRelist = async () => {
+    if (!window.confirm('Relist this auction? A new auction will be created with the same details.')) return;
+    
+    setRelisting(true);
+    setError('');
+    setSuccessMessage('');
+    try {
+      const response = await api.post(`/auctions/${id}/relist`);
+      setSuccessMessage(`Auction relisted! New auction created.`);
+      setTimeout(() => {
+        navigate(`/shop/auctions/${response.data.new_auction_id}`);
+      }, 1500);
+    } catch (err) {
+      console.error('Relist error:', err);
+      setError('Failed to relist: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setRelisting(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     switch(status) {
       case 'active': 
@@ -88,9 +188,17 @@ const AuctionDetailShop = () => {
         return { 
           bg: 'bg-blue-100', 
           text: 'text-blue-700', 
-          label: 'Sold', 
-          icon: <Award size={14} />,
+          label: 'Sold - Awaiting Delivery', 
+          icon: <Truck size={14} />,
           dot: 'bg-blue-500'
+        };
+      case 'completed': 
+        return { 
+          bg: 'bg-emerald-100', 
+          text: 'text-emerald-700', 
+          label: 'Completed', 
+          icon: <CheckCircle size={14} />,
+          dot: 'bg-emerald-500'
         };
       case 'expired': 
         return { 
@@ -203,9 +311,16 @@ const AuctionDetailShop = () => {
   const status = getStatusBadge(auction.status);
   const isActive = auction.status === 'active';
   const isSold = auction.status === 'sold';
+  const isCompleted = auction.status === 'completed';
+  const isCancelled = auction.status === 'cancelled';
+  const isOverridden = auction.completed_via_override === true;
   const deliveryInfo = getDeliveryMethodLabel(auction.delivery_method);
   const hasImages = auction.image_urls && auction.image_urls.length > 0;
   const timeLeft = getTimeLeft(auction.end_time);
+  const hasOtp = auction.verification_code !== null && auction.verification_code !== undefined;
+  const attempts = auction.verification_attempts || 0;
+  const maxAttempts = 5;
+  const attemptsRemaining = maxAttempts - attempts;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
@@ -219,12 +334,18 @@ const AuctionDetailShop = () => {
         >
           <div className="flex items-center gap-3">
             <Button 
-              onClick={() => navigate('/shop/auctions/my')}
+              onClick={() => {
+                if (isActive) {
+                  navigate('/shop/auctions/my');
+                } else {
+                  navigate('/shop/finalized-auctions');
+                }
+              }}
               variant="ghost"
               className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
             >
               <ArrowLeft size={14} className="mr-1.5" />
-              My Auctions
+              {isActive ? 'My Auctions' : 'Finalized Auctions'}
             </Button>
             <div>
               <h1 className="text-xl font-semibold text-[#1A1A2E] flex items-center gap-2">
@@ -252,14 +373,49 @@ const AuctionDetailShop = () => {
                 {cancelling ? 'Cancelling...' : 'Cancel Auction'}
               </Button>
             )}
-            <Button 
-              onClick={() => navigate('/shop/auctions/my')}
-              className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-4 py-1.5 h-auto"
-            >
-              My Auctions
-            </Button>
+            {isCancelled && (
+              <Button
+                onClick={handleRelist}
+                disabled={relisting}
+                className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-4 py-1.5 h-auto flex items-center gap-1.5"
+              >
+                {relisting ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <RotateCcw size={13} />
+                )}
+                Relist
+              </Button>
+            )}
           </div>
         </motion.div>
+
+        {/* Success/Error Messages */}
+        {successMessage && (
+          <div className="bg-emerald-50/80 backdrop-blur-sm rounded-lg p-3 mb-4 text-emerald-700 text-xs flex items-center gap-2 border border-emerald-100">
+            <CheckCircle size={14} />
+            {successMessage}
+            <button 
+              onClick={() => setSuccessMessage('')}
+              className="ml-auto text-emerald-500 hover:text-emerald-700"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-rose-50/80 backdrop-blur-sm rounded-lg p-3 mb-4 text-rose-700 text-xs flex items-center gap-2 border border-rose-100">
+            <AlertCircle size={14} />
+            {error}
+            <button 
+              onClick={() => setError('')}
+              className="ml-auto text-rose-500 hover:text-rose-700"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         <motion.div 
           variants={containerVariants}
@@ -345,6 +501,12 @@ const AuctionDetailShop = () => {
                     {timeLeft}
                   </span>
                 )}
+                {isOverridden && (
+                  <span className="flex items-center gap-1 text-amber-600 text-xs font-medium">
+                    <ShieldCheck size={12} />
+                    Override
+                  </span>
+                )}
               </div>
               
               <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
@@ -378,15 +540,150 @@ const AuctionDetailShop = () => {
                 </div>
               )}
 
-              {isSold && auction.winning_bid_id && (
+              {/* ====== PHASE 5B: Post-Sale Delivery/OTP Section ====== */}
+              {isSold && (
+                <div className="mt-3 pt-3 border-t border-blue-200">
+                  {/* Delivery Status */}
+                  <div className="bg-blue-50/50 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Truck size={16} className="text-blue-600" />
+                        <span className="text-sm font-semibold text-blue-700">Delivery Status</span>
+                      </div>
+                      {auction.delivery_confirmed_by_shop === true ? (
+                        <span className="text-emerald-600 text-xs font-medium flex items-center gap-1">
+                          <CheckCircle size={12} />
+                          Confirmed
+                        </span>
+                      ) : auction.delivery_confirmed_by_shop === false ? (
+                        <span className="text-rose-600 text-xs font-medium flex items-center gap-1">
+                          <XCircle size={12} />
+                          Denied
+                        </span>
+                      ) : (
+                        <span className="text-amber-600 text-xs font-medium flex items-center gap-1">
+                          <Clock size={12} />
+                          Awaiting
+                        </span>
+                      )}
+                    </div>
+                    {auction.delivery_method && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        Method: {auction.delivery_method === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
+                      </p>
+                    )}
+                    {auction.delivery_address && (
+                      <p className="text-xs text-[#4A4A5A] mt-0.5">
+                        Address: {auction.delivery_address}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Confirm/Deny Buttons - Only if not confirmed */}
+                  {auction.delivery_confirmed_by_shop !== true && (
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        onClick={handleConfirmDelivery}
+                        disabled={actionLoading}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 h-auto flex items-center justify-center gap-1.5"
+                      >
+                        {actionLoading ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <CheckCircle size={13} />
+                        )}
+                        Confirm Delivery
+                      </Button>
+                      <Button
+                        onClick={handleDenyDelivery}
+                        disabled={actionLoading}
+                        variant="outline"
+                        className="flex-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 text-xs px-3 py-1.5 h-auto"
+                      >
+                        Deny
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* OTP Section - Only if delivery confirmed or pickup */}
+                  {(auction.delivery_confirmed_by_shop === true || auction.delivery_method === 'pickup') && (
+                    <div className="mt-3 pt-3 border-t border-blue-200">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-medium text-[#4A4A5A] flex items-center gap-1.5">
+                            <Key size={13} className="text-[#A0A0B0]" />
+                            Enter 6-digit OTP
+                          </label>
+                          {hasOtp && (
+                            <span className="text-[10px] text-[#A0A0B0]">
+                              Attempts remaining: {Math.max(0, attemptsRemaining)}
+                            </span>
+                          )}
+                        </div>
+                        {attempts >= maxAttempts && (
+                          <div className="text-[10px] text-rose-600 flex items-center gap-1">
+                            <AlertCircle size={12} />
+                            Max attempts reached - Buyer can override
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            maxLength={6}
+                            placeholder="000000"
+                            value={otpInput}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '');
+                              setOtpInput(val);
+                              setOtpError('');
+                            }}
+                            disabled={actionLoading || attempts >= maxAttempts || !hasOtp}
+                            className={`
+                              flex-1 px-3 py-1.5 text-xs bg-white border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/20 transition-all
+                              ${otpError ? 'border-rose-400 focus:border-rose-400' : 'border-[#EEECE6] focus:border-[#FFBE91]'}
+                              ${(actionLoading || attempts >= maxAttempts || !hasOtp) ? 'opacity-50 cursor-not-allowed' : ''}
+                            `}
+                          />
+                          <Button
+                            onClick={handleVerifyOtp}
+                            disabled={actionLoading || attempts >= maxAttempts || !hasOtp || otpInput.length !== 6}
+                            className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-4 py-1.5 h-auto flex items-center gap-1.5"
+                          >
+                            {actionLoading ? (
+                              <Loader2 size={13} className="animate-spin" />
+                            ) : (
+                              <Key size={13} />
+                            )}
+                            Verify
+                          </Button>
+                        </div>
+                        {otpError && (
+                          <p className="text-[10px] text-rose-600">{otpError}</p>
+                        )}
+                        {!hasOtp && auction.delivery_method === 'home_delivery' && (
+                          <p className="text-[10px] text-amber-600">
+                            Confirm delivery first to generate OTP
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Completed Section */}
+              {isCompleted && (
                 <div className="mt-3 pt-3 border-t border-emerald-200 bg-emerald-50/50 rounded-lg p-3">
                   <div className="flex items-center gap-2">
-                    <Award size={16} className="text-emerald-600" />
-                    <p className="text-sm font-semibold text-emerald-700">Sold!</p>
+                    <CheckCircle size={16} className="text-emerald-600" />
+                    <p className="text-sm font-semibold text-emerald-700">Transaction Completed</p>
                   </div>
-                  <p className="text-xs text-emerald-600 mt-1">
-                    Sold for ₹{auction.current_highest_bid?.toLocaleString() || auction.starting_price.toLocaleString()}
-                  </p>
+                  {isOverridden && (
+                    <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                      <ShieldCheck size={12} />
+                      Completed via buyer override
+                    </p>
+                  )}
                   {auction.closed_at && (
                     <p className="text-[10px] text-emerald-500 mt-0.5">
                       Closed: {formatDate(auction.closed_at)}
@@ -421,6 +718,18 @@ const AuctionDetailShop = () => {
                   <p className="text-xs text-gray-600 mt-1">
                     This auction was cancelled by the shop owner
                   </p>
+                  <Button
+                    onClick={handleRelist}
+                    disabled={relisting}
+                    className="mt-2 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-3 py-1 h-auto flex items-center gap-1.5"
+                  >
+                    {relisting ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <RotateCcw size={12} />
+                    )}
+                    Relist Auction
+                  </Button>
                 </div>
               )}
             </div>

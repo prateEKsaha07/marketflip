@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { AnimatePresence } from 'framer-motion';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PageTransition from './components/PageTransition';
-import './styles/auth.css'; // Import auth styles
+import './styles/auth.css';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import BuyerDashboard from './pages/buyer/Dashboard';
@@ -26,9 +26,14 @@ import AuctionDetail from './pages/buyer/AuctionDetail';
 import Profile from './pages/profile/Profile';
 import ProfileFormPage from './pages/profile/ProfileForm';
 import TransactionHistory from './pages/history/TransactionHistory';
-// ====== NEW: Chat Imports ======
 import ChatList from './pages/chat/ChatList';
 import ChatView from './pages/chat/ChatView';
+
+// ====== NEW: Phase 5b Auction Imports ======
+import FinalizedAuctions from './pages/shop/FinalizedAuctions';
+import ShopAuctionHistory from './pages/shop/AuctionHistory';
+import MyWonAuctions from './pages/buyer/MyWonAuctions';
+import BuyerAuctionHistory from './pages/buyer/AuctionHistory';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -127,6 +132,22 @@ const AnimatedRoutes = () => {
           </PageTransition>
         } />
         
+        {/* ====== NEW: Buyer Auction Phase 5b Routes ====== */}
+        <Route path="/buyer/my-won-auctions" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <MyWonAuctions />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/buyer/auction-history" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <BuyerAuctionHistory />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        
         {/* Shop Routes */}
         <Route path="/shop/dashboard" element={
           <PageTransition>
@@ -191,8 +212,24 @@ const AnimatedRoutes = () => {
             </ProtectedRoute>
           </PageTransition>
         } />
+        
+        {/* ====== NEW: Shop Auction Phase 5b Routes ====== */}
+        <Route path="/shop/finalized-auctions" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="shop_owner">
+              <FinalizedAuctions />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
+        <Route path="/shop/auction-history" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="shop_owner">
+              <ShopAuctionHistory />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
 
-        {/* profile routes */}
+        {/* Profile Routes */}
         <Route path="/buyer/profile" element={
           <PageTransition>
             <ProtectedRoute requiredRole="buyer">
@@ -223,7 +260,7 @@ const AnimatedRoutes = () => {
           </PageTransition>
         } />
 
-        {/* transaction history */}
+        {/* Transaction History */}
         <Route path="/buyer/history" element={
           <PageTransition>
             <ProtectedRoute requiredRole="buyer">
@@ -240,7 +277,7 @@ const AnimatedRoutes = () => {
           </PageTransition>
         } />
 
-        {/* ====== NEW: Chat Routes ====== */}
+        {/* Chat Routes */}
         <Route path="/buyer/chat" element={
           <PageTransition>
             <ProtectedRoute requiredRole="buyer">
