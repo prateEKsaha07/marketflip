@@ -28,6 +28,7 @@ import ProfileFormPage from './pages/profile/ProfileForm';
 import TransactionHistory from './pages/history/TransactionHistory';
 import ChatList from './pages/chat/ChatList';
 import ChatView from './pages/chat/ChatView';
+import BuyerMyBids from './pages/buyer/MyBids';
 
 // ====== NEW: Phase 5b Auction Imports ======
 import FinalizedAuctions from './pages/shop/FinalizedAuctions';
@@ -306,7 +307,13 @@ const AnimatedRoutes = () => {
             </ProtectedRoute>
           </PageTransition>
         } />
-
+        <Route path="/buyer/my-bids" element={
+          <PageTransition>
+            <ProtectedRoute requiredRole="buyer">
+              <BuyerMyBids />
+            </ProtectedRoute>
+          </PageTransition>
+        } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>
