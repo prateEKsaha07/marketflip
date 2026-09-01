@@ -27,14 +27,25 @@ class AuctionService:
             shop_id=shop_id
         )
 
-    def _create_notification_placeholder(self, user_id: str, notification_type: str, 
-                                          title: str, body: str, link: str = None):
-        """
-        Placeholder for notification creation.
-        TODO: Phase 7 - Implement actual notifications table/service
-        Logs the notification that would be created.
-        """
-        logger.info(f"NOTIFICATION (Phase 7 placeholder): user={user_id}, type={notification_type}, title={title}")
+    def _create_notification(self, user_id: str, notification_type: str, 
+                              title: str, body: str, link: str = None):
+        """Create a real notification in the database"""
+        try:
+            data = {
+                "user_id": user_id,
+                "type": notification_type,
+                "title": title,
+                "body": body,
+                "link": link,
+                "read": False
+            }
+            response = self.supabase_admin.table("notifications").insert(data).execute()
+            if response.data:
+                logger.info(f"Notification created for user {user_id}: {title}")
+            else:
+                logger.warning(f"Failed to create notification for user {user_id}")
+        except Exception as e:
+            logger.error(f"Failed to create notification: {e}")
 
     def _get_flagged_targets(self, target_type: str) -> List[str]:
         """
@@ -42,7 +53,6 @@ class AuctionService:
         Used to exclude flagged items from browse feeds.
         """
         try:
-            # Check if reports table exists
             response = self.supabase_admin.table("reports") \
                 .select("target_id") \
                 .eq("target_type", target_type) \
@@ -75,7 +85,6 @@ class AuctionService:
                 "end_time": end_time,
                 "image_urls": auction_data.get("image_urls", []),
                 "status": "active"
-                # Removed delivery_method and delivery_address - buyer sets these post-win
             }
         
             logger.info(f"Creating auction with data: {data}")
@@ -118,18 +127,15 @@ class AuctionService:
                 query = query.eq("category", category)
 
             # ====== APPLY SORTING ======
-            # Note: Supabase .order() uses desc=True for descending,
-            # or .order(column) for ascending (default)
             if sort == "newest":
                 query = query.order("created_at", desc=True)
             elif sort == "price_asc":
-                query = query.order("current_highest_bid")  # ascending is default
+                query = query.order("current_highest_bid")
             elif sort == "price_desc":
                 query = query.order("current_highest_bid", desc=True)
             elif sort == "ending_soon":
-                query = query.order("end_time")  # ascending is default (ending soon first)
+                query = query.order("end_time")
             elif sort == "most_bids":
-                # We'll sort by bid_count after fetching
                 query = query.order("created_at", desc=True)
             else:
                 query = query.order("created_at", desc=True)
@@ -157,7 +163,6 @@ class AuctionService:
                 else:
                     auction["shop_name"] = None
 
-            # If sorting by most_bids, sort after fetching
             if sort == "most_bids":
                 auctions.sort(key=lambda x: x.get("bid_count", 0), reverse=True)
 
@@ -234,14 +239,12 @@ class AuctionService:
             if auction["status"] != "active":
                 raise ValueError("Auction is not active")
 
-            # Parse end_time
             end_time_str = auction["end_time"]
             if isinstance(end_time_str, str):
                 end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
             else:
                 end_time = end_time_str
             
-            # Use timezone-aware current time
             now = datetime.now(timezone.utc)
             
             if now > end_time:
@@ -254,7 +257,6 @@ class AuctionService:
             if auction.get("current_highest_bidder") == buyer_id:
                 raise ValueError("You are already the highest bidder")
 
-            # Place the bid
             bid_data = {
                 "auction_id": auction_id,
                 "buyer_id": buyer_id,
@@ -266,12 +268,10 @@ class AuctionService:
             if not bid_response.data:
                 raise Exception("Failed to place bid")
             
-            # Update auction
             update_data = {
                 "current_highest_bid": bid_amount
             }
             
-            # Try to update current_highest_bidder
             try:
                 self.supabase_admin.table("auctions") \
                     .select("current_highest_bidder") \
@@ -281,7 +281,6 @@ class AuctionService:
             except Exception:
                 pass
             
-            # Sniping prevention
             time_left = (end_time - now).total_seconds()
             if time_left < 300:
                 new_end_time = end_time + timedelta(minutes=5)
@@ -303,12 +302,8 @@ class AuctionService:
             raise
 
     def cancelAuction(self, auction_id: str, shop_id: str) -> bool:
-        """
-        Cancel an active auction (shop owner only).
-        Only active auctions can be cancelled.
-        """
+        """Cancel an active auction (shop owner only)."""
         try:
-            # Get auction
             auction_response = self.supabase_admin.table("auctions") \
                 .select("*") \
                 .eq("id", auction_id) \
@@ -319,15 +314,12 @@ class AuctionService:
             
             auction = auction_response.data[0]
             
-            # Validate shop owns the auction
             if auction["shop_id"] != shop_id:
                 raise ValueError("You don't own this auction")
             
-            # Validate auction is active
             if auction["status"] != "active":
                 raise ValueError(f"Auction must be 'active' to cancel. Current status: {auction['status']}")
             
-            # Update auction status to cancelled
             update_data = {
                 "status": "cancelled",
                 "closed_at": datetime.now(timezone.utc).isoformat()
@@ -349,13 +341,8 @@ class AuctionService:
             raise
 
     def close_auction_with_winner(self, auction_id: str, winner_buyer_id: str) -> Dict[str, Any]:
-        """
-        Close an auction with a winner.
-        This should be called when an auction ends and a winner is selected.
-        Unlocks the chat between buyer and shop.
-        """
+        """Close an auction with a winner. Unlocks chat and sends notifications."""
         try:
-            # Get auction details
             auction_response = self.supabase_admin.table("auctions") \
                 .select("*") \
                 .eq("id", auction_id) \
@@ -367,7 +354,6 @@ class AuctionService:
             auction = auction_response.data[0]
             shop_id = auction["shop_id"]
             
-            # Update auction status to sold
             update_data = {
                 "status": "sold",
                 "closed_at": datetime.now(timezone.utc).isoformat()
@@ -397,10 +383,9 @@ class AuctionService:
                 logger.info(f"Chat unlocked for auction {auction_id}, conversation {conversation['id']}")
             except Exception as e:
                 logger.error(f"Error unlocking chat for auction {auction_id}: {e}")
-                # Don't fail the auction close if chat fails
             
-            # NOTIFICATION PLACEHOLDER: Buyer won
-            self._create_notification_placeholder(
+            # NOTIFICATION: Buyer won
+            self._create_notification(
                 user_id=winner_buyer_id,
                 notification_type="auction_won",
                 title=f"You won the auction: {auction.get('item_name')}",
@@ -408,8 +393,8 @@ class AuctionService:
                 link=f"/buyer/auctions/{auction_id}"
             )
             
-            # NOTIFICATION PLACEHOLDER: Shop sold
-            self._create_notification_placeholder(
+            # NOTIFICATION: Shop sold
+            self._create_notification(
                 user_id=shop_id,
                 notification_type="auction_sold",
                 title=f"Your auction sold: {auction.get('item_name')}",
@@ -427,12 +412,8 @@ class AuctionService:
 
     def set_delivery_method(self, auction_id: str, buyer_id: str, 
                            delivery_method: str, delivery_address: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Buyer sets delivery method and address after winning auction.
-        Generates OTP if delivery method is 'pickup' (immediate handoff).
-        """
+        """Buyer sets delivery method and address after winning auction."""
         try:
-            # Get auction
             auction_response = self.supabase_admin.table("auctions") \
                 .select("*") \
                 .eq("id", auction_id) \
@@ -443,25 +424,20 @@ class AuctionService:
             
             auction = auction_response.data[0]
             
-            # Validate auction is in 'sold' state
             if auction["status"] != "sold":
                 raise ValueError(f"Auction must be in 'sold' status to set delivery method. Current status: {auction['status']}")
             
-            # Validate buyer is the winner
             if auction.get("current_highest_bidder") != buyer_id:
                 raise ValueError("Only the winning buyer can set delivery method")
             
-            # Validate delivery_address if home_delivery
             if delivery_method == "home_delivery" and (not delivery_address or not delivery_address.strip()):
                 raise ValueError("Delivery address is required for home delivery")
             
-            # Update auction
             update_data = {
                 "delivery_method": delivery_method,
                 "delivery_address": delivery_address if delivery_method == "home_delivery" else None
             }
             
-            # Generate OTP if pickup (immediate handoff)
             if delivery_method == "pickup":
                 otp = self._generate_verification_code()
                 update_data["verification_code"] = otp
@@ -475,8 +451,8 @@ class AuctionService:
             if not result.data:
                 raise Exception("Failed to set delivery method")
             
-            # NOTIFICATION PLACEHOLDER: Buyer set delivery method
-            self._create_notification_placeholder(
+            # NOTIFICATION: Buyer set delivery method
+            self._create_notification(
                 user_id=auction["shop_id"],
                 notification_type="delivery_method_set",
                 title=f"Buyer set delivery method for {auction.get('item_name')}",
@@ -494,12 +470,8 @@ class AuctionService:
             raise
 
     def confirm_delivery(self, auction_id: str, shop_id: str) -> Dict[str, Any]:
-        """
-        Shop confirms delivery arrangement.
-        Generates OTP for home delivery (pickup already has OTP).
-        """
+        """Shop confirms delivery arrangement. Generates OTP for home delivery."""
         try:
-            # Get auction
             auction_response = self.supabase_admin.table("auctions") \
                 .select("*") \
                 .eq("id", auction_id) \
@@ -510,25 +482,20 @@ class AuctionService:
             
             auction = auction_response.data[0]
             
-            # Validate shop owns the auction
             if auction["shop_id"] != shop_id:
                 raise ValueError("You don't own this auction")
             
-            # Validate auction is in 'sold' state
             if auction["status"] != "sold":
                 raise ValueError(f"Auction must be in 'sold' status to confirm delivery. Current status: {auction['status']}")
             
-            # Validate delivery_method is set
             if not auction.get("delivery_method"):
                 raise ValueError("Buyer must set delivery method first")
             
-            # Update auction
             update_data = {
                 "delivery_confirmed_by_shop": True,
                 "delivery_response_at": datetime.now(timezone.utc).isoformat()
             }
             
-            # Generate OTP if home_delivery (pickup already has OTP from set_delivery_method)
             if auction["delivery_method"] == "home_delivery":
                 otp = self._generate_verification_code()
                 update_data["verification_code"] = otp
@@ -542,8 +509,8 @@ class AuctionService:
             if not result.data:
                 raise Exception("Failed to confirm delivery")
             
-            # NOTIFICATION PLACEHOLDER: Shop confirmed
-            self._create_notification_placeholder(
+            # NOTIFICATION: Shop confirmed
+            self._create_notification(
                 user_id=auction["current_highest_bidder"],
                 notification_type="delivery_confirmed",
                 title=f"Shop confirmed delivery for {auction.get('item_name')}",
@@ -561,12 +528,8 @@ class AuctionService:
             raise
 
     def deny_delivery(self, auction_id: str, shop_id: str) -> Dict[str, Any]:
-        """
-        Shop denies delivery arrangement.
-        Clears OTP and gives buyer option to switch to pickup.
-        """
+        """Shop denies delivery arrangement. Clears OTP."""
         try:
-            # Get auction
             auction_response = self.supabase_admin.table("auctions") \
                 .select("*") \
                 .eq("id", auction_id) \
@@ -577,15 +540,12 @@ class AuctionService:
             
             auction = auction_response.data[0]
             
-            # Validate shop owns the auction
             if auction["shop_id"] != shop_id:
                 raise ValueError("You don't own this auction")
             
-            # Validate auction is in 'sold' state
             if auction["status"] != "sold":
                 raise ValueError(f"Auction must be in 'sold' status to deny delivery. Current status: {auction['status']}")
             
-            # Update auction - clear OTP so buyer can switch to pickup
             update_data = {
                 "delivery_confirmed_by_shop": False,
                 "delivery_response_at": datetime.now(timezone.utc).isoformat(),
@@ -601,8 +561,8 @@ class AuctionService:
             if not result.data:
                 raise Exception("Failed to deny delivery")
             
-            # NOTIFICATION PLACEHOLDER: Shop denied
-            self._create_notification_placeholder(
+            # NOTIFICATION: Shop denied
+            self._create_notification(
                 user_id=auction["current_highest_bidder"],
                 notification_type="delivery_denied",
                 title=f"Shop denied delivery for {auction.get('item_name')}",
@@ -617,12 +577,8 @@ class AuctionService:
             raise
 
     def switch_to_pickup(self, auction_id: str, buyer_id: str) -> Dict[str, Any]:
-        """
-        Buyer switches to pickup after shop denies delivery.
-        Generates new OTP for pickup handoff.
-        """
+        """Buyer switches to pickup after shop denies delivery."""
         try:
-            # Get auction
             auction_response = self.supabase_admin.table("auctions") \
                 .select("*") \
                 .eq("id", auction_id) \
@@ -633,22 +589,17 @@ class AuctionService:
             
             auction = auction_response.data[0]
             
-            # Validate buyer is the winner
             if auction.get("current_highest_bidder") != buyer_id:
                 raise ValueError("Only the winning buyer can switch to pickup")
             
-            # Validate auction is in 'sold' state
             if auction["status"] != "sold":
                 raise ValueError(f"Auction must be in 'sold' status to switch to pickup. Current status: {auction['status']}")
             
-            # Validate shop has denied delivery (or delivery not confirmed)
             if auction.get("delivery_confirmed_by_shop") is True:
                 raise ValueError("Shop has already confirmed delivery. Cannot switch to pickup.")
             
-            # Generate new OTP for pickup
             otp = self._generate_verification_code()
             
-            # Update auction
             update_data = {
                 "delivery_method": "pickup",
                 "delivery_address": None,
@@ -664,8 +615,8 @@ class AuctionService:
             if not result.data:
                 raise Exception("Failed to switch to pickup")
             
-            # NOTIFICATION PLACEHOLDER: Buyer switched to pickup
-            self._create_notification_placeholder(
+            # NOTIFICATION: Buyer switched to pickup
+            self._create_notification(
                 user_id=auction["shop_id"],
                 notification_type="switched_to_pickup",
                 title=f"Buyer switched to pickup for {auction.get('item_name')}",
@@ -683,15 +634,10 @@ class AuctionService:
             raise
 
     def verify_otp(self, auction_id: str, shop_id: str, verification_code: str) -> Dict[str, Any]:
-        """
-        Shop verifies OTP code submitted by buyer.
-        On success: auction status becomes 'completed', chat locks.
-        Max 5 attempts.
-        """
+        """Shop verifies OTP code. On success: status='completed', chat locks."""
         MAX_ATTEMPTS = 5
         
         try:
-            # Get auction
             auction_response = self.supabase_admin.table("auctions") \
                 .select("*") \
                 .eq("id", auction_id) \
@@ -702,32 +648,24 @@ class AuctionService:
             
             auction = auction_response.data[0]
             
-            # Validate shop owns the auction
             if auction["shop_id"] != shop_id:
                 raise ValueError("You don't own this auction")
             
-            # Validate auction is in 'sold' state
             if auction["status"] != "sold":
                 raise ValueError(f"Auction must be in 'sold' status to verify OTP. Current status: {auction['status']}")
             
-            # Check if OTP exists
             stored_otp = auction.get("verification_code")
             if not stored_otp:
                 raise ValueError("No OTP has been generated for this auction")
             
-            # Check attempts
             attempts = auction.get("verification_attempts", 0)
             if attempts >= MAX_ATTEMPTS:
                 raise ValueError(f"Maximum OTP attempts ({MAX_ATTEMPTS}) exceeded. Buyer must override.")
             
-            # Verify OTP
             is_valid = verification_code == stored_otp
-            
-            # Update attempts
             new_attempts = attempts + 1
             
             if is_valid:
-                # OTP correct - complete the transaction
                 update_data = {
                     "verification_attempts": new_attempts,
                     "status": "completed",
@@ -757,10 +695,9 @@ class AuctionService:
                     logger.info(f"Chat locked for auction {auction_id}, conversation {conversation['id']}")
                 except Exception as e:
                     logger.error(f"Error locking chat for auction {auction_id}: {e}")
-                    # Don't fail the OTP verification if chat fails
                 
-                # NOTIFICATION PLACEHOLDER: Transaction completed
-                self._create_notification_placeholder(
+                # NOTIFICATION: Transaction completed
+                self._create_notification(
                     user_id=auction["current_highest_bidder"],
                     notification_type="transaction_completed",
                     title=f"Transaction completed: {auction.get('item_name')}",
@@ -768,7 +705,7 @@ class AuctionService:
                     link=f"/buyer/auctions/{auction_id}"
                 )
                 
-                self._create_notification_placeholder(
+                self._create_notification(
                     user_id=shop_id,
                     notification_type="transaction_completed",
                     title=f"Transaction completed: {auction.get('item_name')}",
@@ -783,12 +720,10 @@ class AuctionService:
                     "message": "OTP verified successfully. Transaction completed."
                 }
             else:
-                # OTP incorrect
                 update_data = {
                     "verification_attempts": new_attempts
                 }
                 
-                # If max attempts reached, keep OTP but mark attempts
                 result = self.supabase_admin.table("auctions") \
                     .update(update_data) \
                     .eq("id", auction_id) \
@@ -809,15 +744,10 @@ class AuctionService:
             raise
 
     def override_complete(self, auction_id: str, buyer_id: str) -> Dict[str, Any]:
-        """
-        Buyer overrides transaction completion after max OTP attempts.
-        Used when shop is unable or refuses to verify OTP.
-        Sets status='completed' and locks chat.
-        """
+        """Buyer overrides transaction completion after max OTP attempts."""
         MAX_ATTEMPTS = 5
         
         try:
-            # Get auction
             auction_response = self.supabase_admin.table("auctions") \
                 .select("*") \
                 .eq("id", auction_id) \
@@ -828,20 +758,16 @@ class AuctionService:
             
             auction = auction_response.data[0]
             
-            # Validate buyer is the winner
             if auction.get("current_highest_bidder") != buyer_id:
                 raise ValueError("Only the winning buyer can override completion")
             
-            # Validate auction is in 'sold' state
             if auction["status"] != "sold":
                 raise ValueError(f"Auction must be in 'sold' status to override. Current status: {auction['status']}")
             
-            # Check if max attempts reached
             attempts = auction.get("verification_attempts", 0)
             if attempts < MAX_ATTEMPTS:
                 raise ValueError(f"OTP attempts ({attempts}) have not reached maximum ({MAX_ATTEMPTS})")
             
-            # Complete the transaction
             update_data = {
                 "status": "completed",
                 "closed_at": datetime.now(timezone.utc).isoformat(),
@@ -871,10 +797,9 @@ class AuctionService:
                 logger.info(f"Chat locked for auction {auction_id} via override, conversation {conversation['id']}")
             except Exception as e:
                 logger.error(f"Error locking chat for auction {auction_id} via override: {e}")
-                # Don't fail the override if chat fails
             
-            # NOTIFICATION PLACEHOLDER: Override completed
-            self._create_notification_placeholder(
+            # NOTIFICATION: Override completed
+            self._create_notification(
                 user_id=auction["shop_id"],
                 notification_type="override_completed",
                 title=f"Transaction completed via override: {auction.get('item_name')}",
@@ -890,12 +815,8 @@ class AuctionService:
 
     def relist_auction(self, auction_id: str, shop_id: str, 
                       new_end_time: Optional[datetime] = None) -> Dict[str, Any]:
-        """
-        Shop relists a cancelled auction.
-        Copies core fields into a new auction with fresh start.
-        """
+        """Shop relists a cancelled auction."""
         try:
-            # Get original auction
             auction_response = self.supabase_admin.table("auctions") \
                 .select("*") \
                 .eq("id", auction_id) \
@@ -906,22 +827,18 @@ class AuctionService:
             
             original = auction_response.data[0]
             
-            # Validate shop owns the auction
             if original["shop_id"] != shop_id:
                 raise ValueError("You don't own this auction")
             
-            # Validate auction is cancelled
             if original["status"] != "cancelled":
                 raise ValueError(f"Auction must be 'cancelled' to relist. Current status: {original['status']}")
             
-            # Set new end time (default: 7 days from now)
             if new_end_time is None:
                 new_end_time = datetime.now(timezone.utc) + timedelta(days=7)
             elif isinstance(new_end_time, datetime):
                 if new_end_time.tzinfo is None:
                     new_end_time = new_end_time.replace(tzinfo=timezone.utc)
             
-            # Prepare new auction data
             new_auction_data = {
                 "shop_id": shop_id,
                 "item_name": original["item_name"],
@@ -937,7 +854,6 @@ class AuctionService:
             
             logger.info(f"Relisting auction {auction_id} as new auction")
             
-            # Create new auction
             response = self.supabase_admin.table("auctions").insert(new_auction_data).execute()
             
             if not response.data:

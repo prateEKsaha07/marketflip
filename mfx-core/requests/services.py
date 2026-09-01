@@ -12,11 +12,47 @@ class RequestService:
     def __init__(self, supabase_admin: Client, supabase_anon: Client):
         self.supabase_admin = supabase_admin
         self.supabase_anon = supabase_anon
-    
+
+    def _create_notification(self, user_id: str, notification_type: str,
+                              title: str, body: str, link: str = None):
+        """Create a real notification in the database"""
+        try:
+            data = {
+                "user_id": user_id,
+                "type": notification_type,
+                "title": title,
+                "body": body,
+                "link": link,
+                "read": False
+            }
+            response = self.supabase_admin.table("notifications").insert(data).execute()
+            if response.data:
+                logger.info(f"Notification created for user {user_id}: {title}")
+            else:
+                logger.warning(f"Failed to create notification for user {user_id}")
+        except Exception as e:
+            logger.error(f"Failed to create notification: {e}")
+
+    def _get_flagged_targets(self, target_type: str) -> List[str]:
+        """
+        Get IDs of targets with pending reports.
+        Used to exclude flagged items from browse feeds.
+        """
+        try:
+            response = self.supabase_admin.table("reports") \
+                .select("target_id") \
+                .eq("target_type", target_type) \
+                .eq("status", "pending") \
+                .execute()
+            
+            return [str(r["target_id"]) for r in response.data] if response.data else []
+        except Exception as e:
+            logger.error(f"Error getting flagged targets for {target_type}: {e}")
+            return []
+
     def create_request(self, buyer_id: str, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new request"""
         try:
-            # required fields
             data = {
                 "buyer_id": buyer_id,
                 "item_name": request_data["item_name"],
@@ -64,9 +100,16 @@ class RequestService:
         limit: int = 100,
         offset: int = 0
     ) -> List[Dict[str, Any]]:
-        """Get requests with filters"""
+        """Get requests with filters - excludes flagged items"""
         try:
             query = self.supabase_anon.table("requests").select("*")
+            
+            # ====== EXCLUDE FLAGGED REQUESTS ======
+            flagged_ids = self._get_flagged_targets("request")
+            if flagged_ids:
+                logger.info(f"Excluding {len(flagged_ids)} flagged requests from feed")
+                query = query.not_.in_("id", flagged_ids)
+            
             query = query.eq("status", status)
             if pincode:
                 query = query.eq("pincode", pincode)
@@ -85,7 +128,6 @@ class RequestService:
     def get_request_by_id(self, request_id: str, current_user_id: str) -> Dict[str, Any]:
         """Get request by ID with bids (if user is buyer)"""
         try:
-            # Get request
             request_response = self.supabase_anon.table("requests") \
                 .select("*") \
                 .eq("id", request_id) \
@@ -96,16 +138,13 @@ class RequestService:
             
             request = request_response.data[0]
             
-            # Ensure image_urls is always included
             if "image_urls" not in request:
                 request["image_urls"] = []
             elif request["image_urls"] is None:
                 request["image_urls"] = []
             
-            # Check if current user is the buyer
             is_buyer = str(request["buyer_id"]) == current_user_id
             
-            # Get bids if user is the buyer
             bids = []
             if is_buyer:
                 bids_response = self.supabase_anon.table("bids") \
@@ -136,7 +175,6 @@ class RequestService:
     def delete_request(self, request_id: str, current_user_id: str) -> bool:
         """Soft delete a request (set status to 'deleted')"""
         try:
-            # Check ownership
             check_response = self.supabase_admin.table("requests") \
                 .select("buyer_id") \
                 .eq("id", request_id) \
@@ -148,7 +186,6 @@ class RequestService:
             if str(check_response.data[0]["buyer_id"]) != current_user_id:
                 raise Exception("You don't have permission to delete this request")
             
-            # Soft delete - update status
             response = self.supabase_admin.table("requests") \
                 .update({"status": "deleted"}) \
                 .eq("id", request_id) \
@@ -167,16 +204,6 @@ class RequestService:
         """
         Shop confirms home delivery for a request.
         Generates OTP code for the transaction.
-        
-        Args:
-            request_id: The request ID
-            shop_id: The shop owner's profile ID
-            
-        Returns:
-            Updated request data with delivery confirmation and OTP
-            
-        Raises:
-            ValueError: If validation fails
         """
         try:
             request_result = self.supabase_admin.table("requests")\
@@ -209,7 +236,6 @@ class RequestService:
             if bid_result.data[0]["shop_id"] != str(shop_id):
                 raise ValueError("You are not the shop owner of the selected bid")
         
-            # ====== GENERATE OTP FOR HOME DELIVERY ======
             verification_code = generate_verification_code()
             logger.info(f"=== HOME DELIVERY OTP GENERATED ===")
             logger.info(f"Request ID: {request_id}")
@@ -228,6 +254,18 @@ class RequestService:
             if not update_result.data:
                 raise ValueError("Failed to update delivery confirmation")
         
+            # NOTIFICATION: Shop confirmed delivery
+            try:
+                self._create_notification(
+                    user_id=request["buyer_id"],
+                    notification_type="delivery_confirmed",
+                    title=f"Shop confirmed delivery for {request.get('item_name')}",
+                    body=f"The shop has confirmed delivery. Please use the OTP code to complete the transaction.",
+                    link=f"/buyer/request/{request_id}"
+                )
+            except Exception as e:
+                logger.error(f"Error creating notification: {e}")
+        
             return update_result.data[0]
         
         except Exception as e:
@@ -238,16 +276,6 @@ class RequestService:
         """
         Shop denies home delivery for a request.
         Clears any existing verification code.
-        
-        Args:
-            request_id: The request ID
-            shop_id: The shop owner's profile ID
-            
-        Returns:
-            Updated request data with delivery denial
-            
-        Raises:
-            ValueError: If validation fails
         """
         try:
             request_result = self.supabase_admin.table("requests")\
@@ -280,7 +308,6 @@ class RequestService:
             if bid_result.data[0]["shop_id"] != str(shop_id):
                 raise ValueError("You are not the shop owner of the selected bid")
         
-            # Clear verification code when denying delivery
             update_result = self.supabase_admin.table("requests")\
                 .update({
                     "delivery_confirmed_by_shop": False,
@@ -294,6 +321,18 @@ class RequestService:
             if not update_result.data:
                 raise ValueError("Failed to update delivery denial")
         
+            # NOTIFICATION: Shop denied delivery
+            try:
+                self._create_notification(
+                    user_id=request["buyer_id"],
+                    notification_type="delivery_denied",
+                    title=f"Shop denied delivery for {request.get('item_name')}",
+                    body=f"The shop cannot deliver to your address. You can switch to pickup or cancel the transaction.",
+                    link=f"/buyer/request/{request_id}"
+                )
+            except Exception as e:
+                logger.error(f"Error creating notification: {e}")
+        
             return update_result.data[0]
         
         except Exception as e:
@@ -304,19 +343,8 @@ class RequestService:
         """
         Select a bid and generate OTP if the request is for pickup.
         This is called from the bid selection flow.
-        
-        Args:
-            request_id: The request ID
-            bid_id: The selected bid ID
-            
-        Returns:
-            Updated request data with OTP if applicable
-            
-        Raises:
-            ValueError: If validation fails
         """
         try:
-            # Get request
             request_result = self.supabase_admin.table("requests") \
                 .select("*") \
                 .eq("id", str(request_id)) \
@@ -327,16 +355,13 @@ class RequestService:
             
             request = request_result.data[0]
             
-            # Check if delivery method is pickup
             if request.get("delivery_method") == "pickup":
-                # Generate OTP for pickup
                 verification_code = generate_verification_code()
                 
                 logger.info(f"=== PICKUP OTP GENERATED IN SERVICE ===")
                 logger.info(f"Request ID: {request_id}")
                 logger.info(f"Verification Code: {verification_code}")
                 
-                # Update request with OTP and auto-confirm delivery
                 update_result = self.supabase_admin.table("requests") \
                     .update({
                         "verification_code": verification_code,
@@ -349,6 +374,18 @@ class RequestService:
                 
                 if not update_result.data:
                     raise ValueError("Failed to update request with OTP")
+                
+                # NOTIFICATION: Bid selected (shop)
+                try:
+                    self._create_notification(
+                        user_id=request["buyer_id"],
+                        notification_type="bid_selected",
+                        title=f"Your bid was selected for {request.get('item_name')}",
+                        body=f"Your bid has been selected. Please proceed with the transaction.",
+                        link=f"/buyer/request/{request_id}"
+                    )
+                except Exception as e:
+                    logger.error(f"Error creating notification: {e}")
                 
                 return update_result.data[0]
             

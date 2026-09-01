@@ -26,6 +26,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import api from '../../api/client';
+import NotificationDropdown from '../../components/NotificationDropdown';
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -251,6 +252,9 @@ const Dashboard = () => {
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+              {/* Notification Dropdown */}
+              <NotificationDropdown />
+
               {unreadCount > 0 && (
                 <div className="bg-[#FFBE91] text-[#1A1A2E] px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5">
                   <MessageCircle size={14} />
