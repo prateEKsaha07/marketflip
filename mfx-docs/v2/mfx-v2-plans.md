@@ -69,11 +69,15 @@ Richer buyer/shop profiles — both UX value (Amazon-style profiles) and ML feat
 - Flow: user selects file → frontend uploads to Cloudinary (unsigned upload preset or signed via backend) → Cloudinary returns a hosted URL → store that URL in updated `image_urls` array field (see 2.18 for multi-image upgrade)
 - Bonus: Cloudinary auto-resize/compress means faster-loading cards without extra work
 
-### 2.10 In-App Chat (post-selection only)
+### 2.10 In-App Chat — contact-based, WhatsApp-style (redesigned Aug 29)
 - **Scope change from v1 POC** — original docs explicitly excluded chat; reintroduced here for v2 because it adds real value once a bid/auction is actually won
-- Chat unlocks **only after**: a bid is selected (Core Flow) or an auction closes with a winner (Auctions flow) — not available during open bidding, to avoid buyers/shops negotiating outside the bid mechanism
-- Scope: text-only, tied to a specific `request_id` or `auction_id`, between the two matched parties only
-- Needs: `conversations` table + `messages` table (see Section 3/4), realtime delivery via Supabase Realtime (free tier included, no extra service needed)
+- **Redesigned from the original transaction-scoped concept:** chat is now tied to the **buyer-shop pair**, not a single transaction — one persistent thread per relationship, like WhatsApp, not a new chat per deal
+- Chat **unlocks** when a transaction is active between the pair (bid selected / auction won); **locks (read-only)** when there's no active transaction; a future transaction between the same pair unlocks it again and the thread continues
+- Message history is never deleted — stays visible as a record through locked periods too
+- The chat view pins the currently-active transaction's product details at the top (item, price, image) so both parties know what they're discussing
+- **UI:** a chat list page (WhatsApp-style, all threads for the user, active + locked) plus an individual chat view — both linked from the dashboard
+- Scope: text-only, between two matched parties (buyer + shop) only
+- Needs: pair-keyed `conversations` table + `messages` table (see Section 4.13), realtime delivery via Supabase Realtime (free tier included, no extra service needed)
 
 ### 2.11 Synthetic / Seed Data (for ML prototyping)
 Real data volume from the live app won't be sufficient for meaningful ML training early on. Plan: use Python `Faker` library + custom logic to generate realistic seed data, rather than pulling mismatched external datasets (public e-commerce datasets like Kaggle's Amazon/Flipkart/Olist don't match this schema or Bhilai/electronics context).
@@ -93,7 +97,9 @@ Skipped as a separate dashboard for now — existing/planned KPI cards on `buyer
 |---|---|---|
 | `saved_searches`, `favorites` | Own rows only | Own rows only |
 | `notifications` | Own rows only | Own rows only (mark read + delete allowed) |
-| `messages`, `conversations` | Matched parties only (buyer_id/shop_id) | Matched parties only; `read_at` set via backend, not direct write |
+| `messages` | Matched parties only (via conversation's buyer_id/shop_id) | Insert-only, sender must be self, INSERT only when conversation `locked=false`; `read_at`/moderation flags set via backend only, no user UPDATE policy |
+| `conversations` | Matched parties only (buyer_id/shop_id) | Insert via backend on first transaction between a pair; no user UPDATE policy (lock state now computed, not stored) |
+| `conversation_active_transactions` | Matched parties on the parent conversation | Backend/service-role only, no user INSERT/UPDATE/DELETE — rows created on bid-select/auction-win, deleted on completion |
 | `categories` | Public | Admin/backend only |
 | `request_events` | Own rows only (`actor_id = auth.uid()`) | Insert-only, own actions |
 | `shop_reliability_scores` | Public (all authenticated users) | Backend service role only |
@@ -190,7 +196,16 @@ total_transactions integer default 0
 completed_transactions integer default 0
 is_verified boolean default false
 last_active_at timestamptz, nullable
+gst_number text, nullable               -- shop only, built Aug 27/28
+identity_number text, nullable          -- buyer only, buyer-side parity to gst_number (trust/verification)
+delivery_address text, nullable         -- buyer only, default/saved address for delivery-method step (Phase 2)
+budget_range_preference jsonb, nullable -- buyer only, e.g. {min, max} — pairs with preferred_categories, feeds future ML (Phase 9)
+notification_preferences jsonb, nullable -- both roles, optional; granular control once Phase 6 notifications ship
 ```
+**Role field map (shared table):**
+- Both roles: `full_name`, `date_of_birth`, `gender`, `profile_photo_url`, `bio`, `total_transactions`, `completed_transactions`, `is_verified`, `last_active_at`, `notification_preferences`
+- Shop-only (null for buyers): `shop_name`, `business_hours`, `years_in_business`, `gst_number`, `avg_response_time_minutes`
+- Buyer-only (null for shops): `preferred_categories`, `identity_number`, `delivery_address`, `budget_range_preference`
 
 ### 4.2 Extend `requests`
 ```sql
@@ -217,28 +232,34 @@ field_schema jsonb, nullable   -- category-specific field definitions
 created_at timestamptz default now()
 ```
 
-### 4.5 New: `auctions`
+### 4.5 New: `auctions` (corrected Aug 31 — delivery fields are buyer-set post-win, not creation-time)
 ```sql
 id uuid PK default gen_random_uuid()
 shop_id uuid FK -> profiles(id)
 item_name text
 description text, nullable
 starting_price integer
+reserve_price integer, nullable           -- shop-set minimum, checked by close-auctions
 current_highest_bid integer, nullable
 winning_bid_id uuid, nullable, FK -> auction_bids(id)
 category text
 pincode text (6 chars)
 image_url text, nullable
 image_urls jsonb, nullable                -- array of Cloudinary URLs, multi-image support
-status text check ('active','sold','expired','cancelled') default 'active'
+status text check ('active','sold','completed','expired','cancelled') default 'active'
 end_time timestamptz
 closed_at timestamptz, nullable          -- set by cron when auction auto-closes
-delivery_method text, nullable            -- 'home_delivery' | 'pickup'
+delivery_method text, nullable            -- 'home_delivery' | 'pickup' — buyer-set post-win, NOT at creation
+delivery_address text, nullable           -- buyer-supplied, NOT shop-set at creation (corrected Aug 31)
 delivery_confirmed_by_shop boolean, nullable default null
 delivery_response_at timestamptz, nullable
+verification_code text, nullable
+verification_attempts integer default 0
+completed_via_override boolean default false
 verified_at timestamptz, nullable
 created_at timestamptz default now()
 ```
+> **Corrected Aug 31:** `delivery_method`/`delivery_address` are set by the buyer post-win via `PATCH /auctions/{id}/delivery`, not by the shop at creation time — matches how `requests` already works (delivery is *to* the buyer). Original creation form does not collect these. `status` now includes `completed` as a distinct terminal state from `sold` (sold = winner determined, completed = OTP verified/overridden) — mirrors `requests`' `purchased`→`completed` pattern.
 
 ### 4.6 New: `auction_bids`
 ```sql
@@ -286,17 +307,18 @@ target_id uuid
 created_at timestamptz default now()
 ```
 
-### 4.11 New: `notifications`
+### 4.11 New: `notifications` (built ahead of schedule Aug 31, during Phase 5b — schema upgraded from original plan)
 ```sql
 id uuid PK default gen_random_uuid()
 user_id uuid FK -> profiles(id)
-type text          -- 'delivery_confirm_needed' | 'bid_selected' | 'outbid' | 'new_message' | etc.
-message text
-is_read boolean default false
-related_id uuid, nullable
+type text          -- 'auction_won' | 'auction_sold' | 'delivery_confirm_needed' | 'delivery_denied' | 'transaction_completed' | 'bid_selected' | 'outbid' | 'new_message' | etc.
+title text
+body text
+link text, nullable     -- deep-link to relevant chat/auction/request
+read boolean default false
 created_at timestamptz default now()
 ```
-> Unread badge count = count of `is_read=false` rows per user — surface in `Navbar.jsx`.
+> Unread badge count = count of `read=false` rows per user — surface in `Navbar.jsx`. **Upgraded from original plan:** added `title`/`link` (was just `message`) — more useful for deep-linking notifications to their source; this is the real Phase 6 table, not a throwaway placeholder.
 
 ### 4.12 New (later): `reviews`
 ```sql
@@ -309,16 +331,27 @@ comment text, nullable
 created_at timestamptz default now()
 ```
 
-### 4.13 New: `conversations`
+### 4.13 New: `conversations` (redesigned Aug 29 — pair-based, not transaction-based)
 ```sql
 id uuid PK default gen_random_uuid()
-source_type text check ('request','auction')
-source_id uuid          -- request_id or auction_id depending on source_type
 buyer_id uuid FK -> profiles(id)
 shop_id uuid FK -> profiles(id)
 created_at timestamptz default now()
+unique (buyer_id, shop_id)                                        -- one persistent thread per pair
 ```
-> One conversation per selected bid / auction win. Created automatically when a bid is selected or an auction closes with a winner.
+> One conversation per buyer-shop **pair** (not per transaction) — like WhatsApp. Created on first transaction between the pair, then reused as transactions come and go. **Lock state is computed, not stored** (as-built Aug 30) — see 4.13b `conversation_active_transactions`; a conversation is locked when it has zero active-transaction rows.
+
+### 4.13b New: `conversation_active_transactions` (added Aug 30 — supports multiple simultaneous active transactions per pair)
+```sql
+id uuid PK default gen_random_uuid()
+conversation_id uuid FK -> conversations(id)
+source_type text check ('request','auction')
+source_id uuid
+item_name text, nullable          -- denormalized snapshot for chat header, avoids a join
+created_at timestamptz default now()
+unique (conversation_id, source_type, source_id)
+```
+> One row per active transaction keeping a conversation unlocked. Inserted on bid selection / auction win; deleted on transaction completion (hard-delete approach chosen). A conversation with zero rows here is locked. Supports a buyer and shop having more than one simultaneous open deal without one overwriting the other (the gap found in the original single-`active_source_id` design).
 
 ### 4.14 New: `messages`
 ```sql
@@ -497,14 +530,52 @@ completed_via_override boolean default false
 
 Applies to both flows: `requests.verify` (Phase 2, being extended) and the future auction post-sale verify step (Phase 4, step 21).
 
-### 13.3 Transaction History & Analytics ("Reports" page)
-A dedicated page summarizing all of a user's (or platform-wide, TBD) transaction history — not the same as the KPI cards already on dashboards.
+**Verification flow diagram (as built):**
+```
+Shop enters OTP
+       │
+       ▼
+  Code correct?
+       │
+   ┌───┴───┐
+   │       │
+  Yes      No
+   │       │
+   ▼       ▼
+Complete   attempts++
+Transaction   │
+             │
+        attempts < 5?
+             │
+         ┌───┴───┐
+         │       │
+        Yes      No
+         │       │
+         ▼       ▼
+   Try again    Max attempts reached
+                (Blocked for shop)
+                     │
+                     ▼
+              Buyer sees override button
+                     │
+                     ▼
+              Buyer clicks override
+                     │
+                     ▼
+           Transaction completed with
+           completed_via_override = true
+```
+
+**Status: ✅ fully built (Aug 29, 2026)**, including reserve price enforcement in `close-auctions` — see build order Phase 4c and Section 14 changelog for implementation details.
+
+### 13.3 Transaction History & Analytics ("Reports" page) — ✅ DONE (Aug 29, 2026)
+**Delivered as:** `TransactionHistory.jsx`, mounted at `/buyer/history` and `/shop/history` — one shared component, role-scoped by data. Two sections (Requests / Auctions), each with report-style tables, summary KPI cards, and status-based filter tabs with counts.
 - Complete summary/log of past transactions (requests + auctions combined)
 - Intended as the future home for ML-driven insights (price trends, demand patterns, personal spending/selling summaries) once ML features (Phase 9) are built
-- **Not the same as the "analytics dashboard" explicitly skipped earlier (Section 2.12)** — that was about platform-operator-style dashboards; this is user-facing transaction history + future ML surface. Worth clarifying scope further when built.
+- **Not the same as the "analytics dashboard" explicitly skipped earlier (Section 2.12)** — that was about platform-operator-style dashboards; this is user-facing transaction history + future ML surface.
 
-### 13.4 Requests Format Change (deferred, low priority)
-Mentioned as a "maybe later" — revisit the `requests` flow/format similar to how auctions were restructured. No specifics yet; explicitly flagged as "at the very last," not blocking anything now.
+### 13.4 Requests Format Change — now underway (Aug 31), scope clarified as frontend-only
+Originally deferred as "maybe later." **Scope now clarified (Aug 31):** this is a **frontend page-flow reorganization only** — bringing Requests' navigation in line with the 4-card Auction Dashboard hub pattern from Phase 5b. No backend changes; all existing request/bid logic and endpoints stay exactly as-is. See build order Phase 5c for the full page plan.
 
 ### 13.5 Additional Ideas Raised — v2 vs. v3 Split
 Evaluated by whether it completes/de-risks something already in motion (v2) vs. needs new infra or a new external service (v3+):
@@ -536,4 +607,16 @@ Evaluated by whether it completes/de-risks something already in motion (v2) vs. 
 - **Aug 27, 2026** — Phase 4 (Seller Auctions) started: `auctions` and `auction_bids` tables created (delivery + sniping-prevention fields baked in per Section 4.5/4.6), plus RLS policies for both. Auction schemas added for creation, update, and bidding. **Same day, continued:** full backend complete — `POST /auctions`, `GET /auctions` (filters: pincode/category/status, plus `status="all"` handling, limit/offset pagination), `GET /auctions/{id}` (detail + bid history), `POST /auctions/{id}/bids`, `DELETE /auctions/{id}` (shop cancels active only). Sniping prevention implemented (auto-extends `end_time` by 5 min on late bids). `current_highest_bid` and `current_highest_bidder` tracking added. `close-auctions` Edge Function created and scheduled (cron, every 5 min) to auto-close expired auctions. **Bug fixes:** missing return in service.py, `supabase_admin` typo, missing `current_highest_bid` handling, `AuctionService` variable name conflict in routes.py, `from_attributes` typo and inconsistent defaults in schemas.py. Backend for Phase 4 now fully complete — only frontend remains (`PostAuction.jsx`, `BrowseAuctions.jsx`, `MyAuctions.jsx`, `AuctionDetail.jsx`, post-auction delivery/verify flow).
 - **Aug 27, 2026 (same day, cont'd)** — Phase 4 frontend complete: Shop Auction Dashboard, Post Auction page, My Auctions page, Shop Auction Detail page, Buyer Auction Dashboard, Browse Auctions page, Buyer Auction Detail page — all built. **Navigation restructured** (see Section 12 below) — auctions now sit behind an intermediate "Auction Dashboard" hub on both roles rather than flat top-level links. **Bug fix:** timezone issue in `placeBid` function. Bid history now shows buyer names. **Phase 4 is now fully complete end-to-end.**
 - **Aug 27, 2026 (planning)** — New ideas scoped: profile completion page with GST/identity fields + partial verified-shop badge (13.1), in-app OTP-style transaction completion with buyer-holds/shop-enters mechanic + retry cap + buyer-override dispute fallback (13.2), transaction history/reports page as future ML surface (13.3), requests format change deferred (13.4). v2-vs-v3 split done for additional ideas (13.5): reserve price on auctions and OTP dispute path folded into v2; watching/live-bid-count, full-text search, and email notification digest pushed to v3+.
+- **Aug 27/28, 2026** — Phase 4b (Profile Completion) shop side built: `gst_number` column added to `profiles`; new frontend `profile/` module (`Profile.jsx`, `ProfileForm.jsx`, `ProfileLayout.jsx`) with full save→fetch→display loop; key fields also surfaced on Shop Dashboard. **Still pending:** buyer-side profile fields (phone/ID), GST immutability enforcement, surfacing GST/identity on matched request/auction detail pages, and the partial verified-shop badge — none of these are done yet.
+- **Aug 29, 2026** — Phase 4b fully complete: buyer-side fields added (`identity_number`, `identity_type`, `delivery_address`, `budget_range_preference`, `notification_preferences`), `identity_number` immutability implemented (matches `gst_number`), role-specific field validation added (buyers can't set shop fields and vice versa), Verified Shop badge live on Shop Dashboard. **Remaining:** GST/identity surfacing on matched request/auction detail pages, and Verified badge on bid cards (currently dashboard-only). Phase 4c (OTP Transaction Completion) fully complete same day: `verification_code`/`verification_attempts`/`completed_via_override` on both `requests` and `auctions`, `reserve_price` on `auctions`; OTP generation wired into delivery-confirm, pickup-switch, pickup-selected, and bid-selected-for-pickup (the last one was a bug fix — pickup flow wasn't generating OTP on selection originally); `POST /requests/{id}/verify-otp` (5-attempt cap) and `PATCH /requests/{id}/override-complete` (buyer fallback) both live; frontend OTP UI in `BidDetail.jsx` (max-attempts warning, input disabled after 5 tries) and `MyPurchases.jsx` (show/hide, copy, attempts remaining, override button after cap, Completed-tab record view). `close-auctions` Edge Function updated to enforce `reserve_price` with a `reserve_not_met → expired` status path, deployed to production. **Phase 4c fully closed out, including reserve price — no open items remain from this session.** Phase 4d (Transaction History) also completed same day: `TransactionHistory.jsx` built and mounted at `/buyer/history` + `/shop/history`, new `GET /bids/auction-bids`/`GET /bids/shop-bids` endpoints, report tables + KPI cards + status tabs for both Requests and Auctions sections, "History" button added to both dashboards. **Aug 27–29 was an exceptionally productive stretch — Phases 4b, 4c, and 4d all shipped complete.**
+- **Aug 29, 2026 (Phase 5 design)** — In-App Chat redesigned before build: switched from transaction-scoped conversations (one thread per bid/auction) to **contact-based, WhatsApp-style** conversations (one persistent thread per buyer-shop pair, reused across multiple transactions over time). Conversation locks (read-only) when no transaction is active between the pair, unlocks on a new bid selection/auction win, relocks on completion — full message history always stays visible, never deleted. Chat pins the currently-active transaction's product details at the top. New UI concept: a WhatsApp-style chat list page (all threads, active + locked) plus the individual chat view. `conversations` schema (4.13) updated accordingly — `unique(buyer_id, shop_id)` instead of per-source rows.
+- **Aug 29, 2026 (Phase 5 build started)** — `conversations` and `messages` tables created with RLS enabled and policies applied: SELECT restricted to matched parties on both tables, `messages` INSERT restricted to self as sender AND only when the conversation is unlocked (enforced at the DB layer, not just backend), and — correctly — **no user-facing UPDATE policy on either table**, since lock-state transitions, `active_source_*`, `read_at`, and moderation flags (`is_reported`/`is_blocked`) are all backend/service-role owned per the authorization model. RLS table in Section 2.13 updated to reflect the finalized `messages`/`conversations` rules. Indexes added on both tables.
+- **Aug 30, 2026** — Root cause found and fixed for the "unlock not triggering" bug: `bids/routes.py`'s `select_bid` endpoint was doing bid-selection logic inline rather than calling `bid_service.select_bid()` — bypassing the service layer entirely, so the chat-unlock call never ran. Fixed to call the service method properly. **Locked-state redesign implemented:** `conversation_active_transactions` table created (per-transaction rows, not a single `active_source_id`/`locked` boolean) — supports multiple simultaneous active transactions between the same buyer-shop pair, matching the Problem-B scenario discussed. `ChatService` extended with `is_conversation_locked()`, `get_active_transaction()`, `unlock_conversation()` (now takes `item_name` for the pinned header), `lock_conversation()`. `send_message()` and `get_conversations_for_user()` now compute lock state from active transactions rather than a static column. Unlock wired into `select_bid()` (Core Flow) and `close_auction_with_winner()` (Auctions) with `item_name`; lock wired into both completion paths — `verify-otp` and `override-complete` in `requests/routes.py`. **Fixed:** duplicate-key errors on active transaction inserts. Frontend: `ChatList.jsx`/`ChatView.jsx` built and refined (compact UI), `isOwner` check bug fixed (`user.user_id` not `user.id`), Realtime message subscription via `useChat` hook, chat routes added (`/buyer/chat`, `/shop/chat`, `/chat/:conversationId`), chat button with unread-count badge on both dashboards, role-based navigation fixed. **Phase 5 (In-App Chat) is now functionally complete** — unlock/lock flow verified working end-to-end across Core Flow, Auctions, and both completion paths.
+- **Aug 30, 2026 (Phase 5b design)** — Decided to give auctions their own dedicated post-sale flow (delivery/OTP/completion) rather than reusing `requests/*` endpoints — same shape as the Request flow, separate endpoints writing to `auctions` table's existing columns. Flow diagrammed: auction close → notifications (won/sold) + chat unlock → delivery method → shop confirm/deny → OTP (same 5-attempt-cap + override pattern as requests) → completed → notification + chat relock-check. **Cancellation/relist decision:** denied+cancelled auctions don't auto-reopen or re-auction — shop gets a "Relist" action that copies core fields into a fresh `PostAuction` submission (eBay-style relist, not a reopened auction). This is the next thing to build.
+- **Aug 30–31, 2026 (Phase 5b design finalized)** — Three implementation questions resolved: (1) delivery address is buyer-supplied post-win, not shop-set at creation — corrected `auctions` schema (4.5) to remove `delivery_method`/`delivery_address` from creation, matching `requests`; (2) OTP generation triggers mirror requests exactly (confirm/pickup-selected/pickup-switch, not on `status='sold'` alone); switch-to-pickup uses no new flag, just updates `delivery_method` and regenerates OTP; (3) added `completed` as a distinct status from `sold` (mirrors `requests`' `purchased`→`completed`); notifications table brought forward from Phase 6 and built now with an upgraded schema (`title`/`body`/`link` instead of just `message`) rather than a throwaway minimal version.
+- **Aug 31, 2026** — Phase 5b backend complete: `auctions` status constraint updated (`completed` added), `delivery_method`/`delivery_address` removed from creation payload, `notifications` table live with RLS, all six auction post-sale endpoints built (`/delivery`, `/delivery/confirm`, `/delivery/deny`, `/switch-to-pickup`, `/verify-otp`, `/override-complete`) plus `/relist` (server-side field copy), `GET /auctions` status filter updated, chat lock wired into `verify-otp`/`override-complete`, notification placeholders wired for won/sold/delivery events. **Pending:** frontend UI for all of the above (delivery/confirm/deny/OTP screens on auction detail pages, Relist button), and confirming chat-unlock-on-win correctly populates `conversation_active_transactions` for auctions specifically.
+- **Aug 31, 2026 (frontend page plan)** — Decided against a single status-driven detail page for the auction post-sale flow; instead, Auction Dashboard hub fans out to 4 pages per role. Shop: Post Auction + Active Auctions (existing) + **Finalized Auctions** (new — sold/completed/cancelled, delivery confirm/deny, OTP entry, Relist button) + **Auction History** (new — passive full record). Buyer: Browse Auctions + My Bids (existing) + **My Won Auctions** (new — delivery selection, OTP display) + Auction History (shared component, role-scoped). This keeps "still bidding" and "post-sale" cleanly separated rather than one page handling every status.
+- **Aug 31, 2026 (Phase 5b fully closed)** — All frontend pieces delivered: `check_delivery_address_if_home_delivery` constraint, new `auction_close_events` audit table, `close-auctions` Edge Function hardened (retry logic, batching, timeout, event logging). Shop: `MyAuctions.jsx` scoped to active-only, new `FinalizedAuctions.jsx` and `AuctionHistory.jsx`, `AuctionDashboard.jsx` updated to 4-card nav, `AuctionDetailShop.jsx` extended. Buyer: new `MyWonAuctions.jsx` and `AuctionHistory.jsx`, `AuctionDashboard.jsx` 4-card nav, `AuctionDetail.jsx` extended. Shared `AuctionHistoryTable.jsx` component reused across both roles. New routes added. **Phase 5b fully closed — auctions now have a complete, symmetric post-sale flow matching the Request flow's mechanics.**
+- **Aug 31, 2026 (Phase 5c — Request Dashboard page flow)** — Decided to bring Requests' navigation in line with the same 4-card hub pattern just built for auctions. **Frontend-only, zero backend changes** — existing endpoints and flow logic (`RequestDetail.jsx`, `BidDetail.jsx`, `PostRequest.jsx`, `MyPurchases.jsx`) stay exactly as-is, just reorganized. Buyer hub: Post Request + new My Open Requests + Finalized Requests (=`MyPurchases.jsx` reframed) + Request History. Shop hub: Browse Requests + My Bids (split to pending-only) + new Finalized Bids (list feeding into existing `BidDetail.jsx`) + Bid History. Section 13.4 updated to reflect this is now underway, not deferred. See build order Phase 5c for full page/step plan. Added immediately after Phase 5b, before Phase 6.
+- **Sep 1, 2026 (Phase 5c complete)** — Both dashboards built and delivered: buyer `RequestDashboard.jsx` (4 cards + 4 KPI cards), shop `RequestDashboard.jsx` (4 cards + 4 KPI cards). New pages: `MyOpenRequests.jsx`, `FinalizedBids.jsx`, buyer-side `MyBids.jsx` (auction bids). `MyBids.jsx` (shop) split to pending-only with sub-tabs. `BidDetail.jsx` extended with Completed section. KPIs relocated off the main dashboards onto the new hub pages — dashboards are now pure navigation. **Bundled same day:** Profile pages (`Profile.jsx`, `ProfileFormPage.jsx`) redesigned, KPIs removed, professional section layout. Zero backend changes confirmed. **Phase 5c fully closed — Requests and Auctions now share the same symmetric 4-card dashboard pattern.**
 - **Aug 12, 2026 (update 2)** — Added synthetic/seed data strategy using Faker, staging Supabase project, to unblock ML prototyping ahead of real data volume.

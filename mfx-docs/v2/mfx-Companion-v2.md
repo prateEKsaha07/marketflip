@@ -73,45 +73,146 @@ pages/buyer/BrowseAuctions.jsx, AuctionDetail.jsx   — new
 
 ---
 
-## Phase 4b: Profile Completion Page (new, raised Aug 27)
-21b. Build profile edit/complete page for both roles — surfaces the Phase 1 `profiles` extensions (bio, business_hours, etc.) that currently have no UI
-21c. Add identity fields: shop GST number (likely immutable once set), buyer phone/ID number (immutability TBD)
-21d. Surface these fields on request/auction detail pages once matched (post-selection), similar to existing contact-reveal pattern
-21e. Decide exact field set + which are immutable vs. editable before building (see roadmap Section 13.1 open question)
+## Phase 4b: Profile Completion Page — ✅ DONE (Aug 27–29, 2026)
+
+**Shop side (Aug 27/28):**
+- `gst_number` column added to `profiles`
+- New frontend `profile/` module: `Profile.jsx`, `ProfileForm.jsx`, `ProfileLayout.jsx`
+- Full read/write/display loop; key fields also surfaced on Shop Dashboard
+
+**Buyer side + finishing touches (Aug 29):**
+- New columns added: `identity_number`, `identity_type`, `delivery_address`, `budget_range_preference`, `notification_preferences`
+- `ProfileUpdate` schema extended with buyer fields; `GET /auth/profiles/{user_id}` returns them
+- **Immutability implemented:** `identity_number` locked once set (matches `gst_number`)
+- **Role-specific validation added:** buyers can't set shop fields, shops can't set buyer fields, on profile update
+- `Profile.jsx`/`ProfileForm.jsx` extended to display/edit all new buyer fields; locked badge shown for immutable fields
+- **Verified Shop badge:** implemented on Shop Dashboard, conditional on `gst_number` presence
+
+**Still pending (from original 21d):** surfacing GST/identity fields on matched request/auction detail pages, and showing the Verified badge on bid cards (per your decision that it should appear both on shop profile/cards AND on bid cards when buyers compare bids) — badge exists on dashboard only so far, not yet on bid cards.
 
 ---
 
-## Phase 4c: OTP-Based Transaction Completion (finalized mechanics, Aug 27)
+## Phase 4c: OTP-Based Transaction Completion — ✅ DONE (Aug 29, 2026)
 
-**Decided mechanics — in-app code, no third-party SMS/email cost:**
-1. On delivery confirmation (home delivery confirmed by shop, or pickup arranged), backend generates a random 4-digit `verification_code`, stored on the `requests`/`auctions` row
-2. **Buyer holds the code** — shown only in their app (`MyPurchases.jsx` / auction equivalent)
-3. Physical handoff happens — buyer shares the code with the shop in person
-4. **Shop enters the code** in their app (`BidDetail.jsx` / auction equivalent) to confirm
-5. Backend checks entered code against stored → match sets `status='completed'`; mismatch returns error, allows retry
+**Mechanics as built — in-app code, no third-party SMS/email cost:**
+1. OTP (`verification_code`) generated at multiple trigger points: delivery confirmed by shop, pickup switch, pickup selected as delivery method, and bid selected (for pickup requests specifically — this last one was a bug fix, see below)
+2. Buyer holds the code (shown in `MyPurchases.jsx`, with show/hide, copy, attempts-remaining, max-attempts warning)
+3. Shop enters the code in `BidDetail.jsx` (works for both home delivery and pickup)
+4. Backend verifies via `POST /requests/{id}/verify-otp` (max 5 attempts)
 
-21f. Schema: add `verification_code text, nullable`, `verification_attempts integer default 0`, `completed_via_override boolean default false` to both `requests` and `auctions`
-21g. Backend: generate code on delivery-confirmed/pickup-ready transition; verification endpoint for shop to submit code; increment `verification_attempts` on mismatch
-21h. **Dispute/fallback path (required):** cap attempts (e.g. 5); after cap, allow buyer to manually mark completed instead, setting `completed_via_override = true` for future admin/dispute visibility (no admin panel yet, this is the interim safety net)
-21i. Frontend: code display on buyer's `MyPurchases.jsx`/auction equivalent; code entry UI on shop's `BidDetail.jsx`/auction equivalent; override button on buyer side after attempt cap is hit
-21j. Replaces the current single-button verify step in both `requests.verify` flow (Phase 2) and future auction post-sale verify step (Phase 4, step 21) — test existing verify edge cases (denial, pickup-switch) still work with this layered in
-21k. **Reserve price (v2-scoped, from roadmap 13.5):** add `reserve_price integer, nullable` to `auctions`; `close-auctions` Edge Function checks highest bid against it — if unmet, auction doesn't auto-sell (goes unsold/expired instead of `sold`) even past `end_time`. Bundle here since it touches the same close-out logic already built in Phase 4 step 19.
+**Delivered:**
+- Schema: `verification_code`, `verification_attempts`, `completed_via_override` added to both `requests` and `auctions`; `reserve_price` added to `auctions`
+- `utils/verification.py` with `generate_verification_code()`
+- OTP generation wired into: `confirm_delivery`, `switch-to-pickup`, `set_delivery_method` (pickup), `select_bid` (pickup requests)
+- `deny_delivery` clears `verification_code`/`verification_attempts` (correct — no valid handoff if delivery is denied)
+- `POST /requests/{id}/verify-otp` — shop submits code, max 5 attempts
+- `PATCH /requests/{id}/override-complete` — buyer override after max attempts (the dispute/fallback path from 21h)
+- Schemas updated: `RequestResponse`, `DeliveryConfirmResponse` include verification fields
+- Frontend: OTP section in `BidDetail.jsx` (both delivery types), OTP display in `MyPurchases.jsx` (active + Completed tab for record-keeping)
+- **Bug fixes:** pickup-flow OTP wasn't generating on bid selection — fixed by adding generation at `select_bid` for pickup requests; `showOtpVerification` condition fixed to cover both delivery types; delivery-method badge added to OTP section for clarity
 
----
-
-## Phase 4d: Transaction History / Reports Page (new, raised Aug 27)
-21l. New user-facing page: combined request + auction transaction history/log — distinct from the dashboard KPI cards and from the platform-analytics-dashboard idea explicitly skipped in Section 2.12
-21m. Scope for now: chronological history + basic summary (counts, totals) — no ML yet
-21n. Reserve as the future surface for ML outputs (Phase 9: price trends, demand patterns, personal insights) once those features exist — don't over-build the ML-facing parts now
+**Reserve price (21k):** ✅ fully done (Aug 29) — `close-auctions` Edge Function now checks `reserve_price`; added a `reserve_not_met → expired` status path when the highest bid doesn't meet it. Deployed to production.
 
 ---
 
-## Phase 5: In-App Chat (post-selection only)
-22. `conversations` table, `messages` table
-23. Backend: auto-create conversation on bid selection (`PATCH /bids/{id}/select`) and on auction auto-close with a winner
-24. Backend/Realtime: Supabase Realtime subscription on `messages` filtered by `conversation_id`
-25. **Moderation:** basic profanity/abuse keyword filter on send, rate limiting on message frequency, report/block action (block prevents further messages from that user)
-26. Frontend: `Chat.jsx` component — message list + input, opened from `RequestDetail.jsx`/`MyPurchases.jsx` (buyer) and `BidDetail.jsx` (shop)
+## Phase 4d: Transaction History / Reports Page — ✅ DONE (Aug 29, 2026)
+
+**Design (decided):** one shared page/route, accessible to both roles via a "Reports"/"History" button on their respective dashboards — not two separate buyer/shop pages. Content is naturally role-scoped since the underlying query filters by `current_user.id` (a buyer sees their own requests + bids made; a shop sees requests they bid on + auctions they posted).
+
+**Structure:**
+- Two top-level sections/tabs: **Requests** and **Auctions**
+- Within each section, further split by status (mirroring existing dashboard tabs — Open/Completed/Expired/Deleted for requests; Active/Sold/Expired/Cancelled for auctions)
+
+**Delivered:**
+- Backend: `GET /bids/auction-bids` (buyer auction bid history), `GET /bids/shop-bids` (shop bid history) — new endpoints, reused alongside existing `GET /requests`/`GET /auctions`
+- Frontend: `TransactionHistory.jsx` — shared component, mounted at `/buyer/history` and `/shop/history` (same component, role-scoped by data, not a single literal URL — matches the "shared page" intent)
+- Report-style tables for Requests and Auctions sections; summary KPI cards (Total, Completed/Selected, Auctions, Sold/Won); status-based filtering tabs with counts
+- Role-based views: buyers see requests + auction bids; shops see bids + auctions posted
+- "History" button added to both `buyer/Dashboard.jsx` and `shop/Dashboard.jsx`
+- Emojis replaced with Lucide icons; safe handling added for missing/undefined data
+
+---
+
+## Phase 5: In-App Chat (contact-based, WhatsApp-style) — ✅ DONE (Aug 30, 2026)
+
+**Design (as built):**
+- **Conversation key:** one persistent thread per `(buyer_id, shop_id)` pair — not per-transaction. A buyer and shop who transact multiple times over time share one continuous thread with full history, not a new chat each time.
+- **Lock/unlock:** **computed, not stored** — a conversation is locked when it has zero rows in `conversation_active_transactions`. Bid selection / auction win inserts a row (unlocks); transaction completion deletes it (relocks once no active transactions remain). This design supports **multiple simultaneous active transactions** between the same pair, correcting a gap in the original single-`active_source_id` plan.
+- **Pinned product header:** driven by rows in `conversation_active_transactions` (each carries a denormalized `item_name`), so the chat can show one or more currently-active items being discussed.
+- **History persists:** old messages are never deleted — they remain visible as a record across the whole relationship, including through locked periods.
+- **UI:** WhatsApp-style — `ChatList.jsx` (all conversations, compact UI) + `ChatView.jsx` (individual thread), both linked from dashboards with unread-count badges.
+
+**Final schema:** see roadmap Section 4.13/4.13b/4.14 (`conversations`, `conversation_active_transactions`, `messages`).
+
+22. ✅ Tables created with RLS — done Aug 29/30 (`conversations`, `messages`, `conversation_active_transactions`)
+23. ✅ Backend: `ChatService` methods (`is_conversation_locked`, `get_active_transaction`, `unlock_conversation`, `lock_conversation`); unlock wired into `select_bid()` and `close_auction_with_winner()`; lock wired into `verify-otp` and `override-complete` endpoints — done Aug 30. **Bug found and fixed:** `bids/routes.py` was doing selection logic inline instead of calling the service method, silently bypassing the unlock call entirely — root-caused and fixed.
+24. ✅ Realtime: `useChat` hook subscribes to `messages` — done Aug 30
+25. ⬜ **Moderation:** profanity filter, rate limiting, report/block — not yet built (still pending, was original scope item 25)
+26. ✅ Frontend: `ChatList.jsx`, `ChatView.jsx`, routes (`/buyer/chat`, `/shop/chat`, `/chat/:conversationId`), dashboard chat buttons with unread badges, `isOwner` bug fixed (`user.user_id` not `user.id`) — done Aug 30
+
+**Remaining for this phase:** moderation (step 25) is the one piece not yet built — everything else (schema, unlock/lock logic, realtime, UI, navigation) is functionally complete and verified working.
+
+---
+
+## Phase 5b: Auction Post-Sale Flow — BACKEND ✅ DONE (Aug 31, 2026), frontend pending
+
+**Design decisions locked in (Aug 30–31):**
+- **Delivery address:** buyer-supplied post-win, not shop-set at creation — corrected: `delivery_method`/`delivery_address` removed from auction creation, matching how `requests` already works (delivery is *to* the buyer, set when they arrange delivery, not baked in by the shop upfront)
+- **OTP triggers:** mirror requests exactly — shop confirms home delivery, pickup selected, or pickup switch (not on `status='sold'` alone, which only means "winner determined," not "delivery arranged")
+- **Switch-to-pickup:** no new boolean flag — just updates `delivery_method='pickup'` and regenerates OTP, consistent with the requests pattern
+- **Completed vs Sold:** added `completed` as its own status (not overloaded onto `sold`) — `sold` = winner determined, `completed` = OTP verified/overridden. Mirrors `requests`' `purchased` → `completed` two-stage pattern; also what triggers chat relock.
+- **Notifications:** brought forward from Phase 6, built now with a fuller schema (`title`, `body`, `link` — better than the originally-scoped `message`-only version) rather than a throwaway "minimal" table
+- **Relist:** built server-side as `POST /auctions/{id}/relist` (backend copy, not frontend-only prefill) — more consistent with existing API structure
+
+**Delivered (Aug 31):**
+- `auctions` status constraint updated to include `completed`; `delivery_method`/`delivery_address` removed from creation payload
+- `notifications` table created with RLS (Phase 6 table, built early)
+- `PATCH /auctions/{id}/delivery` (buyer sets method + address), `/delivery/confirm` (shop confirms, generates OTP), `/delivery/deny` (shop denies, clears OTP), `/switch-to-pickup` (regenerates OTP), `POST /auctions/{id}/verify-otp` (5-attempt cap), `PATCH /auctions/{id}/override-complete`, `POST /auctions/{id}/relist`
+- `GET /auctions` status filter updated to include `completed`
+- Chat lock integration added to `verify-otp` and `override-complete`
+- Notification placeholders wired for won/sold/delivery events
+
+**Frontend page plan (finalized Aug 31) — Auction Dashboard hub fans out to 4 pages per role, not a single status-driven detail page:**
+
+**Shop side:**
+1. Post Auction — existing, unchanged
+2. Active Auctions — existing, unchanged (status='active' only, no post-sale flow)
+3. **Finalized Auctions** (new) — sold/completed/cancelled auctions; this is where the actual Phase 5b post-sale flow lives: delivery confirm/deny UI, OTP entry (mirrors `BidDetail.jsx`), max-attempts warning, and the **Relist** button for cancelled auctions
+4. **Auction History** (new) — full log, all statuses, passive read-only record — distinct from Finalized Auctions, which is actionable
+
+**Buyer side (mirrored):**
+1. Browse Auctions — existing, unchanged
+2. My Bids / active bidding — existing, unchanged
+3. **My Won Auctions** (new) — delivery method selection, OTP display (show/hide, copy — mirrors `MyPurchases.jsx`), status tracking through to completed
+4. **Auction History** (new — likely a shared component with shop side's History page, role-scoped by query, not a separate build)
+
+**✅ ALL DONE (Aug 31, 2026) — Phase 5b fully complete, backend and frontend:**
+- Schema: `check_delivery_address_if_home_delivery` constraint added; new `auction_close_events` table for audit history tracking
+- `close-auctions` Edge Function hardened: retry logic, backend warm-up, direct Supabase fallback, batch processing (5 at a time), event logging, 60s timeout
+- Shop: `MyAuctions.jsx` scoped to active-only, `FinalizedAuctions.jsx` (new — confirm/deny + OTP + Relist), `AuctionHistory.jsx` (new — read-only), `AuctionDashboard.jsx` updated with 4-card nav, `AuctionDetailShop.jsx` extended with delivery/OTP
+- Buyer: `MyWonAuctions.jsx` (new — delivery selector + OTP display), `AuctionHistory.jsx` (new), `AuctionDashboard.jsx` 4-card nav, `AuctionDetail.jsx` extended with OTP display
+- Shared: `components/auction/AuctionHistoryTable.jsx` (reused across both roles' History pages, avoiding duplication)
+- Routes: `/shop/finalized-auctions`, `/shop/auction-history`, `/buyer/my-won-auctions`, `/buyer/auction-history`
+
+**Phase 5b is fully closed out.** Next per build order: Phase 6 (Sort + Report/Flag) — though note the `notifications` table (originally Phase 6 scope) is already built, so Phase 6 now only needs sort + reports/flagging.
+
+---
+
+## Phase 5c: Request Dashboard Page Flow — ✅ DONE (Sep 1, 2026)
+
+**Design (as built):** Request flow's navigation brought in line with the 4-card Auction Dashboard pattern from Phase 5b. **Zero backend changes confirmed** — all existing endpoints and business logic stayed untouched, purely a frontend reorganization.
+
+**Buyer hub delivered:** `RequestDashboard.jsx` (4 cards: Post Request, My Open Requests, Finalized Requests, Request History) with 4 KPI cards (Total Requests, Open Requests, Finalized, Total Bids). New `MyOpenRequests.jsx` (status='open' only). New `MyBids.jsx` (buyer's auction bids — a naming overlap with the shop-side `MyBids.jsx`, worth noting since they're different pages serving different roles/purposes).
+
+**Shop hub delivered:** `RequestDashboard.jsx` (4 cards: Browse Requests, My Bids, Finalized Bids, Bid History) with 4 KPI cards (Total Bids, Pending, Selected, Completed). New `FinalizedBids.jsx` (selected/rejected bids, links into existing `BidDetail.jsx`). `MyBids.jsx` split to pending-only with sub-tabs (All, Selected, Rejected, Completed). `BidDetail.jsx` extended with a Completed section and conditional back-navigation. `BrowseRequests.jsx` back button now routes to the new hub.
+
+**KPIs relocated:** removed from `buyer/Dashboard.jsx` and `shop/Dashboard.jsx` (now pure navigation) and moved onto the respective `RequestDashboard.jsx` hub pages — cleaner separation of "where do I go" vs. "what's my status."
+
+**Bonus (bundled same day, frontend-only so consistent with phase scope):** `Profile.jsx` and `ProfileFormPage.jsx` redesigned — KPIs removed, professional section-based layout.
+
+**Routes added:** `/buyer/requests`, `/buyer/my-open-requests`, `/buyer/my-bids`, `/shop/requests`, `/shop/finalized-bids`.
+
+**Phase 5c fully complete — Requests and Auctions now share the same symmetric 4-card dashboard pattern across both roles.**
 
 ---
 
