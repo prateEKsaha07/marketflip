@@ -195,6 +195,28 @@ changes:
 - Zero backend changes - all existing endpoints and business logic remain unchanged
 
 
+**Date:** September 2, 2026
+
+**Changes:**
+- `reports` table created with RLS policies
+- Added `POST /reports` endpoint - any authenticated user can report listing/user/message
+- Added `GET /reports` and `GET /reports/my` endpoints
+- Added `PATCH /reports/{id}` endpoint for status updates
+- Flagged items (status='pending') excluded from browse feeds
+- Added `sort` query parameter support to `GET /requests` (newest, price_asc, price_desc, most_bids)
+- Added `sort` query parameter support to `GET /auctions` (newest, price_asc, price_desc, most_bids, ending_soon)
+- `ReportModal.jsx` component created - report/flag UI with reason selection
+- `pages/shop/BrowseRequests.jsx` modified - added sort dropdown + report button
+- `pages/buyer/BrowseAuctions.jsx` modified - added sort dropdown + report button
+- `pages/shop/FinalizedBids.jsx` modified - added report button
+- `pages/buyer/AuctionDetail.jsx` modified - added report button
+- `pages/shop/AuctionDetailShop.jsx` modified - added report button
+- `main.py` updated - reports router registered
+- `auctions/service.py` updated - sort logic + flagged items exclusion
+- `auctions/routes.py` updated - sort parameter support
+- `requests/routes.py` updated - sort parameter support + flagged items exclusion
+
+
 ## License
 
 Copyright © 2026 Prateek Saha
