@@ -112,6 +112,10 @@ npm run build
 - Backend: <https://marketflip.onrender.com>
 - API documentation: <https://marketflip.onrender.com/docs>
 
+## Project Documentation & Roadmap
+Our complete architecture specs, database schemas, and version roadmaps are live in Notion:
+**[View MarketFlip HQ Master Workspace (Read-Only)](https://emphasized-citrus-c5e.notion.site/MarketFlip-HQ-3cebcc73368d80b48018e8fd77c12461?source=copy_link)**
+
 ## License
 
 Copyright © 2026 Prateek Saha. Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
