@@ -19,10 +19,12 @@ import {
   TrendingUp,
   ChevronDown,
   ChevronUp,
-  X
+  X,
+  Flag
 } from 'lucide-react';
 import api from '../../api/client';
 import ImageCarousel from '../../components/ImageCarousel';
+import ReportModal from '../../components/ReportModal';
 
 const BrowseRequests = () => {
   const navigate = useNavigate();
@@ -41,6 +43,7 @@ const BrowseRequests = () => {
     category: '',
     status: 'open'
   });
+  const [sortBy, setSortBy] = useState('newest');
   const [bidding, setBidding] = useState({
     requestId: null,
     price: '',
@@ -51,7 +54,16 @@ const BrowseRequests = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [expandedBid, setExpandedBid] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
   const sliderRef = useRef(null);
+
+  const sortOptions = [
+    { value: 'newest', label: 'Newest First' },
+    { value: 'price_asc', label: 'Price: Low to High' },
+    { value: 'price_desc', label: 'Price: High to Low' },
+    { value: 'most_bids', label: 'Most Bids' },
+  ];
 
   const fetchMyBids = useCallback(async () => {
     try {
@@ -68,6 +80,7 @@ const BrowseRequests = () => {
     try {
       const params = new URLSearchParams();
       params.append('status', activeFilters.status || 'open');
+      params.append('sort', sortBy);
       if (activeFilters.pincode) params.append('pincode', activeFilters.pincode);
       if (activeFilters.category) params.append('category', activeFilters.category);
       
@@ -78,7 +91,7 @@ const BrowseRequests = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeFilters]);
+  }, [activeFilters, sortBy]);
 
   useEffect(() => {
     fetchMyBids();
@@ -225,6 +238,7 @@ const BrowseRequests = () => {
       category: '',
       status: 'open'
     });
+    setSortBy('newest');
     setShowFilters(false);
   };
 
@@ -252,6 +266,12 @@ const BrowseRequests = () => {
 
   const closeRequestDetail = () => {
     setSelectedRequest(null);
+  };
+
+  const handleReport = (req, e) => {
+    e.stopPropagation();
+    setReportTarget(req);
+    setShowReportModal(true);
   };
 
   const containerVariants = {
@@ -302,6 +322,20 @@ const BrowseRequests = () => {
             <p className="text-xs text-[#A0A0B0] mt-0.5">{requests.length} requests found</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {/* Sort Dropdown */}
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-3 py-1.5 text-xs bg-white/80 border border-[#EEECE6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/20 appearance-none pr-8"
+              >
+                {sortOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A0A0B0] pointer-events-none" />
+            </div>
+
             <Button 
               onClick={() => setShowFilters(!showFilters)}
               variant="outline"
@@ -542,6 +576,15 @@ const BrowseRequests = () => {
                           )}
                         </div>
                       </div>
+
+                      {/* Report Button */}
+                      <button
+                        onClick={(e) => handleReport(req, e)}
+                        className="p-1.5 rounded-lg hover:bg-[#F5F3EF] text-[#A0A0B0] hover:text-rose-500 transition-all flex-shrink-0"
+                        title="Report"
+                      >
+                        <Flag size={14} />
+                      </button>
                     </div>
                   </div>
 
@@ -729,6 +772,22 @@ const BrowseRequests = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => {
+          setShowReportModal(false);
+          setReportTarget(null);
+        }}
+        targetType="request"
+        targetId={reportTarget?.id}
+        targetName={reportTarget?.item_name}
+        onSuccess={() => {
+          // Refresh requests to hide flagged item
+          fetchRequests();
+        }}
+      />
     </div>
   );
 };

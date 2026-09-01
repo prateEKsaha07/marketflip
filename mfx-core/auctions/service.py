@@ -118,14 +118,16 @@ class AuctionService:
                 query = query.eq("category", category)
 
             # ====== APPLY SORTING ======
+            # Note: Supabase .order() uses desc=True for descending,
+            # or .order(column) for ascending (default)
             if sort == "newest":
                 query = query.order("created_at", desc=True)
             elif sort == "price_asc":
-                query = query.order("current_highest_bid", ascending=True)
+                query = query.order("current_highest_bid")  # ascending is default
             elif sort == "price_desc":
-                query = query.order("current_highest_bid", ascending=False)
+                query = query.order("current_highest_bid", desc=True)
             elif sort == "ending_soon":
-                query = query.order("end_time", ascending=True)
+                query = query.order("end_time")  # ascending is default (ending soon first)
             elif sort == "most_bids":
                 # We'll sort by bid_count after fetching
                 query = query.order("created_at", desc=True)

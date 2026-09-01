@@ -30,10 +30,12 @@ import {
   Copy,
   ShieldCheck,
   Eye,
-  EyeOff
+  EyeOff,
+  Flag
 } from 'lucide-react';
 import api from '../../api/client';
 import ImageCarousel from '../../components/ImageCarousel';
+import ReportModal from '../../components/ReportModal';
 
 const AuctionDetail = () => {
   const { id } = useParams();
@@ -48,6 +50,7 @@ const AuctionDetail = () => {
   const [bidSuccess, setBidSuccess] = useState(false);
   const [otpCopied, setOtpCopied] = useState(false);
   const [otpVisible, setOtpVisible] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     fetchAuctionDetail();
@@ -323,6 +326,15 @@ const AuctionDetail = () => {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {/* Report Button */}
+            <Button
+              onClick={() => setShowReportModal(true)}
+              variant="outline"
+              className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 text-xs px-3 py-1.5 h-auto"
+            >
+              <Flag size={13} className="mr-1.5" />
+              Report
+            </Button>
             <Button 
               onClick={() => navigate('/buyer/auctions/browse')}
               variant="outline"
@@ -556,7 +568,7 @@ const AuctionDetail = () => {
               )}
             </div>
 
-            {/* ====== PHASE 5B: OTP Display for Won Auctions ====== */}
+            {/* OTP Display for Won Auctions */}
             {showOtpSection && hasOtp && (
               <div className="bg-white/80 backdrop-blur-xl rounded-xl p-4 border border-blue-200 shadow-sm">
                 <h3 className="text-sm font-medium text-[#1A1A2E] mb-3 flex items-center gap-2">
@@ -779,6 +791,18 @@ const AuctionDetail = () => {
           </span>
         </motion.div>
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="auction"
+        targetId={auction?.id}
+        targetName={auction?.item_name}
+        onSuccess={() => {
+          // Optionally refresh or navigate
+        }}
+      />
     </div>
   );
 };

@@ -18,9 +18,11 @@ import {
   ChevronUp,
   TrendingUp,
   Sparkles,
-  Eye
+  Eye,
+  Flag
 } from 'lucide-react';
 import api from '../../api/client';
+import ReportModal from '../../components/ReportModal';
 
 const BrowseAuctions = () => {
   const navigate = useNavigate();
@@ -40,6 +42,16 @@ const BrowseAuctions = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('ending_soon');
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
+
+  const sortOptions = [
+    { value: 'ending_soon', label: 'Ending Soon' },
+    { value: 'newest', label: 'Newest First' },
+    { value: 'price_asc', label: 'Price: Low to High' },
+    { value: 'price_desc', label: 'Price: High to Low' },
+    { value: 'most_bids', label: 'Most Bids' },
+  ];
 
   useEffect(() => {
     fetchAuctions();
@@ -51,34 +63,12 @@ const BrowseAuctions = () => {
     try {
       const params = new URLSearchParams();
       params.append('status', activeFilters.status || 'active');
+      params.append('sort', sortBy);
       if (activeFilters.pincode) params.append('pincode', activeFilters.pincode);
       if (activeFilters.category) params.append('category', activeFilters.category);
       
       const response = await api.get(`/auctions?${params.toString()}`);
-      let auctionData = response.data || [];
-      
-      // Sort
-      switch(sortBy) {
-        case 'ending_soon':
-          auctionData.sort((a, b) => new Date(a.end_time) - new Date(b.end_time));
-          break;
-        case 'price_low':
-          auctionData.sort((a, b) => (a.current_highest_bid || a.starting_price) - (b.current_highest_bid || b.starting_price));
-          break;
-        case 'price_high':
-          auctionData.sort((a, b) => (b.current_highest_bid || b.starting_price) - (a.current_highest_bid || a.starting_price));
-          break;
-        case 'newest':
-          auctionData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-          break;
-        case 'most_bids':
-          auctionData.sort((a, b) => (b.bid_count || 0) - (a.bid_count || 0));
-          break;
-        default:
-          break;
-      }
-      
-      setAuctions(auctionData);
+      setAuctions(response.data || []);
     } catch (err) {
       console.error('Fetch auctions error:', err);
       setError('Failed to load auctions');
@@ -108,6 +98,7 @@ const BrowseAuctions = () => {
       category: '',
       status: 'active'
     });
+    setSortBy('ending_soon');
     setShowFilters(false);
   };
 
@@ -133,7 +124,13 @@ const BrowseAuctions = () => {
     const now = new Date();
     const end = new Date(endTime);
     const diff = end - now;
-    return diff > 0 && diff < 60 * 60 * 1000 * 24; // Less than 24 hours
+    return diff > 0 && diff < 60 * 60 * 1000 * 24;
+  };
+
+  const handleReport = (auction, e) => {
+    e.stopPropagation();
+    setReportTarget(auction);
+    setShowReportModal(true);
   };
 
   const containerVariants = {
@@ -194,6 +191,20 @@ const BrowseAuctions = () => {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {/* Sort Dropdown */}
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-3 py-1.5 text-xs bg-white/80 border border-[#EEECE6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/20 appearance-none pr-8"
+              >
+                {sortOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A0A0B0] pointer-events-none" />
+            </div>
+
             <Button 
               onClick={() => setShowFilters(!showFilters)}
               variant="outline"
@@ -254,20 +265,6 @@ const BrowseAuctions = () => {
                       <option value="home_kitchen">Home & Kitchen</option>
                       <option value="vehicles">Vehicles</option>
                       <option value="other">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-medium text-[#A0A0B0] mb-1">Sort By</label>
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="w-36 px-3 py-1.5 text-xs bg-[#F8F6F0] border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all appearance-none"
-                    >
-                      <option value="ending_soon">Ending Soon</option>
-                      <option value="newest">Newest First</option>
-                      <option value="price_low">Price: Low to High</option>
-                      <option value="price_high">Price: High to Low</option>
-                      <option value="most_bids">Most Bids</option>
                     </select>
                   </div>
                   <div className="flex gap-2">
@@ -365,6 +362,14 @@ const BrowseAuctions = () => {
                         {timeLeft}
                       </div>
                     )}
+                    {/* Report Button */}
+                    <button
+                      onClick={(e) => handleReport(auction, e)}
+                      className="absolute top-2 left-2 p-1.5 rounded-lg bg-black/40 text-white/70 hover:bg-black/60 hover:text-white transition-colors"
+                      title="Report"
+                    >
+                      <Flag size={14} />
+                    </button>
                   </div>
 
                   <div className="p-3">
@@ -416,6 +421,22 @@ const BrowseAuctions = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => {
+          setShowReportModal(false);
+          setReportTarget(null);
+        }}
+        targetType="auction"
+        targetId={reportTarget?.id}
+        targetName={reportTarget?.item_name}
+        onSuccess={() => {
+          // Refresh auctions to hide flagged item
+          fetchAuctions();
+        }}
+      />
     </div>
   );
 };

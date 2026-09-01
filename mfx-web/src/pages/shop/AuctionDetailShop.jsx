@@ -28,10 +28,12 @@ import {
   Truck,
   Key,
   RotateCcw,
-  ShieldCheck
+  ShieldCheck,
+  Flag
 } from 'lucide-react';
 import api from '../../api/client';
 import ImageCarousel from '../../components/ImageCarousel';
+import ReportModal from '../../components/ReportModal';
 
 const AuctionDetailShop = () => {
   const { id } = useParams();
@@ -46,6 +48,7 @@ const AuctionDetailShop = () => {
   const [otpError, setOtpError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [relisting, setRelisting] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     fetchAuctionDetail();
@@ -358,6 +361,15 @@ const AuctionDetailShop = () => {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {/* Report Button */}
+            <Button
+              onClick={() => setShowReportModal(true)}
+              variant="outline"
+              className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 text-xs px-3 py-1.5 h-auto"
+            >
+              <Flag size={13} className="mr-1.5" />
+              Report
+            </Button>
             {isActive && (
               <Button
                 onClick={handleCancelAuction}
@@ -813,6 +825,18 @@ const AuctionDetailShop = () => {
           </span>
         </motion.div>
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="auction"
+        targetId={auction?.id}
+        targetName={auction?.item_name}
+        onSuccess={() => {
+          // Optionally refresh or navigate
+        }}
+      />
     </div>
   );
 };

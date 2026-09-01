@@ -18,9 +18,11 @@ import {
   Store,
   AlertCircle,
   RefreshCw,
-  FileCheck
+  FileCheck,
+  Flag
 } from 'lucide-react';
 import api from '../../api/client';
+import ReportModal from '../../components/ReportModal';
 
 const FinalizedBids = () => {
   const navigate = useNavigate();
@@ -30,6 +32,8 @@ const FinalizedBids = () => {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
 
   // Filter bids - only show selected and rejected
   const filteredBids = useMemo(() => {
@@ -150,6 +154,12 @@ const FinalizedBids = () => {
       return bid.request_id;
     }
     return null;
+  };
+
+  const handleReport = (bid, e) => {
+    e.stopPropagation();
+    setReportTarget(bid);
+    setShowReportModal(true);
   };
 
   // Counts for filter tabs
@@ -413,6 +423,14 @@ const FinalizedBids = () => {
                       </div>
                       
                       <div className="flex items-center gap-1 flex-shrink-0">
+                        {/* Report Button */}
+                        <button
+                          onClick={(e) => handleReport(bid, e)}
+                          className="p-1.5 rounded-lg hover:bg-[#F5F3EF] text-[#A0A0B0] hover:text-rose-500 transition-all"
+                          title="Report"
+                        >
+                          <Flag size={14} />
+                        </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -447,6 +465,22 @@ const FinalizedBids = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => {
+          setShowReportModal(false);
+          setReportTarget(null);
+        }}
+        targetType="bid"
+        targetId={reportTarget?.id}
+        targetName={getItemName(reportTarget || {})}
+        onSuccess={() => {
+          // Refresh bids
+          fetchBids();
+        }}
+      />
     </div>
   );
 };
