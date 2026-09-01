@@ -62,6 +62,7 @@ async def getAuctions(
     category: Optional[str] = None,
     status: str = Query("active", pattern="^(active|sold|completed|expired|cancelled|all)$"),
     limit: int = Query(100, ge=1, le=500),
+    sort: str = Query('newest', pattern = "^(newest|price_asc|price_desc|most_bids|ending_soon)$"),
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user)
 ):
@@ -74,6 +75,7 @@ async def getAuctions(
             pincode=pincode,
             category=category,
             status=status_filter,
+            sort = sort,
             limit=limit,
             offset=offset
         )

@@ -29,6 +29,26 @@ router = APIRouter(prefix="/requests", tags=["requests"])
 # Initialize service
 request_service = RequestService(supabase_admin, supabase_anon)
 
+
+# ====== HELPER: Get flagged targets ======
+def _get_flagged_targets(target_type: str) -> List[str]:
+    """
+    Get IDs of targets with pending reports.
+    Used to exclude flagged items from browse feeds.
+    """
+    try:
+        response = supabase_admin.table("reports") \
+            .select("target_id") \
+            .eq("target_type", target_type) \
+            .eq("status", "pending") \
+            .execute()
+        
+        return [str(r["target_id"]) for r in response.data] if response.data else []
+    except Exception as e:
+        logger.error(f"Error getting flagged targets for {target_type}: {e}")
+        return []
+
+
 # ----- Routes -----
 
 @router.post("", response_model=RequestResponse)
@@ -69,18 +89,25 @@ async def get_requests(
     status: Optional[str] = Query("open", regex="^(open|purchased|completed|deleted|expired|all)$"),
     pincode: Optional[str] = None,
     category: Optional[str] = None,
+    sort: str = Query("newest", regex="^(newest|price_asc|price_desc|most_bids)$"),
     limit: int = 100,
     offset: int = 0,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get requests with filters."""
+    """Get requests with filters, sorting, and exclude flagged items."""
     try:
         print(f"=== GET REQUESTS ===")
-        print(f"Status: {status}")
+        print(f"Status: {status}, Sort: {sort}")
         print(f"User Role: {current_user.get('role')}")
         print(f"User ID: {current_user.get('id')}")
         
         query = supabase_admin.table("requests").select("*")
+        
+        # ====== EXCLUDE FLAGGED REQUESTS ======
+        flagged_ids = _get_flagged_targets("request")
+        if flagged_ids:
+            print(f"Excluding {len(flagged_ids)} flagged requests from feed")
+            query = query.not_.in_("id", flagged_ids)
         
         if status != "all":
             print(f"Filtering by status: {status}")
@@ -96,12 +123,24 @@ async def get_requests(
             print("Filtering by buyer_id for buyer")
             query = query.eq("buyer_id", current_user["id"])
         
-        query = query.order("created_at", desc=True)
+        # ====== APPLY SORTING ======
+        if sort == "newest":
+            query = query.order("created_at", desc=True)
+        elif sort == "price_asc":
+            query = query.order("budget_min", ascending=True)
+        elif sort == "price_desc":
+            query = query.order("budget_max", ascending=False)
+        elif sort == "most_bids":
+            # We'll sort by bid_count after fetching
+            query = query.order("created_at", desc=True)
+        else:
+            query = query.order("created_at", desc=True)
+        
         query = query.range(offset, offset + limit - 1)
         
         response = query.execute()
         requests_data = response.data if response.data else []
-        print(f"Found: {len(requests_data)} requests")
+        print(f"Found: {len(requests_data)} requests (excluded flagged)")
         
         for req in requests_data:
             bid_count_response = supabase_admin.table("bids") \
@@ -116,6 +155,10 @@ async def get_requests(
             
             print(f"Request {req['id']} has {req['bid_count']} bids")
         
+        # If sorting by most_bids, sort after fetching
+        if sort == "most_bids":
+            requests_data.sort(key=lambda x: x.get("bid_count", 0), reverse=True)
+        
         return requests_data
         
     except Exception as e:
@@ -129,7 +172,7 @@ async def get_request_detail(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Get request details with bids.
+    Get request details with bids (bypasses flag filter for detail page).
     Bids are only shown if the current user is the buyer.
     """
     try:
@@ -327,7 +370,7 @@ async def confirm_delivery(
             request_id=updated_request["id"],
             delivery_confirmed_by_shop=updated_request["delivery_confirmed_by_shop"],
             delivery_response_at=updated_request["delivery_response_at"],
-            verification_code=verification_code  # Include for logging/response
+            verification_code=verification_code
         )
         
     except HTTPException:
@@ -504,7 +547,7 @@ async def switch_to_pickup(
                 "delivery_confirmed_by_shop": updated_request["delivery_confirmed_by_shop"],
                 "delivery_response_at": updated_request["delivery_response_at"],
                 "status": updated_request["status"],
-                "verification_code": verification_code  # For logging only
+                "verification_code": verification_code
             }
         }
         
@@ -518,7 +561,6 @@ async def switch_to_pickup(
         )
 
 
-# ====== FIXED: Set Delivery Method ======
 @router.patch("/{request_id}/delivery")
 async def set_delivery_method(
     request_id: str,
@@ -568,7 +610,7 @@ async def set_delivery_method(
             detail="delivery_method must be 'home_delivery' or 'pickup'"
         )
     
-    # ====== BUILD UPDATE DATA ======
+    # BUILD UPDATE DATA
     update_data = {}
     
     # Always include these
@@ -592,7 +634,7 @@ async def set_delivery_method(
         logger.info(f"Update data for pickup: {update_data}")
     
     try:
-        # ====== PERFORM UPDATE ======
+        # PERFORM UPDATE
         result = supabase_admin.table("requests")\
             .update(update_data)\
             .eq("id", request_id)\
@@ -609,7 +651,7 @@ async def set_delivery_method(
         updated_request = result.data[0]
         logger.info(f"Updated request: {updated_request}")
         
-        # ====== RETURN RESPONSE ======
+        # RETURN RESPONSE
         response_data = {
             "message": f"Delivery method set to {delivery_method}",
             "request": {
@@ -636,8 +678,6 @@ async def set_delivery_method(
             detail=f"Failed to set delivery method: {str(e)}"
         )
 
-
-# ====== NEW: OTP Verification Endpoints ======
 
 @router.post("/{request_id}/verify-otp")
 async def verify_otp(
@@ -726,7 +766,7 @@ async def verify_otp(
                 .update({
                     "status": "completed",
                     "completed_at": datetime.utcnow().isoformat(),
-                    "verification_code": None  # Clear the code after success
+                    "verification_code": None
                 })\
                 .eq("id", str(request_id))\
                 .execute()
@@ -736,7 +776,7 @@ async def verify_otp(
             
             logger.info(f"Transaction {request_id} verified by shop {current_user['id']}")
             
-            # ====== LOCK CHAT ======
+            # LOCK CHAT
             try:
                 bid_result = supabase_admin.table("bids") \
                     .select("shop_id") \
@@ -851,7 +891,7 @@ async def override_complete(
         
         logger.info(f"Transaction {request_id} completed via override by buyer {current_user['id']}")
         
-        # ====== LOCK CHAT ======
+        # LOCK CHAT
         try:
             bid_result = supabase_admin.table("bids") \
                 .select("shop_id") \
@@ -883,9 +923,6 @@ async def override_complete(
     except Exception as e:
         logger.error(f"Override complete error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# ====== END OTP Verification Endpoints ======
 
 
 @router.patch("/{request_id}/verify")

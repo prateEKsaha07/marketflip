@@ -35,8 +35,24 @@ class AuctionService:
         Logs the notification that would be created.
         """
         logger.info(f"NOTIFICATION (Phase 7 placeholder): user={user_id}, type={notification_type}, title={title}")
-        # In Phase 7, this will insert into notifications table
-        # For now, we just log it
+
+    def _get_flagged_targets(self, target_type: str) -> List[str]:
+        """
+        Get IDs of targets with pending reports.
+        Used to exclude flagged items from browse feeds.
+        """
+        try:
+            # Check if reports table exists
+            response = self.supabase_admin.table("reports") \
+                .select("target_id") \
+                .eq("target_type", target_type) \
+                .eq("status", "pending") \
+                .execute()
+            
+            return [str(r["target_id"]) for r in response.data] if response.data else []
+        except Exception as e:
+            logger.error(f"Error getting flagged targets for {target_type}: {e}")
+            return []
 
     def createAuction(self, 
                   shop_id: str, 
@@ -78,13 +94,20 @@ class AuctionService:
     def getAuctions(self, 
                     pincode: Optional[str] = None, 
                     category: Optional[str] = None, 
-                    status: Optional[str] = "active", 
+                    status: Optional[str] = "active",
+                    sort: Optional[str] = "newest",
                     limit: int = 100, 
                     offset: int = 0
                     ) -> List[Dict[str, Any]]:
-        """Get auctions with filters"""
+        """Get auctions with filters, sorting, and exclude flagged items"""
         try:
             query = self.supabase_admin.table("auctions").select("*")
+            
+            # ====== EXCLUDE FLAGGED AUCTIONS ======
+            flagged_ids = self._get_flagged_targets("auction")
+            if flagged_ids:
+                logger.info(f"Excluding {len(flagged_ids)} flagged auctions from feed")
+                query = query.not_.in_("id", flagged_ids)
             
             if status:
                 query = query.eq("status", status)
@@ -94,13 +117,27 @@ class AuctionService:
             if category:
                 query = query.eq("category", category)
 
-            query = query.order("created_at", desc=True)
+            # ====== APPLY SORTING ======
+            if sort == "newest":
+                query = query.order("created_at", desc=True)
+            elif sort == "price_asc":
+                query = query.order("current_highest_bid", ascending=True)
+            elif sort == "price_desc":
+                query = query.order("current_highest_bid", ascending=False)
+            elif sort == "ending_soon":
+                query = query.order("end_time", ascending=True)
+            elif sort == "most_bids":
+                # We'll sort by bid_count after fetching
+                query = query.order("created_at", desc=True)
+            else:
+                query = query.order("created_at", desc=True)
+
             query = query.range(offset, offset + limit - 1)
 
             response = query.execute()
             auctions = response.data if response.data else []
 
-            logger.info(f"Found {len(auctions)} auctions")
+            logger.info(f"Found {len(auctions)} auctions (excluded flagged)")
 
             for auction in auctions:
                 bid_count_response = self.supabase_admin.table("auction_bids") \
@@ -118,6 +155,10 @@ class AuctionService:
                 else:
                     auction["shop_name"] = None
 
+            # If sorting by most_bids, sort after fetching
+            if sort == "most_bids":
+                auctions.sort(key=lambda x: x.get("bid_count", 0), reverse=True)
+
             return auctions
             
         except Exception as e:
@@ -127,7 +168,7 @@ class AuctionService:
     def getAuctionById(self, 
                        auction_id: str
                        ) -> Dict[str, Any]:
-        """Get auction by ID with bids"""
+        """Get auction by ID with bids (bypasses flag filter for detail page)"""
         try:
             auction_response = self.supabase_admin.table("auctions") \
                 .select("*, profiles!shop_id(shop_name)") \
