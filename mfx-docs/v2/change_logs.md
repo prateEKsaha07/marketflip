@@ -175,7 +175,6 @@ changes:
 
 
 **Date:** September 1, 2026
-
 **Changes:**
 - `buyer/RequestDashboard.jsx` created - 4-card hub page (Post Request, My Open Requests, Finalized Requests, Request History)
 - `buyer/MyOpenRequests.jsx` created - shows only `status='open'` requests
@@ -196,7 +195,6 @@ changes:
 
 
 **Date:** September 2, 2026
-
 **Changes:**
 - `reports` table created with RLS policies
 - Added `POST /reports` endpoint - any authenticated user can report listing/user/message
@@ -215,6 +213,26 @@ changes:
 - `auctions/service.py` updated - sort logic + flagged items exclusion
 - `auctions/routes.py` updated - sort parameter support
 - `requests/routes.py` updated - sort parameter support + flagged items exclusion
+
+**Date:** September 2, 2026
+**Changes:**
+- `shop_reliability_scores` table created with RLS policies
+- `completed_at` column added to `auctions` table
+- `reliability/schemas.py` created - Pydantic schemas for reliability scores
+- `reliability/service.py` created - service layer for computing shop reliability scores
+- `reliability/routes.py` created - API endpoints for reliability scores
+- `main.py` updated - reliability router registered
+- `auctions/service.py` updated - `completed_at` set in `verify_otp()` and `override_complete()`
+- Added `POST /reliability/refresh` - refresh all shop reliability scores
+- Added `GET /reliability/shop/{shop_id}` - get score for a single shop
+- Added `GET /reliability/shops` - get scores for multiple shops
+- Added `GET /reliability/top` - get top reliable shops
+- Request flow response time: `completed_at - bid.created_at`
+- Auction flow response time: `completed_at - auction.closed_at`
+- Reliability scoring: response_score (30%) + completion_score (40%) + selection_score (30%)
+- Response time scoring: <2h (100), 2-12h (90), 12-24h (80), 1-3d (60), 3-7d (40), >7d (20)
+- `pages/shop/BidDetail.jsx` updated - reliability badge with color-coded labels
+- Reliability badge colors: Highly Reliable (emerald), Reliable (blue), Moderately Reliable (amber), Needs Improvement (rose)
 
 
 ## License

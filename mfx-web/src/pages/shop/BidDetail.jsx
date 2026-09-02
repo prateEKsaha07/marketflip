@@ -31,7 +31,8 @@ import {
   Image as ImageIcon,
   PartyPopper,
   Shield,
-  ShieldCheck
+  ShieldCheck,
+  Star
 } from 'lucide-react';
 import api from '../../api/client';
 import { confirmDelivery, denyDelivery } from '../../api/client';
@@ -50,6 +51,8 @@ const BidDetail = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [successSubtext, setSuccessSubtext] = useState('');
   const [deliveryResolved, setDeliveryResolved] = useState(false);
+  const [reliabilityScore, setReliabilityScore] = useState(null);
+  const [reliabilityLoading, setReliabilityLoading] = useState(false);
   
   // OTP Verification States
   const [otpCode, setOtpCode] = useState('');
@@ -118,11 +121,32 @@ const BidDetail = () => {
       setOtpCode('');
       setOtpError('');
       setOtpSuccess(false);
+
+      // Fetch reliability score for the shop
+      if (bidResponse.data.shop_id) {
+        fetchReliabilityScore(bidResponse.data.shop_id);
+      }
+      
     } catch (err) {
       console.error('Fetch error:', err);
       setError(err.response?.data?.detail || 'Failed to fetch bid details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReliabilityScore = async (shopId) => {
+    setReliabilityLoading(true);
+    try {
+      const response = await api.get(`/reliability/shop/${shopId}`);
+      if (response.data) {
+        setReliabilityScore(response.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch reliability score:', err);
+      // Don't show error to user, just keep score null
+    } finally {
+      setReliabilityLoading(false);
     }
   };
 
@@ -217,6 +241,33 @@ const BidDetail = () => {
     return styles[status] || { bg: 'bg-gray-500/10', text: 'text-gray-600', border: 'border-gray-200', icon: <Clock size={14} />, label: status?.toUpperCase() || 'Unknown' };
   };
 
+  const getReliabilityBadge = (score) => {
+    if (!score || score.reliability_score === 0) return null;
+    
+    const value = score.reliability_score;
+    let color, label, bg;
+    
+    if (value >= 80) {
+      color = 'text-emerald-700';
+      bg = 'bg-emerald-100';
+      label = 'Highly Reliable';
+    } else if (value >= 60) {
+      color = 'text-blue-700';
+      bg = 'bg-blue-100';
+      label = 'Reliable';
+    } else if (value >= 40) {
+      color = 'text-amber-700';
+      bg = 'bg-amber-100';
+      label = 'Moderately Reliable';
+    } else {
+      color = 'text-rose-700';
+      bg = 'bg-rose-100';
+      label = 'Needs Improvement';
+    }
+    
+    return { color, bg, label, value };
+  };
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { 
@@ -278,6 +329,7 @@ const BidDetail = () => {
   const isBidSelected = bid.status === 'selected';
   const isCompleted = request.status === 'completed';
   const isOverridden = request.completed_via_override === true;
+  const reliabilityBadge = getReliabilityBadge(reliabilityScore);
 
   const needsDeliveryConfirmation = 
     isBidSelected && 
@@ -377,6 +429,14 @@ const BidDetail = () => {
                 <span className="text-[10px] font-medium text-amber-600">Override</span>
               </div>
             )}
+            {/* Reliability Badge */}
+            {reliabilityBadge && (
+              <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${reliabilityBadge.bg} ${reliabilityBadge.color}`}>
+                <ShieldCheck size={12} />
+                {reliabilityBadge.label}
+                <span className="ml-0.5 text-[9px] opacity-70">({Math.round(reliabilityBadge.value)}%)</span>
+              </div>
+            )}
           </div>
         </motion.div>
 
@@ -405,7 +465,7 @@ const BidDetail = () => {
             </motion.div>
           )}
 
-          {/* ====== COMPLETED SECTION ====== */}
+          {/* Completed Section */}
           {isCompleted && (
             <motion.div 
               variants={itemVariants}
@@ -539,7 +599,7 @@ const BidDetail = () => {
               </div>
             </div>
 
-            {/* Delivery Method - Only show if not completed or show as read-only */}
+            {/* Delivery Method */}
             {request.delivery_method && (
               <div className={`mt-3 p-3 rounded-lg border ${isCompleted ? 'bg-violet-50/50 border-violet-100' : 'bg-amber-50/50 border-amber-100'}`}>
                 <div className="flex items-center gap-2 text-xs">
