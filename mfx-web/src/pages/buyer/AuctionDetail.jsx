@@ -36,6 +36,7 @@ import {
 import api from '../../api/client';
 import ImageCarousel from '../../components/ImageCarousel';
 import ReportModal from '../../components/ReportModal';
+import FraudWarning from '../../components/ml/FraudWarning';
 
 const AuctionDetail = () => {
   const { id } = useParams();
@@ -51,6 +52,10 @@ const AuctionDetail = () => {
   const [otpCopied, setOtpCopied] = useState(false);
   const [otpVisible, setOtpVisible] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  
+  // ====== FRAUD DETECTION STATE ======
+  const [fraudData, setFraudData] = useState(null);
+  const [fraudLoading, setFraudLoading] = useState(false);
 
   useEffect(() => {
     fetchAuctionDetail();
@@ -68,11 +73,44 @@ const AuctionDetail = () => {
       // Set initial bid amount to current highest + 100
       const currentPrice = response.data.current_highest_bid || response.data.starting_price;
       setBidAmount((currentPrice + 100).toString());
+      
+      // ====== CHECK FOR FRAUD ======
+      await checkFraud(response.data);
+      
     } catch (err) {
       console.error('Fetch auction error:', err);
       setError(err.response?.data?.detail || 'Failed to load auction details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ====== FRAUD DETECTION ======
+  const checkFraud = async (auctionData) => {
+    setFraudLoading(true);
+    try {
+      // Prepare bid data for fraud detection
+      const bidData = {
+        price: auctionData.current_highest_bid || auctionData.starting_price,
+        created_at: auctionData.created_at,
+        shop_id: auctionData.shop_id,
+        category: auctionData.category,
+        budget_min: auctionData.starting_price,
+        budget_max: auctionData.starting_price * 2,
+      };
+      
+      const response = await api.post('/ml/detect-fraud', bidData);
+      console.log('Fraud detection result:', response.data);
+      setFraudData(response.data);
+      
+      // For testing: Uncomment this line to force fraud warning
+      // setFraudData({ is_fraud: true, confidence: 0.85, risk_factors: ['Test fraud detection'] });
+      
+    } catch (err) {
+      console.error('Fraud detection error:', err);
+      // Silently fail - don't show error to user
+    } finally {
+      setFraudLoading(false);
     }
   };
 
@@ -287,6 +325,13 @@ const AuctionDetail = () => {
   const maxAttempts = 5;
   const attemptsRemaining = maxAttempts - attempts;
   const showOtpSection = isSold && isWinner && isBuyer && (auction.delivery_confirmed_by_shop === true || auction.delivery_method === 'pickup');
+  
+  // Fraud detection
+  const isFraud = fraudData?.is_fraud === true;
+  const fraudConfidence = fraudData?.confidence || 0;
+  const riskFactors = fraudData?.risk_factors || [];
+
+  console.log('Fraud display check:', { isFraud, fraudData });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
@@ -350,6 +395,32 @@ const AuctionDetail = () => {
             </Button>
           </div>
         </motion.div>
+
+        {/* ====== FRAUD WARNING ====== */}
+        <AnimatePresence>
+          {isFraud && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-4"
+            >
+              <FraudWarning
+                isFraud={isFraud}
+                confidence={fraudConfidence}
+                riskFactors={riskFactors}
+                showDetails={true}
+                onReport={() => setShowReportModal(true)}
+                onDismiss={() => {}}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ====== DEBUG: Show fraud status (remove in production) ====== */}
+        <div className="mb-4 p-2 bg-gray-100 rounded text-xs text-gray-500">
+          Fraud Status: {isFraud ? 'Flagged' : 'Clean'} | Confidence: {(fraudConfidence * 100).toFixed(0)}% | Risk Factors: {riskFactors.length}
+        </div>
 
         <motion.div 
           variants={containerVariants}

@@ -39,6 +39,44 @@ export const getAuctionBids = () => {
   return api.get('/bids/auction-bids');
 };
 
+// ml apis
+
+export const getPriceSuggestion = (requestData) => {
+  return api.post('/ml/price-suggestion', requestData);
+};
+
+export const rankBids = (data) => {
+  return api.post('/ml/rank-bids', data);
+};
+
+export const getRecommendations = (requestId) => {
+  return api.get(`/ml/recommendations?request_id=${requestId}`);
+};
+
+export const getDemandForecast = (params) => {
+  const queryParams = new URLSearchParams();
+  if (params.category) queryParams.append('category', params.category);
+  if (params.pincode) queryParams.append('pincode', params.pincode);
+  if (params.days) queryParams.append('days', params.days);
+  return api.get(`/ml/demand-forecast?${queryParams.toString()}`);
+};
+
+export const detectFraud = (bidData) => {
+  return api.post('/ml/detect-fraud', bidData);
+};
+
+export const getShopReliability = (shopId) => {
+  return api.get(`/reliability/shop/${shopId}`);
+};
+
+export const getShopsReliability = (shopIds) => {
+  return api.get(`/reliability/shops?shop_ids=${shopIds.join(',')}`);
+};
+
+export const getTopReliableShops = (limit = 10) => {
+  return api.get(`/reliability/top?limit=${limit}`);
+};
+
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');

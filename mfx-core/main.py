@@ -36,6 +36,7 @@ from notifications.routes import router as notifications_router
 from saved_searches.routes import router as saved_searches_router
 from favorites.routes import router as favorites_router
 from reliability.routes import router as reliability_router
+from ml.routes import router as ml_router
 logger.info("All routers imported successfully")
 
 # INCLUDE ROUTERS
@@ -51,6 +52,7 @@ app.include_router(notifications_router)
 app.include_router(saved_searches_router)
 app.include_router(favorites_router)
 app.include_router(reliability_router)
+app.include_router(ml_router)
 logger.info("All routers included successfully")
 
 # STARTUP EVENT
