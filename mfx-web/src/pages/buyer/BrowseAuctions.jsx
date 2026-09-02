@@ -19,10 +19,13 @@ import {
   TrendingUp,
   Sparkles,
   Eye,
-  Flag
+  Flag,
+  Heart
 } from 'lucide-react';
 import api from '../../api/client';
 import ReportModal from '../../components/ReportModal';
+import FavoriteButton from '../../components/FavoriteButton';
+import SaveSearchButton from '../../components/SaveSearchButton';
 
 const BrowseAuctions = () => {
   const navigate = useNavigate();
@@ -205,6 +208,17 @@ const BrowseAuctions = () => {
               <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A0A0B0] pointer-events-none" />
             </div>
 
+            {/* Save Search Button */}
+            <SaveSearchButton
+              searchParams={{
+                status: activeFilters.status || 'active',
+                pincode: activeFilters.pincode || '',
+                category: activeFilters.category || '',
+                sort: sortBy
+              }}
+              onSave={fetchAuctions}
+            />
+
             <Button 
               onClick={() => setShowFilters(!showFilters)}
               variant="outline"
@@ -362,14 +376,22 @@ const BrowseAuctions = () => {
                         {timeLeft}
                       </div>
                     )}
-                    {/* Report Button */}
-                    <button
-                      onClick={(e) => handleReport(auction, e)}
-                      className="absolute top-2 left-2 p-1.5 rounded-lg bg-black/40 text-white/70 hover:bg-black/60 hover:text-white transition-colors"
-                      title="Report"
-                    >
-                      <Flag size={14} />
-                    </button>
+                    {/* Action Buttons - Report & Favorite */}
+                    <div className="absolute top-2 left-2 flex flex-col gap-1">
+                      <button
+                        onClick={(e) => handleReport(auction, e)}
+                        className="p-1.5 rounded-lg bg-black/40 text-white/70 hover:bg-black/60 hover:text-white transition-colors"
+                        title="Report"
+                      >
+                        <Flag size={14} />
+                      </button>
+                      <FavoriteButton
+                        targetType="auction"
+                        targetId={auction.id}
+                        size={16}
+                        className="bg-black/40 hover:bg-black/60"
+                      />
+                    </div>
                   </div>
 
                   <div className="p-3">
@@ -433,7 +455,6 @@ const BrowseAuctions = () => {
         targetId={reportTarget?.id}
         targetName={reportTarget?.item_name}
         onSuccess={() => {
-          // Refresh auctions to hide flagged item
           fetchAuctions();
         }}
       />

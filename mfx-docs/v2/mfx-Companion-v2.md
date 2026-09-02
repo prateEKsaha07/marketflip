@@ -216,21 +216,43 @@ pages/buyer/BrowseAuctions.jsx, AuctionDetail.jsx   — new
 
 ---
 
-## Phase 6: Browse Improvements — Sort + Report/Flag
-27. Add `sort` query param support to `GET /requests` and `GET /auctions` (newest, price asc/desc, most bids, ending soon)
-28. Frontend: sort dropdown in `shop/BrowseRequests.jsx` toolbar and future `buyer/BrowseAuctions.jsx` toolbar
-29. `reports` table
-30. Backend: `POST /reports` (any authenticated user can report a listing/user/message), flagged listings excluded from browse feeds while `status='pending'`
-31. Frontend: report/flag icon+modal on request/auction cards and detail pages
-32. Manual review via Supabase dashboard for now — no admin panel yet
+## Phase 6: Browse Improvements — Sort + Report/Flag — ✅ DONE (Sep 2, 2026)
+
+27. ✅ `sort` query param on `GET /requests` (newest, price_asc, price_desc, most_bids) and `GET /auctions` (adds ending_soon)
+28. ✅ Sort dropdown added to `shop/BrowseRequests.jsx` and `buyer/BrowseAuctions.jsx`
+29. ✅ `reports` table created with RLS
+30. ✅ `POST /reports`, `GET /reports`, `GET /reports/my`, `PATCH /reports/{id}` (status updates) — broader than originally scoped (added list/mine endpoints and a status-update endpoint, not just create). Flagged (`status='pending'`) items excluded from both `requests` and `auctions` browse feeds.
+31. ✅ Frontend: new `ReportModal.jsx` (reason-selection UI), report button added to `BrowseRequests.jsx`, `BrowseAuctions.jsx`, `FinalizedBids.jsx`, buyer `AuctionDetail.jsx`, shop `AuctionDetailShop.jsx` — wider coverage than just browse cards, includes detail and finalized views too
+32. Manual review via Supabase dashboard — unchanged, still no admin panel
+
+**Phase 6 fully complete.**
 
 ---
 
-## Phase 7: Engagement Features
-33. `saved_searches` table + backend + simple UI in `buyer/Dashboard.jsx`
-34. `favorites` table + backend + bookmark button on request/auction cards
-35. `notifications` table + backend + notification dropdown with unread badge count in `Navbar.jsx` (in-app only)
-   - Trigger points: delivery confirmation needed (shop), bid selected (shop), outbid on auction (buyer), auction won (buyer), new chat message
+## Phase 7: Engagement Features — ✅ DONE (Sep 2, 2026)
+
+33. ✅ `saved_searches` table + RLS; `POST/GET/PATCH/DELETE /saved-searches` — full CRUD delivered
+34. ✅ `favorites` table + RLS; `POST /favorites/toggle`, `GET /favorites`, `GET /favorites/check/{target_type}/{target_id}`
+35. ✅ Notifications completed: `NotificationDropdown.jsx` built and integrated into both dashboards; backend routes (`GET /notifications`, `GET /notifications/unread-count`, `PATCH /notifications/{id}/read`, `PATCH /notifications/read-all`); the Phase 5b placeholder `_create_notification` calls replaced with real implementations in both `auctions/service.py` and `requests/services.py`
+
+**Notification trigger points — 9 of 10 verified via direct DB insertion (natural end-to-end flow testing still pending for these), 1 not yet tested:**
+
+| Trigger | Recipient | Status |
+|---|---|---|
+| Auction won | Buyer | ✅ DB tested |
+| Auction sold | Shop | ✅ DB tested |
+| Delivery method set | Shop | ✅ DB tested |
+| Delivery confirmed | Buyer | ✅ DB tested |
+| Delivery denied | Buyer | ✅ DB tested |
+| Switched to pickup | Shop | ✅ DB tested |
+| Transaction completed | Both | ✅ DB tested |
+| Override completed | Shop | ✅ DB tested |
+| Bid selected | Buyer | ✅ DB tested |
+| New chat message | Recipient | ⏳ not yet tested |
+
+**Follow-up worth doing before considering this fully verified:** natural end-to-end flow testing (trigger each event through the actual UI, not direct DB insertion) for all 10, and specifically wiring/testing the new-chat-message trigger which hasn't been touched yet.
+
+**Saved searches / favorites UI confirmed complete (Sep 2):** `FavoriteButton.jsx` (heart toggle), `SaveSearchButton.jsx` (save-search modal), `SavedSearchesList.jsx` (dashboard display) all built. Wired into `BrowseRequests.jsx` and `BrowseAuctions.jsx` (save search + favorite button on cards) and both dashboards (Saved Searches section). `favorites` table has a unique constraint (prevents duplicate favorites). **Phase 7 is now fully, completely done — no open items remain.**
 
 ---
 

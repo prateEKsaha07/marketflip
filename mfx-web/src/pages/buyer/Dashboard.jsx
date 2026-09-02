@@ -23,10 +23,12 @@ import {
   Calendar,
   TrendingUp,
   Phone,
-  ShieldCheck
+  ShieldCheck,
+  Bookmark
 } from 'lucide-react';
 import api from '../../api/client';
 import NotificationDropdown from '../../components/NotificationDropdown';
+import SavedSearchesList from '../../components/SavedSearchesList';
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -307,6 +309,21 @@ const Dashboard = () => {
               </Button>
             </motion.div>
           ))}
+        </motion.div>
+
+        {/* Saved Searches Section */}
+        <motion.div 
+          variants={itemVariants}
+          className="bg-white/80 backdrop-blur-xl rounded-xl p-4 border border-[#EEECE6] shadow-sm mb-6"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Bookmark size={16} className="text-[#FFBE91]" />
+              <h3 className="text-sm font-medium text-[#1A1A2E]">Saved Searches</h3>
+            </div>
+            <span className="text-[10px] text-[#A0A0B0]">Quick access to your saved searches</span>
+          </div>
+          <SavedSearchesList limit={3} showViewAll />
         </motion.div>
 
         {/* Quick Actions */}

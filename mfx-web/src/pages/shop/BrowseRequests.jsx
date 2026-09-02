@@ -25,6 +25,8 @@ import {
 import api from '../../api/client';
 import ImageCarousel from '../../components/ImageCarousel';
 import ReportModal from '../../components/ReportModal';
+import FavoriteButton from '../../components/FavoriteButton';
+import SaveSearchButton from '../../components/SaveSearchButton';
 
 const BrowseRequests = () => {
   const navigate = useNavigate();
@@ -336,6 +338,17 @@ const BrowseRequests = () => {
               <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A0A0B0] pointer-events-none" />
             </div>
 
+            {/* Save Search Button */}
+            <SaveSearchButton
+              searchParams={{
+                status: activeFilters.status || 'open',
+                pincode: activeFilters.pincode || '',
+                category: activeFilters.category || '',
+                sort: sortBy
+              }}
+              onSave={fetchRequests}
+            />
+
             <Button 
               onClick={() => setShowFilters(!showFilters)}
               variant="outline"
@@ -577,14 +590,21 @@ const BrowseRequests = () => {
                         </div>
                       </div>
 
-                      {/* Report Button */}
-                      <button
-                        onClick={(e) => handleReport(req, e)}
-                        className="p-1.5 rounded-lg hover:bg-[#F5F3EF] text-[#A0A0B0] hover:text-rose-500 transition-all flex-shrink-0"
-                        title="Report"
-                      >
-                        <Flag size={14} />
-                      </button>
+                      {/* Action Buttons - Report & Favorite */}
+                      <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={(e) => handleReport(req, e)}
+                          className="p-1.5 rounded-lg hover:bg-[#F5F3EF] text-[#A0A0B0] hover:text-rose-500 transition-all"
+                          title="Report"
+                        >
+                          <Flag size={14} />
+                        </button>
+                        <FavoriteButton
+                          targetType="request"
+                          targetId={req.id}
+                          size={16}
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -784,7 +804,6 @@ const BrowseRequests = () => {
         targetId={reportTarget?.id}
         targetName={reportTarget?.item_name}
         onSuccess={() => {
-          // Refresh requests to hide flagged item
           fetchRequests();
         }}
       />

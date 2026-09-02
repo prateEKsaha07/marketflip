@@ -2,7 +2,7 @@
 """
 MarketFlip v2 - Faker Seed Script
 Generates realistic synthetic data for testing and ML prototyping.
-Matches exact database schema.
+Matches exact database schema with data_source tagging.
 """
 
 import os
@@ -72,6 +72,9 @@ NUM_BUYERS = 15
 NUM_SHOPS = 12
 NUM_REQUESTS = 50
 MAX_BIDS_PER_REQUEST = 6
+NUM_AUCTIONS = 30
+NUM_AUCTION_BIDS = 80
+NUM_EVENTS = 300
 
 # ============================================
 # SUPABASE SETUP
@@ -139,7 +142,7 @@ def verify_existing_users() -> bool:
 
 def verify_tables_exist() -> bool:
     """Verify all required tables exist"""
-    required_tables = ['profiles', 'requests', 'bids', 'request_events']
+    required_tables = ['profiles', 'requests', 'bids', 'request_events', 'auctions', 'auction_bids']
     
     for table in required_tables:
         try:
@@ -235,10 +238,21 @@ def random_bid_price(budget_min: int, budget_max: int) -> int:
         return random.randint(budget_max, int(budget_max * 1.2))
 
 def random_urgency() -> Optional[str]:
-    """Random urgency level"""
     choices = ['flexible', 'soon', 'urgent', None]
     weights = [0.3, 0.3, 0.2, 0.2]
     return random.choices(choices, weights=weights, k=1)[0]
+
+def random_date(start: datetime, end: datetime) -> datetime:
+    """Generate random date between start and end"""
+    return start + timedelta(
+        days=random.randint(0, (end - start).days),
+        hours=random.randint(0, 23),
+        minutes=random.randint(0, 59)
+    )
+
+def random_status(weights: Dict[str, float]) -> str:
+    """Pick a status based on weights"""
+    return random.choices(list(weights.keys()), weights=list(weights.values()))[0]
 
 # ============================================
 # GENERATE USERS
@@ -310,7 +324,6 @@ def create_users_with_auth(num_buyers: int, num_shops: int) -> tuple:
     """Create users with duplicate checking"""
     logger.info(f"Creating {num_buyers} buyers and {num_shops} shops...")
     
-    # Get existing profile IDs to avoid duplicates
     existing_ids = get_existing_ids('profiles')
     logger.info(f"Found {len(existing_ids)} existing profiles")
     
@@ -318,7 +331,6 @@ def create_users_with_auth(num_buyers: int, num_shops: int) -> tuple:
     shops = []
     created_count = 0
     
-    # Create buyers
     for i in range(num_buyers):
         profile_data, email, password = generate_buyer_data()
         
@@ -340,7 +352,6 @@ def create_users_with_auth(num_buyers: int, num_shops: int) -> tuple:
         
         time.sleep(0.1)
     
-    # Create shops
     for i in range(num_shops):
         profile_data, email, password = generate_shop_data()
         
@@ -370,7 +381,7 @@ def create_users_with_auth(num_buyers: int, num_shops: int) -> tuple:
 # ============================================
 
 def generate_request(buyer_id: str) -> Dict[str, Any]:
-    """Generate a fake request matching requests schema"""
+    """Generate a fake request matching requests schema with data_source='seed'"""
     category = random_category()
     item = random_item(category)
     budget_min, budget_max = random_budget(category)
@@ -405,11 +416,12 @@ def generate_request(buyer_id: str) -> Dict[str, Any]:
         "category_id": None,
         "selected_bid_id": None,
         "purchased_at": None,
-        "completed_at": None
+        "completed_at": None,
+        "data_source": "seed"  # <-- NEW
     }
 
 def create_requests(buyer_ids: List[str], num_requests: int) -> List[Dict]:
-    """Create requests with duplicate checking"""
+    """Create requests with data_source='seed'"""
     logger.info(f"Creating {num_requests} requests...")
     
     if not buyer_ids:
@@ -440,7 +452,7 @@ def create_requests(buyer_ids: List[str], num_requests: int) -> List[Dict]:
         except Exception as e:
             logger.error(f"  Failed to create request: {e}")
     
-    logger.info(f"Created {created_count} new requests")
+    logger.info(f"Created {created_count} new requests with data_source='seed'")
     return requests
 
 # ============================================
@@ -448,7 +460,7 @@ def create_requests(buyer_ids: List[str], num_requests: int) -> List[Dict]:
 # ============================================
 
 def generate_bid(request: Dict, shop_id: str) -> Dict[str, Any]:
-    """Generate a fake bid matching bids schema"""
+    """Generate a fake bid with data_source='seed'"""
     budget_min = request['budget_min']
     budget_max = request['budget_max']
     price = random_bid_price(budget_min, budget_max)
@@ -472,11 +484,12 @@ def generate_bid(request: Dict, shop_id: str) -> Dict[str, Any]:
         "rejected_at": None,
         "withdrawn_at": None,
         "buyer_contact_viewed": False,
-        "is_negotiable": random.random() < 0.3
+        "is_negotiable": random.random() < 0.3,
+        "data_source": "seed"  # <-- NEW
     }
 
 def create_bids(requests: List[Dict], shop_ids: List[str]) -> List[Dict]:
-    """Create bids with duplicate checking"""
+    """Create bids with data_source='seed'"""
     logger.info(f"Creating bids...")
     logger.info(f"  Requests available: {len(requests)}")
     logger.info(f"  Shops available: {len(shop_ids)}")
@@ -502,7 +515,6 @@ def create_bids(requests: List[Dict], shop_ids: List[str]) -> List[Dict]:
     insert_failed = 0
     
     for idx, request in enumerate(requests):
-        # Determine number of bids for this request
         roll = random.random()
         if roll < 0.3:
             num_bids = 0
@@ -511,7 +523,6 @@ def create_bids(requests: List[Dict], shop_ids: List[str]) -> List[Dict]:
         else:
             num_bids = random.randint(4, MAX_BIDS_PER_REQUEST)
         
-        # Log first 10 requests
         if idx < 10:
             logger.info(f"  Request {idx+1}: roll={roll:.2f}, num_bids={num_bids}, id={request['id'][:8]}")
         
@@ -519,7 +530,6 @@ def create_bids(requests: List[Dict], shop_ids: List[str]) -> List[Dict]:
             skipped_no_bids += 1
             continue
         
-        # Ensure we have enough shops
         if len(shop_ids) < num_bids:
             num_bids = len(shop_ids)
             logger.debug(f"  Reduced bids to {num_bids} (only {len(shop_ids)} shops available)")
@@ -575,11 +585,149 @@ def create_bids(requests: List[Dict], shop_ids: List[str]) -> List[Dict]:
     return all_bids
 
 # ============================================
+# GENERATE AUCTIONS
+# ============================================
+
+AUCTION_NAMES = [
+    "Vintage Camera", "Smart Watch", "Drone", "Tablet", "Gaming Console",
+    "Record Player", "Vinyl Collection", "Sports Equipment", "Artwork",
+    "Antique Vase", "Designer Bag", "Sunglasses", "Perfume", "Jewelry",
+    "Collector's Item", "Limited Edition Shoe", "Signed Book", "Concert Tickets",
+    "Studio Headphones", "Mechanical Keyboard", "Graphics Card", "Monitor",
+    "Office Chair", "Standing Desk", "Bookshelf", "Coffee Table"
+]
+
+def generate_auction(shop_id: str) -> Dict[str, Any]:
+    """Generate a fake auction with data_source='seed'"""
+    item_name = random.choice(AUCTION_NAMES)
+    starting_price = random.randint(100, 5000)
+    category = random_category()
+    pincode = random_pincode()
+    created_at = random_date(datetime.now() - timedelta(days=30), datetime.now())
+    end_time = random_date(created_at, created_at + timedelta(days=14))
+    
+    return {
+        "id": str(uuid.uuid4()),
+        "shop_id": shop_id,
+        "item_name": item_name,
+        "description": f"Beautiful {item_name} in excellent condition",
+        "starting_price": starting_price,
+        "current_highest_bid": starting_price,
+        "pincode": pincode,
+        "category": category,
+        "status": random_status({
+            'active': 0.4,
+            'sold': 0.25,
+            'expired': 0.2,
+            'cancelled': 0.15
+        }),
+        "reserve_price": starting_price + random.randint(100, 1000) if random.random() > 0.3 else None,
+        "end_time": end_time.isoformat(),
+        "image_urls": [f"https://picsum.photos/seed/{random.randint(1000,9999)}/400/400"] if random.random() > 0.4 else [],
+        "created_at": created_at.isoformat(),
+        "closed_at": None,
+        "data_source": "seed"  # <-- NEW
+    }
+
+def create_auctions(shop_ids: List[str], num_auctions: int) -> List[Dict]:
+    """Create auctions with data_source='seed'"""
+    logger.info(f"Creating {num_auctions} auctions...")
+    
+    if not shop_ids:
+        logger.error("No shop IDs available!")
+        return []
+    
+    existing_ids = get_existing_ids('auctions')
+    logger.info(f"Found {len(existing_ids)} existing auctions")
+    
+    auctions = []
+    created_count = 0
+    
+    for i in range(num_auctions):
+        shop_id = random.choice(shop_ids)
+        auction = generate_auction(shop_id)
+        
+        if auction['id'] in existing_ids:
+            continue
+        
+        auctions.append(auction)
+        
+        try:
+            supabase.table("auctions").insert(auction).execute()
+            created_count += 1
+            existing_ids.append(auction['id'])
+            if created_count % 10 == 0:
+                logger.info(f"  Created {created_count}/{num_auctions} auctions")
+        except Exception as e:
+            logger.error(f"  Failed to create auction: {e}")
+    
+    logger.info(f"Created {created_count} new auctions with data_source='seed'")
+    return auctions
+
+# ============================================
+# GENERATE AUCTION BIDS
+# ============================================
+
+def generate_auction_bid(auction_id: str, buyer_id: str) -> Dict[str, Any]:
+    """Generate a fake auction bid with data_source='seed'"""
+    bid_amount = random.randint(100, 10000)
+    created_at = random_date(datetime.now() - timedelta(days=15), datetime.now())
+    
+    return {
+        "id": str(uuid.uuid4()),
+        "auction_id": auction_id,
+        "buyer_id": buyer_id,
+        "bid_amount": bid_amount,
+        "created_at": created_at.isoformat(),
+        "data_source": "seed"  # <-- NEW
+    }
+
+def create_auction_bids(auctions: List[Dict], buyer_ids: List[str], num_bids: int) -> List[Dict]:
+    """Create auction bids with data_source='seed'"""
+    logger.info(f"Creating {num_bids} auction bids...")
+    
+    if not auctions:
+        logger.error("No auctions available!")
+        return []
+    
+    if not buyer_ids:
+        logger.error("No buyer IDs available!")
+        return []
+    
+    existing_ids = get_existing_ids('auction_bids')
+    logger.info(f"Found {len(existing_ids)} existing auction bids")
+    
+    auction_bids = []
+    created_count = 0
+    
+    for i in range(num_bids):
+        auction = random.choice(auctions)
+        buyer_id = random.choice(buyer_ids)
+        bid = generate_auction_bid(auction['id'], buyer_id)
+        
+        if bid['id'] in existing_ids:
+            continue
+        
+        auction_bids.append(bid)
+        
+        try:
+            supabase.table("auction_bids").insert(bid).execute()
+            created_count += 1
+            existing_ids.append(bid['id'])
+            if created_count % 10 == 0:
+                logger.info(f"  Created {created_count}/{num_bids} auction bids")
+        except Exception as e:
+            logger.error(f"  Failed to create auction bid: {e}")
+    
+    logger.info(f"Created {created_count} new auction bids with data_source='seed'")
+    return auction_bids
+
+# ============================================
 # GENERATE REQUEST EVENTS
 # ============================================
 
 def create_request_events(requests: List[Dict], bids: List[Dict], buyer_ids: List[str], shop_ids: List[str]) -> List[Dict]:
-    """Create request events matching request_events schema"""
+    """Create request events with data_source='seed'"""
     logger.info(f"Creating request events...")
     
     if not requests:
@@ -608,7 +756,8 @@ def create_request_events(requests: List[Dict], bids: List[Dict], buyer_ids: Lis
                 "event_type": 'viewed',
                 "actor_id": actor_id,
                 "metadata": {"timestamp": created_at.isoformat()},
-                "created_at": created_at.isoformat()
+                "created_at": created_at.isoformat(),
+                "data_source": "seed"  # <-- NEW
             }
             
             if event['id'] in existing_ids:
@@ -625,7 +774,8 @@ def create_request_events(requests: List[Dict], bids: List[Dict], buyer_ids: Lis
                 "event_type": 'bid_placed',
                 "actor_id": bid['shop_id'],
                 "metadata": {"bid_id": bid['id'], "price": bid['price']},
-                "created_at": bid['created_at']
+                "created_at": bid['created_at'],
+                "data_source": "seed"  # <-- NEW
             }
             
             if event['id'] in existing_ids:
@@ -646,7 +796,8 @@ def create_request_events(requests: List[Dict], bids: List[Dict], buyer_ids: Lis
                 "event_type": 'selected',
                 "actor_id": request['buyer_id'],
                 "metadata": {"bid_id": selected_bid['id'], "price": selected_bid['price']},
-                "created_at": created_at.isoformat()
+                "created_at": created_at.isoformat(),
+                "data_source": "seed"  # <-- NEW
             }
             
             if event['id'] in existing_ids:
@@ -664,7 +815,7 @@ def create_request_events(requests: List[Dict], bids: List[Dict], buyer_ids: Lis
         except Exception as e:
             logger.debug(f"  Failed to create event: {e}")
     
-    logger.info(f"Created {created_count} request events")
+    logger.info(f"Created {created_count} request events with data_source='seed'")
     return events
 
 # ============================================
@@ -694,7 +845,6 @@ def process_lifecycle(requests: List[Dict], bids: List[Dict]):
             else:
                 selected_bid = random.choice(request_bids)
             
-            # Update bid status to selected
             try:
                 supabase.table("bids").update({
                     "status": "selected",
@@ -705,7 +855,6 @@ def process_lifecycle(requests: List[Dict], bids: List[Dict]):
                 failed_count += 1
                 logger.debug(f"  Failed to select bid: {e}")
             
-            # Update request to purchased
             try:
                 supabase.table("requests").update({
                     "status": "purchased",
@@ -750,7 +899,7 @@ def process_lifecycle(requests: List[Dict], bids: List[Dict]):
 
 def main():
     logger.info("=" * 60)
-    logger.info("MarketFlip v2 - Faker Seed Script")
+    logger.info("MarketFlip v2 - Faker Seed Script (with data_source tagging)")
     logger.info("=" * 60)
     
     # Step 1: Verify connection
@@ -817,45 +966,67 @@ def main():
     logger.info("Step 8: Creating request events...")
     events = create_request_events(requests, bids, all_buyer_ids, all_shop_ids)
     
-    # Step 9: Process lifecycle
-    logger.info("Step 9: Processing lifecycle...")
+    # Step 9: Create auctions
+    logger.info("Step 9: Creating auctions...")
+    auctions = create_auctions(all_shop_ids, NUM_AUCTIONS)
+    
+    # Step 10: Create auction bids
+    logger.info("Step 10: Creating auction bids...")
+    auction_bids = create_auction_bids(auctions, all_buyer_ids, NUM_AUCTION_BIDS)
+    
+    # Step 11: Process lifecycle
+    logger.info("Step 11: Processing lifecycle...")
     process_lifecycle(requests, bids)
     
-    # Step 10: Summary
+    # Step 12: Summary
     logger.info("=" * 60)
-    logger.info("SEED DATA SUMMARY")
+    logger.info("SEED DATA SUMMARY (All with data_source='seed')")
     logger.info("=" * 60)
     
     result = supabase.table("profiles").select("id, role").execute()
     final_buyers = [p for p in result.data if p['role'] == 'buyer']
     final_shops = [p for p in result.data if p['role'] == 'shop_owner']
     
-    result = supabase.table("requests").select("id, status").execute()
+    result = supabase.table("requests").select("id, status, data_source").execute()
     requests_data = result.data
     status_counts = {}
     for r in requests_data:
         status_counts[r['status']] = status_counts.get(r['status'], 0) + 1
     
-    result = supabase.table("bids").select("id, status").execute()
+    result = supabase.table("bids").select("id, status, data_source").execute()
     bids_data = result.data
     bid_status_counts = {}
     for b in bids_data:
         bid_status_counts[b['status']] = bid_status_counts.get(b['status'], 0) + 1
     
-    result = supabase.table("request_events").select("id").execute()
+    result = supabase.table("auctions").select("id, status, data_source").execute()
+    auctions_data = result.data
+    auction_status_counts = {}
+    for a in auctions_data:
+        auction_status_counts[a['status']] = auction_status_counts.get(a['status'], 0) + 1
+    
+    result = supabase.table("request_events").select("id, data_source").execute()
     events_count = len(result.data)
     
+    result = supabase.table("auction_bids").select("id, data_source").execute()
+    auction_bids_count = len(result.data)
+    
     logger.info(f"Profiles: {len(final_buyers)} buyers, {len(final_shops)} shops")
-    logger.info(f"Requests: {len(requests_data)} total")
+    logger.info(f"Requests: {len(requests_data)} total (data_source='seed')")
     for status, count in status_counts.items():
         logger.info(f"  - {status}: {count}")
-    logger.info(f"Bids: {len(bids_data)} total")
+    logger.info(f"Bids: {len(bids_data)} total (data_source='seed')")
     for status, count in bid_status_counts.items():
         logger.info(f"  - {status}: {count}")
-    logger.info(f"Request Events: {events_count} total")
+    logger.info(f"Auctions: {len(auctions_data)} total (data_source='seed')")
+    for status, count in auction_status_counts.items():
+        logger.info(f"  - {status}: {count}")
+    logger.info(f"Request Events: {events_count} total (data_source='seed')")
+    logger.info(f"Auction Bids: {auction_bids_count} total (data_source='seed')")
     
     logger.info("=" * 60)
     logger.info("Seed data generation complete!")
+    logger.info("All data has data_source='seed'")
     logger.info("=" * 60)
 
 if __name__ == "__main__":

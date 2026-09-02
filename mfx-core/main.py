@@ -32,7 +32,9 @@ from routes.upload import router as upload_router
 from auctions.routes import router as auctions_router
 from chat.routes import router as chat_router
 from reports.routes import router as reports_router
-from notifications.routes import router as notifications_router  # <-- ADDED
+from notifications.routes import router as notifications_router
+from saved_searches.routes import router as saved_searches_router  # <-- ADDED
+from favorites.routes import router as favorites_router  # <-- ADDED
 logger.info("All routers imported successfully")
 
 # INCLUDE ROUTERS
@@ -44,7 +46,9 @@ app.include_router(upload_router)
 app.include_router(auctions_router)
 app.include_router(chat_router)
 app.include_router(reports_router)
-app.include_router(notifications_router)  # <-- ADDED
+app.include_router(notifications_router)
+app.include_router(saved_searches_router)  # <-- ADDED
+app.include_router(favorites_router)  # <-- ADDED
 logger.info("All routers included successfully")
 
 # STARTUP EVENT
