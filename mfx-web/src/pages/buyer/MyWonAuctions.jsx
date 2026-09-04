@@ -26,9 +26,13 @@ import {
   ShieldCheck,
   RefreshCw,
   Home,
-  Building2
+  Building2,
+  Star
 } from 'lucide-react';
 import api from '../../api/client';
+import ReviewModal from '../../components/review/ReviewModal';
+import ReviewBadge from '../../components/review/ReviewBadge';
+import { checkUserReviewed } from '../../api/client';
 
 const MyWonAuctions = () => {
   const navigate = useNavigate();
@@ -45,6 +49,12 @@ const MyWonAuctions = () => {
   const [otpVisible, setOtpVisible] = useState({});
   const [deliveryAddresses, setDeliveryAddresses] = useState({});
   const [deliveryMethods, setDeliveryMethods] = useState({});
+
+  // Review states
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedReviewTarget, setSelectedReviewTarget] = useState(null);
+  const [reviewCheckStatus, setReviewCheckStatus] = useState({});
+  const [reviewStats, setReviewStats] = useState({});
 
   // Get user's won auctions from all auctions
   const filteredAuctions = useMemo(() => {
@@ -88,11 +98,61 @@ const MyWonAuctions = () => {
         ['sold', 'completed'].includes(a.status)
       );
       setAuctions(won);
+
+      // Check review status for completed auctions
+      for (const auction of won) {
+        if (auction.status === 'completed' && auction.shop_id) {
+          await checkReviewStatusForCompleted(auction.id, auction.shop_id);
+        }
+      }
     } catch (err) {
       console.error('Fetch won auctions error:', err);
       setError('Failed to load won auctions: ' + (err.response?.data?.detail || err.message));
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ===== Review Functions =====
+  const checkReviewStatusForCompleted = async (auctionId, reviewedId) => {
+    try {
+      const response = await checkUserReviewed('auction', auctionId);
+      setReviewCheckStatus(prev => ({
+        ...prev,
+        [auctionId]: response.data
+      }));
+      
+      // Also fetch review stats for the shop
+      if (reviewedId) {
+        const statsResponse = await api.get(`/reviews/stats/${reviewedId}`);
+        setReviewStats(prev => ({
+          ...prev,
+          [reviewedId]: statsResponse.data
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to check review status:', err);
+    }
+  };
+
+  const handleReviewSuccess = (auctionId) => {
+    // Update the review check status to hide the review button
+    setReviewCheckStatus(prev => ({
+      ...prev,
+      [auctionId]: { has_reviewed: true }
+    }));
+    
+    // Refresh stats for the shop
+    const auction = auctions.find(a => a.id === auctionId);
+    if (auction?.shop_id) {
+      api.get(`/reviews/stats/${auction.shop_id}`)
+        .then(res => {
+          setReviewStats(prev => ({
+            ...prev,
+            [auction.shop_id]: res.data
+          }));
+        })
+        .catch(console.error);
     }
   };
 
@@ -700,25 +760,68 @@ const MyWonAuctions = () => {
                       </div>
                     )}
 
-                    {/* Completed Section */}
+                    {/* Completed Section with Review */}
                     {isCompleted && (
                       <div className="border-t border-[#EEECE6] pt-3 mt-1">
-                        <div className="flex flex-wrap items-center gap-3 text-xs">
-                          <span className="flex items-center gap-1.5 text-emerald-600">
-                            <CheckCircle size={14} />
-                            Transaction completed
-                          </span>
-                          {isOverridden && (
-                            <span className="flex items-center gap-1.5 text-amber-600">
-                              <ShieldCheck size={14} />
-                              Completed via override
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex flex-wrap items-center gap-3 text-xs">
+                            <span className="flex items-center gap-1.5 text-emerald-600">
+                              <CheckCircle size={14} />
+                              Transaction completed
                             </span>
-                          )}
-                          {auction.delivery_method && (
-                            <span className="text-[#A0A0B0]">
-                              Delivery: {auction.delivery_method === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
-                            </span>
-                          )}
+                            {isOverridden && (
+                              <span className="flex items-center gap-1.5 text-amber-600">
+                                <ShieldCheck size={14} />
+                                Completed via override
+                              </span>
+                            )}
+                            {auction.delivery_method && (
+                              <span className="text-[#A0A0B0]">
+                                Delivery: {auction.delivery_method === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Review Section */}
+                          <div className="flex items-center gap-3">
+                            {/* Review Stats */}
+                            {auction.shop_id && reviewStats[auction.shop_id] && (
+                              <ReviewBadge 
+                                averageRating={reviewStats[auction.shop_id].average_rating}
+                                totalReviews={reviewStats[auction.shop_id].total_reviews}
+                                size="sm"
+                              />
+                            )}
+                            
+                            {/* Review Button */}
+                            {!reviewCheckStatus[auction.id]?.has_reviewed ? (
+                              <Button
+                                onClick={() => {
+                                  // Get shop name from auction data
+                                  // Since we don't have shop details in auction object, use auction.shop_id
+                                  // We'll need to fetch shop name or use a placeholder
+                                  const shopName = auction.shop_name || auction.shop?.shop_name || 'the shop';
+                                  setSelectedReviewTarget({
+                                    targetType: 'auction',
+                                    targetId: auction.id,
+                                    reviewedId: auction.shop_id,
+                                    reviewedName: shopName
+                                  });
+                                  setShowReviewModal(true);
+                                }}
+                                size="sm"
+                                className="bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 text-xs px-3 py-1 h-auto"
+                              >
+                                <Star size={12} className="mr-1 fill-yellow-400 text-yellow-400" />
+                                Leave Review
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-green-600 flex items-center gap-1 bg-green-50 px-2 py-1 rounded">
+                                <CheckCircle size={12} />
+                                Reviewed
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -742,6 +845,24 @@ const MyWonAuctions = () => {
           </span>
         </motion.div>
       </div>
+
+      {/* Review Modal */}
+      <ReviewModal
+        isOpen={showReviewModal}
+        onClose={() => {
+          setShowReviewModal(false);
+          setSelectedReviewTarget(null);
+        }}
+        targetType={selectedReviewTarget?.targetType}
+        targetId={selectedReviewTarget?.targetId}
+        reviewedId={selectedReviewTarget?.reviewedId}
+        reviewedName={selectedReviewTarget?.reviewedName}
+        onSuccess={() => {
+          if (selectedReviewTarget) {
+            handleReviewSuccess(selectedReviewTarget.targetId);
+          }
+        }}
+      />
     </div>
   );
 };

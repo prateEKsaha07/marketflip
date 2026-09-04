@@ -30,9 +30,12 @@ import {
   EyeOff,
   Check,
   X,
-  History
+  History,
+  Star
 } from 'lucide-react';
-import api from '../../api/client';
+import api, { checkUserReviewed } from '../../api/client';
+import ReviewModal from '../../components/review/ReviewModal';
+import ReviewBadge from '../../components/review/ReviewBadge';
 
 const MyPurchases = () => {
   const navigate = useNavigate();
@@ -50,6 +53,12 @@ const MyPurchases = () => {
   const [updating, setUpdating] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
   const [showOtpCode, setShowOtpCode] = useState(false);
+  
+  // Review states
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedReviewTarget, setSelectedReviewTarget] = useState(null);
+  const [reviewCheckStatus, setReviewCheckStatus] = useState({});
+  const [reviewStats, setReviewStats] = useState({});
 
   useEffect(() => {
     fetchAllPurchases();
@@ -109,6 +118,13 @@ const MyPurchases = () => {
       setVerificationRequests(verificationWithDetails);
       setCompletedRequests(completedWithDetails);
       
+      // Check review status for completed items
+      for (const req of completedWithDetails) {
+        if (req.selectedBid?.shop_id) {
+          await checkReviewStatusForCompleted(req.id, req.selectedBid.shop_id);
+        }
+      }
+      
     } catch (err) {
       console.error('Fetch purchases error:', err);
       setError('Failed to fetch purchases: ' + (err.response?.data?.detail || err.message));
@@ -155,6 +171,49 @@ const MyPurchases = () => {
         }
       })
     );
+  };
+
+  // ===== Review Functions =====
+  const checkReviewStatusForCompleted = async (requestId, reviewedId) => {
+    try {
+      const response = await checkUserReviewed('request', requestId);
+      setReviewCheckStatus(prev => ({
+        ...prev,
+        [requestId]: response.data
+      }));
+      
+      // Also fetch review stats for the shop
+      if (reviewedId) {
+        const statsResponse = await api.get(`/reviews/stats/${reviewedId}`);
+        setReviewStats(prev => ({
+          ...prev,
+          [reviewedId]: statsResponse.data
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to check review status:', err);
+    }
+  };
+
+  const handleReviewSuccess = (requestId) => {
+    // Update the review check status to hide the review button
+    setReviewCheckStatus(prev => ({
+      ...prev,
+      [requestId]: { has_reviewed: true }
+    }));
+    
+    // Refresh stats for the shop
+    const purchase = completedRequests.find(r => r.id === requestId);
+    if (purchase?.selectedBid?.shop_id) {
+      api.get(`/reviews/stats/${purchase.selectedBid.shop_id}`)
+        .then(res => {
+          setReviewStats(prev => ({
+            ...prev,
+            [purchase.selectedBid.shop_id]: res.data
+          }));
+        })
+        .catch(console.error);
+    }
   };
 
   // ============================================
@@ -801,6 +860,51 @@ const MyPurchases = () => {
                             </p>
                           </div>
                         )}
+
+                        {/* Review Button - Only for Completed Tab */}
+                        {isCompleted && (
+                          <div className="mt-3 flex items-center justify-between">
+                            <div>
+                              {purchase.selectedBid?.shop_id && reviewStats[purchase.selectedBid.shop_id] && (
+                                <ReviewBadge 
+                                  averageRating={reviewStats[purchase.selectedBid.shop_id].average_rating}
+                                  totalReviews={reviewStats[purchase.selectedBid.shop_id].total_reviews}
+                                  size="sm"
+                                />
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              {!reviewCheckStatus[purchase.id]?.has_reviewed && (
+                                <Button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const shopName = purchase.selectedBid?.shop_details?.shop_name || 
+                                                   purchase.selectedBid?.shop_name || 
+                                                   'the shop';
+                                    setSelectedReviewTarget({
+                                      targetType: 'request',
+                                      targetId: purchase.id,
+                                      reviewedId: purchase.selectedBid?.shop_id,
+                                      reviewedName: shopName
+                                    });
+                                    setShowReviewModal(true);
+                                  }}
+                                  size="sm"
+                                  className="bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 text-xs px-3 py-1 h-auto"
+                                >
+                                  <Star size={12} className="mr-1 fill-yellow-400 text-yellow-400" />
+                                  Leave Review
+                                </Button>
+                              )}
+                              {reviewCheckStatus[purchase.id]?.has_reviewed && (
+                                <span className="text-xs text-green-600 flex items-center gap-1 bg-green-50 px-2 py-1 rounded">
+                                  <CheckCircle size={12} />
+                                  Reviewed
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="flex-shrink-0 text-[#4A4A5A] group-hover:text-[#FFBE91] transition-colors">
                         <ChevronRight size={18} />
@@ -1207,6 +1311,24 @@ const MyPurchases = () => {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Review Modal */}
+      <ReviewModal
+        isOpen={showReviewModal}
+        onClose={() => {
+          setShowReviewModal(false);
+          setSelectedReviewTarget(null);
+        }}
+        targetType={selectedReviewTarget?.targetType}
+        targetId={selectedReviewTarget?.targetId}
+        reviewedId={selectedReviewTarget?.reviewedId}
+        reviewedName={selectedReviewTarget?.reviewedName}
+        onSuccess={() => {
+          if (selectedReviewTarget) {
+            handleReviewSuccess(selectedReviewTarget.targetId);
+          }
+        }}
+      />
     </div>
   );
 };

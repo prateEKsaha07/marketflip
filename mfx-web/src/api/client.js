@@ -77,6 +77,34 @@ export const getTopReliableShops = (limit = 10) => {
   return api.get(`/reliability/top?limit=${limit}`);
 };
 
+export const createReview = (data) => {
+  return api.post('/reviews/', data);
+};
+
+export const getProfileReviews = (profileId, params = {}) => {
+  return api.get(`/reviews/profile/${profileId}`, { params });
+};
+
+export const getMyReviews = (params = {}) => {
+  return api.get('/reviews/my-reviews', { params });
+};
+
+export const getTargetReviews = (targetType, targetId) => {
+  return api.get(`/reviews/target/${targetType}/${targetId}`);
+};
+
+export const checkUserReviewed = (targetType, targetId) => {
+  return api.get(`/reviews/check/${targetType}/${targetId}`);
+};
+
+export const getReviewStats = (profileId) => {
+  return api.get(`/reviews/stats/${profileId}`);
+};
+
+export const deleteReview = (reviewId) => {
+  return api.delete(`/reviews/${reviewId}`);
+};
+
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
