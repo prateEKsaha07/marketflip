@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -697,7 +697,19 @@ const Auth = () => {
                       {renderSignupFields()}
                     </form>
 
-                    <p className="text-center text-xs text-[#A0A0B0] mt-3">
+                    {/* ====== LEGAL DISCLAIMER - ADDED ====== */}
+                    <div className="mt-3 text-[10px] text-[#A0A0B0] text-center leading-relaxed border-t border-[#EEECE6] pt-3">
+                      By creating an account, you agree to our{' '}
+                      <Link to="/privacy" className="text-[#FFBE91] hover:underline transition-colors">
+                        Privacy Policy
+                      </Link>
+                      {' '}and{' '}
+                      <Link to="/terms" className="text-[#FFBE91] hover:underline transition-colors">
+                        Terms of Service
+                      </Link>
+                    </div>
+
+                    <p className="text-center text-xs text-[#A0A0B0] mt-2">
                       Already have an account?{' '}
                       <button
                         type="button"

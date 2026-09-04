@@ -29,6 +29,8 @@ import TransactionHistory from './pages/history/TransactionHistory';
 import ChatList from './pages/chat/ChatList';
 import ChatView from './pages/chat/ChatView';
 import BuyerMyBids from './pages/buyer/MyBids';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 
 // ====== Phase 5b Auction Imports ======
 import FinalizedAuctions from './pages/shop/FinalizedAuctions';
@@ -78,6 +80,18 @@ const AnimatedRoutes = () => {
         <Route path="/auth" element={
           <PageTransition>
             <Auth />
+          </PageTransition>
+        } />
+        
+        {/* ====== Legal Pages (Public) ====== */}
+        <Route path="/privacy" element={
+          <PageTransition>
+            <PrivacyPolicy />
+          </PageTransition>
+        } />
+        <Route path="/terms" element={
+          <PageTransition>
+            <TermsOfService />
           </PageTransition>
         } />
         

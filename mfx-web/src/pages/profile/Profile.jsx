@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -440,20 +440,35 @@ const Profile = () => {
             )}
           </div>
 
-          {/* Footer */}
-          <div className="px-6 py-4 border-t border-[#EEECE6] bg-[#F8F6F0]/50 flex justify-between items-center">
-            <span className="text-[9px] text-[#A0A0B0]">
-              <Sparkles size={10} className="inline mr-1 text-[#FFBE91]" />
-              Profile last updated: {new Date().toLocaleDateString()}
-            </span>
-            <Button
-              onClick={() => navigate(editPath)}
-              variant="ghost"
-              className="text-[#A0A0B0] hover:text-[#1A1A2E] text-xs px-3 py-1 h-auto"
-            >
-              <Edit2 size={12} className="mr-1.5" />
-              Edit Profile
-            </Button>
+          {/* Footer - UPDATED with Legal Links */}
+          <div className="px-6 py-4 border-t border-[#EEECE6] bg-[#F8F6F0]/50">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-3">
+              <span className="text-[9px] text-[#A0A0B0]">
+                <Sparkles size={10} className="inline mr-1 text-[#FFBE91]" />
+                Profile last updated: {new Date().toLocaleDateString()}
+              </span>
+              
+              <div className="flex flex-wrap items-center gap-3 text-[10px] text-[#A0A0B0]">
+                <Link to="/privacy" className="hover:text-[#1A1A2E] transition-colors">
+                  Privacy Policy
+                </Link>
+                <span className="text-[#EEECE6]">|</span>
+                <Link to="/terms" className="hover:text-[#1A1A2E] transition-colors">
+                  Terms of Service
+                </Link>
+                <span className="text-[#EEECE6]">|</span>
+                <span>© {new Date().getFullYear()} MarketFlip</span>
+              </div>
+              
+              <Button
+                onClick={() => navigate(editPath)}
+                variant="ghost"
+                className="text-[#A0A0B0] hover:text-[#1A1A2E] text-xs px-3 py-1 h-auto"
+              >
+                <Edit2 size={12} className="mr-1.5" />
+                Edit Profile
+              </Button>
+            </div>
           </div>
         </motion.div>
       </div>
