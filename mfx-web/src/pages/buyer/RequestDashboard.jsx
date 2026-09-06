@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
+import LoadingAnimation from '../../components/ui/LoadingAnimation';
 import { 
   ArrowLeft, 
   FileText, 
@@ -174,12 +175,13 @@ const BuyerRequestDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-2 border-[#1A1A2E] border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-[#A0A0B0]">Loading dashboard...</p>
-        </div>
-      </div>
+      // <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
+      //   <div className="flex flex-col items-center gap-3">
+      //     <div className="w-6 h-6 border-2 border-[#1A1A2E] border-t-transparent rounded-full animate-spin" />
+      //     <p className="text-xs text-[#A0A0B0]">Loading dashboard...</p>
+      //   </div>
+      // </div>
+      <LoadingAnimation/>
     );
   }
 

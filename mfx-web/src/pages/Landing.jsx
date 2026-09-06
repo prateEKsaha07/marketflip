@@ -10,6 +10,7 @@ import AnimatedTestimonials from '../components/sections/AnimatedTestimonials';
 import FAQ from '../components/sections/FAQ';
 import AboutDev from '../components/sections/AboutDev';
 import Footer from '../components/sections/Footer';
+import LoadingAnimation from '../components/ui/LoadingAnimation';
 
 const Landing = () => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -26,11 +27,12 @@ const Landing = () => {
   }, [loading, isAuthenticated, user, navigate]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FFFCE1]">
-        <div className="animate-pulse text-2xl font-bold text-[#FFBE91]">Loading...</div>
-      </div>
-    );
+    return <LoadingAnimation message="Loading your experience..." />;
+    // return (
+    //   <div className="min-h-screen flex items-center justify-center bg-[#FFFCE1]">
+    //     <div className="animate-pulse text-2xl font-bold text-[#FFBE91]">Loading...</div>
+    //   </div>
+    // );
   }
 
   return (
