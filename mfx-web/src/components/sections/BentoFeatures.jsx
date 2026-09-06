@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   ShoppingBag, 
   Users, 
@@ -84,6 +85,8 @@ const featuredFeature = {
 };
 
 const BentoFeatures = () => {
+  const navigate = useNavigate();
+  
   return (
     <section id="features" className="relative py-20 px-4 overflow-hidden">
       {/* Section Background */}
@@ -192,7 +195,7 @@ const BentoFeatures = () => {
           <p className="text-[#4A4A5A] mb-4">
             Ready to flip how you buy?
           </p>
-          <Button className="bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E] px-8 py-6 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all group">
+          <Button onClick={() => navigate('/auth')} className="bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E] px-8 py-6 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all group">
             Get Started
             <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </Button>

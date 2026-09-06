@@ -2,11 +2,13 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Heart, MapPin, Mail } from 'lucide-react';
-
+import { useNavigate } from 'react-router-dom';
 const Footer = () => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const navigate = useNavigate();
 
   const footerLinks = {
     product: ['Features', 'How It Works', 'Pricing', 'FAQ'],
@@ -15,11 +17,11 @@ const Footer = () => {
   };
 
   const socialLinks = [
-    { label: 'Facebook', href: '#' },
-    { label: 'Twitter', href: '#' },
-    { label: 'Instagram', href: '#' },
-    { label: 'LinkedIn', href: '#' },
-    { label: 'GitHub', href: '#' },
+    { label: 'Facebook', href: 'https://www.facebook.com/prateek.saha.10' },
+    { label: 'Twitter', href: 'https://x.com/PrateEKsaha_07' },
+    { label: 'Instagram', href: 'https://www.instagram.com/sketchy.prate_ek' },
+    { label: 'LinkedIn', href: 'https://www.linkedin.com/in/prateeksaha' },
+    { label: 'GitHub', href: 'https://github.com/prateEKsaha07' },
   ];
 
   return (
@@ -75,10 +77,10 @@ const Footer = () => {
                   whileHover={{ x: 3 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 >
-                  <a href="#" className="text-xs text-[#4A4A5A] hover:text-[#FFBE91] transition-colors flex items-center gap-1 group">
+                  <button onClick={() => navigate('/auth')} className="text-xs text-[#4A4A5A] hover:text-[#FFBE91] transition-colors flex items-center gap-1 group">
                     {item}
                     <ArrowUpRight className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </a>
+                  </button>
                 </motion.li>
               ))}
             </ul>
@@ -94,7 +96,7 @@ const Footer = () => {
                   whileHover={{ x: 3 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 >
-                  <a href="#" className="text-xs text-[#4A4A5A] hover:text-[#FFBE91] transition-colors">
+                  <a href="" className="text-xs text-[#4A4A5A] hover:text-[#FFBE91] transition-colors">
                     {item}
                   </a>
                 </motion.li>
@@ -127,7 +129,7 @@ const Footer = () => {
 
             <div className="mt-3 pt-3 border-t border-[#EEECE6] flex items-center gap-1.5 text-[10px] text-[#A0A0B0]">
               <Mail size={12} />
-              <span>support@marketflip.com</span>
+              <span>prateeksaha963@gmail.com</span>
             </div>
           </div>
         </div>
@@ -138,11 +140,11 @@ const Footer = () => {
             © {new Date().getFullYear()} MarketFlip. All rights reserved.
           </p>
           
-          <div className="flex items-center gap-4 text-[10px] text-[#A0A0B0]">
+          {/* <div className="flex items-center gap-4 text-[10px] text-[#A0A0B0]">
             <span>Made with</span>
             <Heart size={11} className="text-[#FFBE91] fill-[#FFBE91]" />
             <span>in Bhilai</span>
-          </div>
+          </div> */}
           
           {/* Back to Top Button */}
           <motion.button

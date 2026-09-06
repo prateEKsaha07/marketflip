@@ -82,7 +82,7 @@ const AboutDev = () => {
             Prateek Saha
           </motion.h3>
           <motion.p variants={itemVariants} className="text-sm text-[#4A4A5A]">
-            Full Stack Developer
+            Software Developer
           </motion.p>
 
           {/* Bio */}
@@ -107,25 +107,32 @@ const AboutDev = () => {
             ))}
           </motion.div>
 
-          {/* Social Links - Text based (No icons) */}
+          {/* Social Links - Text based */}
           <motion.div 
             variants={itemVariants}
-            className="mt-6 flex flex-wrap gap-3 justify-center"
-          >
-            {['GitHub', 'LinkedIn', 'Twitter', 'Email'].map((social, index) => (
-              <motion.a
-                key={index}
-                href={social === 'Email' ? 'mailto:prateek@marketflip.com' : '#'}
-                whileHover={{ y: -2, scale: 1.02 }}
-                whileTap={{ scale: 0.95 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                className="px-4 py-1.5 text-[10px] font-medium text-[#1A1A2E] bg-white/80 backdrop-blur-sm border border-[#EEECE6] rounded-full hover:bg-[#FFBE91]/10 hover:border-[#FFBE91] transition-all"
-              >
-                {social}
-              </motion.a>
-            ))}
-          </motion.div>
-
+            className="mt-6 flex flex-wrap gap-3 justify-center">
+            {
+              [
+                { name: 'GitHub', url: 'https://github.com/prateEKsaha07' },
+                { name: 'LinkedIn', url: 'https://www.linkedin.com/in/prateeksaha' },
+                { name: 'Twitter', url: 'https://x.com/PrateEKsaha_07' },
+                { name: 'Email', url: 'mailto:prateeksaha963@gmail.com' }
+              ].map((social, index) => (
+                <motion.a
+                  key={index}
+                  href={social.url}
+                  target={social.name !== 'Email' ? '_blank' : undefined}
+                  rel={social.name !== 'Email' ? 'noopener noreferrer' : undefined}
+                  whileHover={{ y: -2, scale: 1.02 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                  className="px-4 py-1.5 text-[10px] font-medium text-[#1A1A2E] bg-white/80 backdrop-blur-sm border border-[#EEECE6] rounded-full hover:bg-[#FFBE91]/10 hover:border-[#FFBE91] transition-all">
+              {social.name}
+            </motion.a>
+          )
+        )
+      }
+    </motion.div>
           {/* Stats */}
           <motion.div 
             variants={itemVariants}
@@ -133,17 +140,17 @@ const AboutDev = () => {
           >
             <div className="flex items-center gap-1.5">
               <Code size={13} className="text-[#FFBE91]" />
-              <span>2+ Years</span>
+              <span>3+ Years</span>
             </div>
             <div className="w-px h-4 bg-[#EEECE6]" />
             <div className="flex items-center gap-1.5">
               <Briefcase size={13} className="text-[#FFDDB0]" />
-              <span>3 Projects</span>
+              <span>5+ Projects</span>
             </div>
             <div className="w-px h-4 bg-[#EEECE6]" />
             <div className="flex items-center gap-1.5">
               <Users size={13} className="text-[#CFEBFF]" />
-              <span>100+ Users</span>
+              <span>100+ Users*</span>
             </div>
           </motion.div>
 
@@ -159,7 +166,7 @@ const AboutDev = () => {
             <div className="w-px h-3 bg-[#EEECE6]" />
             <div className="flex items-center gap-1.5">
               <Mail size={13} />
-              <span>prateek@marketflip.com</span>
+              <span>prateeksaha963@gmail.com</span>
             </div>
           </motion.div>
         </motion.div>

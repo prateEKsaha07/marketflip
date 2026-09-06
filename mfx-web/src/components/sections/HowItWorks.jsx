@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   ShoppingBag, 
   Users, 
@@ -46,6 +47,8 @@ const steps = [
 ];
 
 const HowItWorks = () => {
+  const navigate = useNavigate();
+
   return (
     <section id="how-it-works" className="relative py-16 md:py-20 px-4 overflow-hidden">
       {/* Section Background */}
@@ -141,7 +144,7 @@ const HowItWorks = () => {
           <p className="text-sm text-[#4A4A5A] mb-3">
             Ready to flip how you buy?
           </p>
-          <Button className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white px-6 py-5 text-sm font-medium rounded-xl shadow-lg hover:shadow-xl transition-all group">
+          <Button onClick={() => navigate('/auth')} className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white px-6 py-5 text-sm font-medium rounded-xl shadow-lg hover:shadow-xl transition-all group">
             Get Started
             <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Button>

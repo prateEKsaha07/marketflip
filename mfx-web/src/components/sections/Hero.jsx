@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 import { 
   ArrowRight, 
   Sparkles, 
@@ -15,7 +16,9 @@ import {
   Activity
 } from 'lucide-react';
 
+
 const Hero = () => {
+  const navigate = useNavigate();
   return (
     <section className="relative min-h-screen flex items-center justify-center px-4 pt-20 overflow-hidden">
       <div className="max-w-6xl mx-auto w-full">
@@ -72,7 +75,7 @@ const Hero = () => {
               transition={{ delay: 0.5, duration: 0.5 }}
               className="flex flex-wrap gap-3 pt-2"
             >
-              <Button className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white px-6 py-5 text-sm font-medium rounded-xl shadow-lg hover:shadow-xl transition-all group">
+              <Button onClick={() => navigate('/auth')} className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white px-6 py-5 text-sm font-medium rounded-xl shadow-lg hover:shadow-xl transition-all group">
                 Get Started
                 <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>

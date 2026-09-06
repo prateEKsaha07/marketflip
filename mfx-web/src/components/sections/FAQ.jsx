@@ -160,7 +160,10 @@ const FAQ = () => {
           className="text-center mt-8"
         >
           <p className="text-xs text-[#4A4A5A]">
-            Still have questions? <span className="text-[#FFBE91] font-medium">Contact us</span>
+            Still have questions? {" "}
+              <a href="mailto:prateeksaha963@gmail.com" className="text-[#FFBE91] font-medium">
+                Contact us
+              </a>
           </p>
         </motion.div>
       </div>

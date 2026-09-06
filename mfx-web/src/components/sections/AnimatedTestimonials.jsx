@@ -184,7 +184,7 @@ const AnimatedTestimonials = () => {
           className="text-center mb-12"
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 mb-4 bg-[#FFBE91]/10 rounded-full border border-[#FFBE91]/20">
-            <span className="text-sm font-medium text-[#FFBE91]">💬 Testimonials</span>
+            <span className="text-sm font-medium text-[#FFBE91]">Testimonials</span>
           </div>
           
           <h2 className="text-4xl md:text-5xl font-bold">
