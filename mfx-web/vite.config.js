@@ -33,10 +33,11 @@ export default defineConfig({
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-lottie': ['lottie-web'],
-          'vendor-axios': ['axios'],
+          'vendor-ui': ['@mui/material', '@emotion/react', '@emotion/styled'],
         }
       }
     },
+
     chunkSizeWarningLimit: 1000, // 1MB (adjust as needed)
   },
 })
