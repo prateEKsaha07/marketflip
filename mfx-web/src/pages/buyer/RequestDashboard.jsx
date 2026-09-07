@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
 import LoadingAnimation from '../../components/ui/LoadingAnimation';
+import ModernNavbar from "../../components/ui/Navbar";
 import { 
   ArrowLeft, 
   FileText, 
@@ -31,10 +32,12 @@ const BuyerRequestDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
 
+  // Fetch stats on mount
   useEffect(() => {
     fetchStats();
   }, []);
 
+  // Fetch all request statistics
   const fetchStats = async () => {
     setLoading(true);
     try {
@@ -75,6 +78,7 @@ const BuyerRequestDashboard = () => {
     }
   };
 
+  // Handle logout
   const handleLogout = async () => {
     await logout();
     navigate('/auth');
@@ -156,6 +160,7 @@ const BuyerRequestDashboard = () => {
     }
   ];
 
+  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { 
@@ -173,20 +178,42 @@ const BuyerRequestDashboard = () => {
     }
   };
 
+  // Show loading state
   if (loading) {
-    return (
-      // <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
-      //   <div className="flex flex-col items-center gap-3">
-      //     <div className="w-6 h-6 border-2 border-[#1A1A2E] border-t-transparent rounded-full animate-spin" />
-      //     <p className="text-xs text-[#A0A0B0]">Loading dashboard...</p>
-      //   </div>
-      // </div>
-      <LoadingAnimation/>
-    );
+    return <LoadingAnimation />;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
+      {/* Modern Reusable Navbar - Buyer Request Dashboard */}
+      <ModernNavbar
+        navItems={[
+          { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
+          { name: "Requests", path: "/buyer/requests", icon: "FileText" },
+          { name: "Auctions", path: "/buyer/auctions", icon: "Gavel" },
+          { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
+          { name: "History", path: "/buyer/history", icon: "History" },
+        ]}
+        logo={{
+          src: "/Logo.png",
+          alt: "MarketFlip",
+          link: "/buyer/dashboard",
+        }}
+        showProfile={true}
+        showLogout={true}
+        showNotifications={true}
+        logoutButton={{
+          label: "Logout",
+          icon: "LogOut",
+          onClick: handleLogout
+        }}
+        profileButton={{
+          label: "Profile",
+          path: "/buyer/profile",
+          icon: "User"
+        }}
+      />
+
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div 
@@ -214,13 +241,6 @@ const BuyerRequestDashboard = () => {
               </p>
             </div>
           </div>
-          <Button 
-            onClick={handleLogout}
-            variant="ghost"
-            className="text-[#A0A0B0] hover:text-rose-500 hover:bg-rose-50 text-sm px-3 py-2"
-          >
-            <LogOut size={15} />
-          </Button>
         </motion.div>
 
         {/* Stats Grid - 4 KPIs */}
@@ -283,7 +303,7 @@ const BuyerRequestDashboard = () => {
           className="bg-white/80 backdrop-blur-xl rounded-xl p-4 border border-[#EEECE6] shadow-sm text-center"
         >
           <p className="text-xs text-[#A0A0B0]">
-            💡 Post a request to get bids from shops · Track your purchases in Finalized Requests
+             Post a request to get bids from shops · Track your purchases in Finalized Requests
           </p>
         </motion.div>
       </div>

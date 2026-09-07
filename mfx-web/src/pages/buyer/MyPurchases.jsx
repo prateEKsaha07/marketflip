@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
+import ModernNavbar from "../../components/ui/Navbar";
 import { 
   ArrowLeft, 
   RefreshCw, 
@@ -60,10 +61,12 @@ const MyPurchases = () => {
   const [reviewCheckStatus, setReviewCheckStatus] = useState({});
   const [reviewStats, setReviewStats] = useState({});
 
+  // Fetch all purchases on mount
   useEffect(() => {
     fetchAllPurchases();
   }, []);
 
+  // Fetch all purchases from API
   const fetchAllPurchases = async () => {
     setLoading(true);
     setError('');
@@ -88,14 +91,11 @@ const MyPurchases = () => {
       const verification = [];
       
       for (const req of purchasedData) {
-        // Check if delivery is confirmed (for home delivery) or pickup (auto-confirmed)
         const isDeliveryConfirmed = req.delivery_confirmed_by_shop === true;
         const isPickup = req.delivery_method === 'pickup';
         const isPending = req.delivery_confirmed_by_shop === null && req.delivery_method === 'home_delivery';
         const isDenied = req.delivery_confirmed_by_shop === false;
         
-        // For pickup, always put in verification tab since OTP should be generated
-        // For home delivery, only if shop confirmed
         if (isPickup || isDeliveryConfirmed) {
           verification.push(req);
         } 
@@ -133,13 +133,13 @@ const MyPurchases = () => {
     }
   };
 
+  // Process requests with bid details
   const processRequests = async (requests) => {
     if (!requests || requests.length === 0) return [];
     
     return await Promise.all(
       requests.map(async (req) => {
         try {
-          // Get bid details
           const bidsResponse = await api.get(`/requests/${req.id}/bids`);
           const selectedBid = bidsResponse.data.find(b => b.status === 'selected');
           
@@ -151,11 +151,6 @@ const MyPurchases = () => {
             } catch (err) {
               shopDetails = selectedBid.profiles || null;
             }
-          }
-          
-          // Log verification code for debugging
-          if (req.verification_code) {
-            console.log(`Request ${req.id} has verification code:`, req.verification_code);
           }
           
           return {
@@ -182,7 +177,6 @@ const MyPurchases = () => {
         [requestId]: response.data
       }));
       
-      // Also fetch review stats for the shop
       if (reviewedId) {
         const statsResponse = await api.get(`/reviews/stats/${reviewedId}`);
         setReviewStats(prev => ({
@@ -196,13 +190,11 @@ const MyPurchases = () => {
   };
 
   const handleReviewSuccess = (requestId) => {
-    // Update the review check status to hide the review button
     setReviewCheckStatus(prev => ({
       ...prev,
       [requestId]: { has_reviewed: true }
     }));
     
-    // Refresh stats for the shop
     const purchase = completedRequests.find(r => r.id === requestId);
     if (purchase?.selectedBid?.shop_id) {
       api.get(`/reviews/stats/${purchase.selectedBid.shop_id}`)
@@ -280,7 +272,6 @@ const MyPurchases = () => {
     }
     
     if (request.delivery_method === 'pickup') {
-      // Check if pickup has OTP code generated
       if (request.verification_code) {
         return {
           icon: <Key size={14} className="text-violet-600" />,
@@ -574,6 +565,7 @@ const MyPurchases = () => {
     );
   };
 
+  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FFFCE1]">
@@ -600,7 +592,38 @@ const MyPurchases = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFFCE1] via-[#FFDDB0]/5 to-[#CFEBFF]/5 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
+      {/* Modern Reusable Navbar */}
+      <ModernNavbar
+        navItems={[
+          { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
+          { name: "Requests", path: "/buyer/requests", icon: "FileText" },
+          { name: "Auctions", path: "/buyer/auctions", icon: "Gavel" },
+          { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
+          { name: "History", path: "/buyer/history", icon: "History" },
+        ]}
+        logo={{
+          src: "/Logo.png",
+          alt: "MarketFlip",
+          link: "/buyer/dashboard",
+        }}
+        showProfile={true}
+        showLogout={true}
+        showNotifications={true}
+        logoutButton={{
+          label: "Logout",
+          icon: "LogOut",
+          onClick: () => {
+            // Your logout logic here
+          }
+        }}
+        profileButton={{
+          label: "Profile",
+          path: "/buyer/profile",
+          icon: "User"
+        }}
+      />
+
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <motion.div 
@@ -1195,7 +1218,7 @@ const MyPurchases = () => {
                   </motion.div>
                 )}
 
-                {/* Verification Tab - Transaction Status (NO VERIFY BUTTON) */}
+                {/* Verification Tab - Transaction Status */}
                 {activeTab === 'verification' && selectedPurchase.delivery_method && (
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}

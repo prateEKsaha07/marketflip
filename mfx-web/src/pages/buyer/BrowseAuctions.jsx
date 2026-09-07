@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
+import ModernNavbar from "../../components/ui/Navbar";
 import { 
   ArrowLeft, 
   Search, 
@@ -61,6 +62,7 @@ const BrowseAuctions = () => {
     { value: 'most_bids', label: 'Most Bids' },
   ];
 
+  // Fetch auctions on filter/sort change
   useEffect(() => {
     fetchAuctions();
   }, [activeFilters, sortBy]);
@@ -131,7 +133,7 @@ const BrowseAuctions = () => {
           }
         }
         
-        // Try 2: Any active auctions (fallback) - ALWAYS show something
+        // Try 2: Any active auctions (fallback)
         if (formatted.length === 0) {
           console.log('Fetching any active auctions (fallback)');
           try {
@@ -216,6 +218,7 @@ const BrowseAuctions = () => {
     return () => clearTimeout(timer);
   }, [auctions, activeFilters.category, activeFilters.pincode]);
 
+  // Fetch auctions from API
   const fetchAuctions = async () => {
     setLoading(true);
     setError('');
@@ -311,6 +314,7 @@ const BrowseAuctions = () => {
     }
   };
 
+  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
@@ -324,6 +328,37 @@ const BrowseAuctions = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
+      {/* Modern Reusable Navbar */}
+      <ModernNavbar
+        navItems={[
+          { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
+          { name: "Requests", path: "/buyer/requests", icon: "FileText" },
+          { name: "Auctions", path: "/buyer/auctions", icon: "Gavel" },
+          { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
+          { name: "History", path: "/buyer/history", icon: "History" },
+        ]}
+        logo={{
+          src: "/Logo.png",
+          alt: "MarketFlip",
+          link: "/buyer/dashboard",
+        }}
+        showProfile={true}
+        showLogout={true}
+        showNotifications={true}
+        logoutButton={{
+          label: "Logout",
+          icon: "LogOut",
+          onClick: () => {
+            // Your logout logic here
+          }
+        }}
+        profileButton={{
+          label: "Profile",
+          path: "/buyer/profile",
+          icon: "User"
+        }}
+      />
+
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div 
@@ -460,6 +495,7 @@ const BrowseAuctions = () => {
           )}
         </AnimatePresence>
 
+        {/* Error Message */}
         {error && (
           <div className="bg-rose-50/80 backdrop-blur-sm rounded-lg p-3 mb-4 text-rose-700 text-xs flex items-center gap-2 border border-rose-100">
             <AlertCircle size={14} />

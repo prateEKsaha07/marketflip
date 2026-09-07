@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
+import ModernNavbar from "../../components/ui/Navbar";
 import { 
   ArrowLeft, 
   FileText, 
@@ -32,6 +33,7 @@ const MyOpenRequests = () => {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [error, setError] = useState('');
 
+  // Filter and sort requests
   const filteredRequests = useMemo(() => {
     let filtered = [...requests];
 
@@ -51,10 +53,12 @@ const MyOpenRequests = () => {
     return filtered;
   }, [requests, searchQuery, categoryFilter]);
 
+  // Fetch open requests on mount
   useEffect(() => {
     fetchOpenRequests();
   }, []);
 
+  // Fetch open requests from API
   const fetchOpenRequests = async () => {
     setLoading(true);
     setError('');
@@ -69,6 +73,7 @@ const MyOpenRequests = () => {
     }
   };
 
+  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { 
@@ -86,6 +91,7 @@ const MyOpenRequests = () => {
     }
   };
 
+  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
@@ -99,6 +105,37 @@ const MyOpenRequests = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
+      {/* Modern Reusable Navbar */}
+      <ModernNavbar
+        navItems={[
+          { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
+          { name: "Requests", path: "/buyer/requests", icon: "FileText" },
+          { name: "Auctions", path: "/buyer/auctions", icon: "Gavel" },
+          { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
+          { name: "History", path: "/buyer/history", icon: "History" },
+        ]}
+        logo={{
+          src: "/Logo.png",
+          alt: "MarketFlip",
+          link: "/buyer/dashboard",
+        }}
+        showProfile={true}
+        showLogout={true}
+        showNotifications={true}
+        logoutButton={{
+          label: "Logout",
+          icon: "LogOut",
+          onClick: () => {
+            // Your logout logic here
+          }
+        }}
+        profileButton={{
+          label: "Profile",
+          path: "/buyer/profile",
+          icon: "User"
+        }}
+      />
+
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div 
@@ -135,6 +172,7 @@ const MyOpenRequests = () => {
           </Button>
         </motion.div>
 
+        {/* Error Message */}
         {error && (
           <div className="bg-rose-50/80 backdrop-blur-sm rounded-lg p-3 mb-4 text-rose-700 text-xs flex items-center gap-2 border border-rose-100">
             <AlertCircle size={14} />

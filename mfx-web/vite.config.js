@@ -16,8 +16,8 @@ export default defineConfig({
         background_color: '#F8F6F0',
         display: 'standalone',
         icons: [
-          { src: '/letter-m.png', sizes: '192x192', type: 'image/png' },
-          { src: '/letter-m.png', sizes: '512x512', type: 'image/png' }
+          { src: '/Logo.png', sizes: '192x192', type: 'image/png' },
+          { src: '/Logo.png', sizes: '512x512', type: 'image/png' }
         ]
       }
     })

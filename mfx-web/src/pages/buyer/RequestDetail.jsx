@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import ModernNavbar from "../../components/ui/Navbar";
 import { 
   ArrowLeft, 
   Edit, 
@@ -292,6 +293,7 @@ const RequestDetail = () => {
     }
   };
 
+  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FFFCE1]">
@@ -303,6 +305,7 @@ const RequestDetail = () => {
     );
   }
 
+  // Show not found state
   if (notFound || error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FFFCE1] p-4">
@@ -333,6 +336,37 @@ const RequestDetail = () => {
 
   return (
     <div className="min-h-screen bg-[#FFFCE1] p-6 md:p-8">
+      {/* Modern Reusable Navbar */}
+      <ModernNavbar
+        navItems={[
+          { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
+          { name: "Requests", path: "/buyer/requests", icon: "FileText" },
+          { name: "Auctions", path: "/buyer/auctions", icon: "Gavel" },
+          { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
+          { name: "History", path: "/buyer/history", icon: "History" },
+        ]}
+        logo={{
+          src: "/Logo.png",
+          alt: "MarketFlip",
+          link: "/buyer/dashboard",
+        }}
+        showProfile={true}
+        showLogout={true}
+        showNotifications={true}
+        logoutButton={{
+          label: "Logout",
+          icon: "LogOut",
+          onClick: () => {
+            // Your logout logic here
+          }
+        }}
+        profileButton={{
+          label: "Profile",
+          path: "/buyer/profile",
+          icon: "User"
+        }}
+      />
+
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6">

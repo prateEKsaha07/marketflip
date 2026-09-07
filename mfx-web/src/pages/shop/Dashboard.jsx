@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
+import ModernNavbar from "../../components/ui/Navbar";
 import { 
   LogOut,
   Package,
@@ -52,6 +53,7 @@ const Dashboard = () => {
     completed: 0
   });
 
+  // Fetch data on mount
   useEffect(() => {
     fetchShopProfile();
     generateGreeting();
@@ -59,6 +61,7 @@ const Dashboard = () => {
     fetchBidStats();
   }, []);
 
+  // Generate time-based greeting
   const generateGreeting = () => {
     const hour = new Date().getHours();
     let timeGreeting = 'Good Evening';
@@ -76,6 +79,7 @@ const Dashboard = () => {
     setGreeting(`${timeGreeting}, ${randomGreeting}`);
   };
 
+  // Fetch shop profile
   const fetchShopProfile = async () => {
     try {
       setLoading(true);
@@ -90,6 +94,7 @@ const Dashboard = () => {
     }
   };
 
+  // Fetch unread chat count
   const fetchUnreadCount = async () => {
     try {
       const response = await api.get('/chat/unread-count');
@@ -99,34 +104,24 @@ const Dashboard = () => {
     }
   };
 
+  // Fetch bid statistics
   const fetchBidStats = async () => {
     try {
       const response = await api.get('/bids');
       const bids = response.data || [];
       
-      console.log('=== BID STATS DATA ===', bids);
-      
-      // Log each bid to see structure
-      bids.forEach((bid, index) => {
-        console.log(`Bid ${index}:`, {
-          status: bid.status,
-          request_status: bid.requests?.status || bid.request?.status || 'N/A',
-          request: bid.requests || bid.request || 'N/A'
-        });
-      });
-      
-      // Calculate stats - handle both 'requests' and 'request' property names
+      // Calculate stats
       const total = bids.length;
       const pending = bids.filter(b => b.status === 'pending').length;
       
-      // Selected bids are those with status 'selected' AND request is NOT completed
+      // Selected bids where request is NOT completed
       const selected = bids.filter(b => {
         if (b.status !== 'selected') return false;
         const reqStatus = b.requests?.status || b.request?.status;
         return reqStatus !== 'completed';
       }).length;
       
-      // Completed bids are those where the request is completed
+      // Completed bids
       const completed = bids.filter(b => {
         const reqStatus = b.requests?.status || b.request?.status;
         return reqStatus === 'completed';
@@ -138,19 +133,18 @@ const Dashboard = () => {
         selected: selected,
         completed: completed
       });
-      
-      console.log('Stats calculated:', { total, pending, selected, completed });
     } catch (err) {
       console.error('Failed to fetch bid stats:', err);
-      // Keep default values (all 0)
     }
   };
 
+  // Handle logout
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
+  // Copy shop ID
   const copyShopId = async () => {
     if (user?.user_id) {
       await navigator.clipboard.writeText(user.user_id);
@@ -159,6 +153,7 @@ const Dashboard = () => {
     }
   };
 
+  // Copy GST number
   const copyGSTNumber = async () => {
     if (profile?.gst_number) {
       await navigator.clipboard.writeText(profile.gst_number);
@@ -167,19 +162,23 @@ const Dashboard = () => {
     }
   };
 
+  // Get user initials for avatar
   const getInitials = () => {
     const name = profile?.shop_name || profile?.full_name || user?.email?.split('@')[0] || 'User';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  // Get full name
   const getFullName = () => {
     return profile?.full_name || user?.email?.split('@')[0] || 'User';
   };
 
+  // Get shop name
   const getShopName = () => {
     return profile?.shop_name || null;
   };
 
+  // Get GST status
   const getGSTStatus = () => {
     return profile?.gst_number || null;
   };
@@ -260,6 +259,7 @@ const Dashboard = () => {
     },
   ];
 
+  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { 
@@ -277,6 +277,7 @@ const Dashboard = () => {
     }
   };
 
+  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
@@ -290,6 +291,35 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
+      {/* Modern Reusable Navbar - Shop Side */}
+      <ModernNavbar
+        navItems={[
+          { name: "Dashboard", path: "/shop/dashboard", icon: "LayoutDashboard" },
+          { name: "Requests", path: "/shop/requests", icon: "FileText" },
+          { name: "Auctions", path: "/shop/auctions", icon: "Gavel" },
+          { name: "Chats", path: "/shop/chat", icon: "MessageCircle" },
+          { name: "History", path: "/shop/history", icon: "History" },
+        ]}
+        logo={{
+          src: "/Logo.png",
+          alt: "MarketFlip",
+          link: "/shop/dashboard",
+        }}
+        showProfile={true}
+        showLogout={true}
+        showNotifications={true}
+        logoutButton={{
+          label: "Logout",
+          icon: "LogOut",
+          onClick: handleLogout
+        }}
+        profileButton={{
+          label: "Profile",
+          path: "/shop/profile",
+          icon: "User"
+        }}
+      />
+
       <div className="max-w-6xl mx-auto">
         {/* Header with User Profile */}
         <motion.div 
@@ -400,7 +430,6 @@ const Dashboard = () => {
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-              {/* Notification Dropdown */}
               <NotificationDropdown />
 
               {unreadCount > 0 && (

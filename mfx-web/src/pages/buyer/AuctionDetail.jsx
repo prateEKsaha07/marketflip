@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
+import ModernNavbar from "../../components/ui/Navbar";
 import { 
   ArrowLeft, 
   Gavel, 
@@ -57,10 +58,12 @@ const AuctionDetail = () => {
   const [fraudData, setFraudData] = useState(null);
   const [fraudLoading, setFraudLoading] = useState(false);
 
+  // Fetch auction detail on mount
   useEffect(() => {
     fetchAuctionDetail();
   }, [id]);
 
+  // Fetch auction detail from API
   const fetchAuctionDetail = async () => {
     setLoading(true);
     setError('');
@@ -276,6 +279,7 @@ const AuctionDetail = () => {
     }
   };
 
+  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
@@ -287,6 +291,7 @@ const AuctionDetail = () => {
     );
   }
 
+  // Show error state
   if (error || !auction) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0] p-4">
@@ -335,6 +340,37 @@ const AuctionDetail = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
+      {/* Modern Reusable Navbar */}
+      <ModernNavbar
+        navItems={[
+          { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
+          { name: "Requests", path: "/buyer/requests", icon: "FileText" },
+          { name: "Auctions", path: "/buyer/auctions", icon: "Gavel" },
+          { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
+          { name: "History", path: "/buyer/history", icon: "History" },
+        ]}
+        logo={{
+          src: "/Logo.png",
+          alt: "MarketFlip",
+          link: "/buyer/dashboard",
+        }}
+        showProfile={true}
+        showLogout={true}
+        showNotifications={true}
+        logoutButton={{
+          label: "Logout",
+          icon: "LogOut",
+          onClick: () => {
+            // Your logout logic here
+          }
+        }}
+        profileButton={{
+          label: "Profile",
+          path: "/buyer/profile",
+          icon: "User"
+        }}
+      />
+
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div 
@@ -802,15 +838,7 @@ const AuctionDetail = () => {
                 return (
                   <div 
                     key={bid.id}
-                    className={`flex items-center justify-between p-2 rounded-lg transition-all ${
-                      isWinner 
-                        ? 'bg-emerald-50 border border-emerald-200' 
-                        : isYourBid 
-                        ? 'bg-[#FFFCE1] border border-[#FFDDB0]'
-                        : isHighest 
-                        ? 'bg-[#F8F6F0]' 
-                        : 'hover:bg-[#F8F6F0]'
-                    }`}
+                    className={`flex items-center justify-between p-2 rounded-lg transition-all ${isWinner ? 'bg-emerald-50 border border-emerald-200' : isYourBid ? 'bg-[#FFFCE1] border border-[#FFDDB0]' : isHighest ? 'bg-[#F8F6F0]' : 'hover:bg-[#F8F6F0]'}`}
                   >
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 rounded-full bg-[#1A1A2E]/5 flex items-center justify-center text-[10px] font-medium text-[#1A1A2E]">

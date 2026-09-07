@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
+import ModernNavbar from "../../components/ui/Navbar";
 import {
   ArrowLeft,
   Calendar,
@@ -47,10 +48,12 @@ const TransactionHistory = () => {
   const [activeAuctionStatus, setActiveAuctionStatus] = useState('all');
   const [isShopOwner, setIsShopOwner] = useState(false);
 
+  // Fetch history on mount
   useEffect(() => {
     fetchHistory();
   }, []);
 
+  // Fetch all transaction history
   const fetchHistory = async () => {
     setLoading(true);
     setError('');
@@ -65,18 +68,14 @@ const TransactionHistory = () => {
       if (role === 'shop_owner') {
         // Shop owners: fetch their bids and auctions
         try {
-          // Fetch all bids placed by this shop
           const bidsResponse = await api.get('/bids/shop-bids');
           bidsData = bidsResponse.data || [];
           setShopBids(bidsData);
-          
-          // Use the bids data directly as requests (they contain all needed info)
           requestsData = bidsData;
         } catch (err) {
           console.log('Could not fetch shop bids:', err.message);
         }
 
-        // Fetch shop's auctions
         try {
           const auctionsResponse = await api.get('/auctions?status=all');
           auctionsData = auctionsResponse.data || [];
@@ -217,11 +216,9 @@ const TransactionHistory = () => {
     if (activeRequestStatus === 'all') return requests;
     return requests.filter(r => {
       if (isShopOwner) {
-        // For shop owners, filter bids by status
         const status = r.status || 'pending';
         return status === activeRequestStatus;
       }
-      // For buyers, filter requests by status
       return r.status === activeRequestStatus;
     });
   };
@@ -273,6 +270,7 @@ const TransactionHistory = () => {
 
   const selectedBids = isShopOwner ? shopBids.filter(b => b.status === 'selected').length : 0;
 
+  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FFFCE1]">
@@ -288,6 +286,43 @@ const TransactionHistory = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F6F0] p-4 md:p-6">
+      {/* Modern Reusable Navbar - Dynamic based on role */}
+      <ModernNavbar
+        navItems={isShopOwner ? [
+          { name: "Dashboard", path: "/shop/dashboard", icon: "LayoutDashboard" },
+          { name: "Requests", path: "/shop/requests", icon: "FileText" },
+          { name: "Auctions", path: "/shop/auctions", icon: "Gavel" },
+          { name: "Chats", path: "/shop/chat", icon: "MessageCircle" },
+          { name: "History", path: "/shop/history", icon: "History" },
+        ] : [
+          { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
+          { name: "Requests", path: "/buyer/requests", icon: "FileText" },
+          { name: "Auctions", path: "/buyer/auctions", icon: "Gavel" },
+          { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
+          { name: "History", path: "/buyer/history", icon: "History" },
+        ]}
+        logo={{
+          src: "/Logo.png",
+          alt: "MarketFlip",
+          link: isShopOwner ? "/shop/dashboard" : "/buyer/dashboard",
+        }}
+        showProfile={true}
+        showLogout={true}
+        showNotifications={true}
+        logoutButton={{
+          label: "Logout",
+          icon: "LogOut",
+          onClick: () => {
+            // Your logout logic here
+          }
+        }}
+        profileButton={{
+          label: "Profile",
+          path: isShopOwner ? "/shop/profile" : "/buyer/profile",
+          icon: "User"
+        }}
+      />
+
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
@@ -492,9 +527,8 @@ const TransactionHistory = () => {
                         </thead>
                         <tbody>
                           {isShopOwner ? (
-                            // Shop Owner - Bids Rows (using bid data directly)
+                            // Shop Owner - Bids Rows
                             filteredRequests.map((bid) => {
-                              // The request data is in bid.requests
                               const request = bid.requests || {};
                               const buyer = request.profiles || {};
                               const bidStatus = bid.status || 'pending';

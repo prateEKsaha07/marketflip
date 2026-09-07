@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
+import ModernNavbar from "../../components/ui/Navbar";
 import { 
   ArrowLeft, 
   Package, 
@@ -21,10 +22,12 @@ const BuyerAuctionHistory = () => {
   const [auctions, setAuctions] = useState([]);
   const [error, setError] = useState('');
 
+  // Fetch auction history on mount
   useEffect(() => {
     fetchAuctionHistory();
   }, []);
 
+  // Fetch auction history from API
   const fetchAuctionHistory = async () => {
     setLoading(true);
     setError('');
@@ -54,6 +57,7 @@ const BuyerAuctionHistory = () => {
     }
   };
 
+  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
@@ -67,6 +71,37 @@ const BuyerAuctionHistory = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
+      {/* Modern Reusable Navbar */}
+      <ModernNavbar
+        navItems={[
+          { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
+          { name: "Requests", path: "/buyer/requests", icon: "FileText" },
+          { name: "Auctions", path: "/buyer/auctions", icon: "Gavel" },
+          { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
+          { name: "History", path: "/buyer/history", icon: "History" },
+        ]}
+        logo={{
+          src: "/Logo.png",
+          alt: "MarketFlip",
+          link: "/buyer/dashboard",
+        }}
+        showProfile={true}
+        showLogout={true}
+        showNotifications={true}
+        logoutButton={{
+          label: "Logout",
+          icon: "LogOut",
+          onClick: () => {
+            // Your logout logic here
+          }
+        }}
+        profileButton={{
+          label: "Profile",
+          path: "/buyer/profile",
+          icon: "User"
+        }}
+      />
+
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div 
@@ -95,7 +130,7 @@ const BuyerAuctionHistory = () => {
             </div>
           </div>
           <Button 
-            onClick={() => navigate('/buyer/browse-auctions')}
+            onClick={() => navigate('/buyer/auctions/browse')}
             className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-4 py-1.5 h-auto flex items-center gap-1.5"
           >
             <Store size={14} />

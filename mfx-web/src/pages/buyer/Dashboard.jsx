@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
-// import MordernNavbar from 'https://framer.com/m/Modern-Navbar-VoWUeq.js@oVVLpffE3sD117Do5FBy';
-import Navbar from "../../components/ui/Navbar";
+// Import the new reusable navbar
+import ModernNavbar from "../../components/ui/Navbar";
 import { 
   LogOut,
   Gavel,
@@ -41,12 +41,14 @@ const Dashboard = () => {
   const [copied, setCopied] = useState(false);
   const [greeting, setGreeting] = useState('');
 
+  // Fetch user data on mount
   useEffect(() => {
     fetchProfile();
     fetchUnreadCount();
     generateGreeting();
   }, []);
 
+  // Generate time-based greeting
   const generateGreeting = () => {
     const hour = new Date().getHours();
     let timeGreeting = 'Good Evening';
@@ -64,6 +66,7 @@ const Dashboard = () => {
     setGreeting(`${timeGreeting}, ${randomGreeting}`);
   };
 
+  // Fetch user profile
   const fetchProfile = async () => {
     try {
       const response = await api.get(`/auth/profiles/${user?.user_id}`);
@@ -77,6 +80,7 @@ const Dashboard = () => {
     }
   };
 
+  // Fetch unread chat count
   const fetchUnreadCount = async () => {
     try {
       const response = await api.get('/chat/unread-count');
@@ -86,11 +90,13 @@ const Dashboard = () => {
     }
   };
 
+  // Handle logout
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
+  // Copy user ID to clipboard
   const copyUserId = async () => {
     if (user?.user_id) {
       await navigator.clipboard.writeText(user.user_id);
@@ -99,16 +105,18 @@ const Dashboard = () => {
     }
   };
 
+  // Get user initials for avatar fallback
   const getInitials = () => {
     const name = profile?.full_name || user?.email?.split('@')[0] || 'User';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  // Get full name
   const getFullName = () => {
     return profile?.full_name || user?.email?.split('@')[0] || 'User';
   };
 
-  // Navigation cards
+  // Dashboard navigation cards
   const navItems = [
     {
       id: 'requests',
@@ -144,6 +152,7 @@ const Dashboard = () => {
     },
   ];
 
+  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { 
@@ -161,6 +170,7 @@ const Dashboard = () => {
     }
   };
 
+  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
@@ -174,7 +184,34 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
-    <Navbar />
+      {/* Modern Reusable Navbar */}
+      <ModernNavbar
+        navItems={[
+          { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
+          { name: "Requests", path: "/buyer/requests", icon: "FileText" },
+          { name: "Auctions", path: "/buyer/auctions", icon: "Gavel" },
+          { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
+          { name: "History", path: "/buyer/history", icon: "History" },
+        ]}
+        logo={{
+          src: "/Logo.png",
+          alt: "MarketFlip",
+          link: "/buyer/dashboard",
+        }}
+        showProfile={true}
+        showLogout={true}
+        showNotifications={true}
+        logoutButton={{
+          label: "Logout",
+          icon: "LogOut",
+          onClick: handleLogout
+        }}
+        profileButton={{
+          label: "Profile",
+          path: "/buyer/profile",
+          icon: "User"
+        }}
+      />
 
       <div className="max-w-6xl mx-auto">
         {/* Header with User Profile */}
@@ -258,7 +295,6 @@ const Dashboard = () => {
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-              {/* Notification Dropdown */}
               <NotificationDropdown />
 
               {unreadCount > 0 && (

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import ModernNavbar from "../../components/ui/Navbar";
 import { 
   ArrowLeft, 
   Plus, 
@@ -50,16 +51,18 @@ const PostRequest = () => {
   const [success, setSuccess] = useState('');
   const [focused, setFocused] = useState(null);
 
+  // Handle form field changes
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     if (error) setError('');
     if (success) setSuccess('');
   };
 
+  // Handle image file selection
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
-    console.log('Files selected:', files);
     
+    // Filter valid files
     const validFiles = files.filter((file) => {
       const isValidType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type);
       const isValidSize = file.size <= 5 * 1024 * 1024;
@@ -80,9 +83,9 @@ const PostRequest = () => {
     setImageFiles((prev) => [...prev, ...validFiles]);
     setImagePreviews((prev) => [...prev, ...previews]);
     setError('');
-    console.log('Valid files:', validFiles.length, 'Image files:', imageFiles.length + validFiles.length);
   };
 
+  // Remove image
   const removeImage = (index) => {
     const newFiles = imageFiles.filter((_, i) => i !== index);
     const newPreviews = imagePreviews.filter((_, i) => i !== index);
@@ -91,28 +94,28 @@ const PostRequest = () => {
     URL.revokeObjectURL(imagePreviews[index]);
   };
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     setSuccess('');
 
-    console.log('=== SUBMITTING REQUEST ===');
-    console.log('Form data:', formData);
-    console.log('Image files:', imageFiles.length, 'files');
-
+    // Validate budget
     if (parseInt(formData.budget_min) > parseInt(formData.budget_max)) {
       setError('Min budget cannot be greater than max budget');
       setLoading(false);
       return;
     }
 
+    // Validate pincode
     if (formData.pincode.length !== 6 || !/^\d{6}$/.test(formData.pincode)) {
       setError('Please enter a valid 6-digit pincode');
       setLoading(false);
       return;
     }
 
+    // Validate delivery address
     if (formData.delivery_method === 'home_delivery' && !formData.delivery_address.trim()) {
       setError('Please enter a delivery address');
       setLoading(false);
@@ -122,16 +125,13 @@ const PostRequest = () => {
     try {
       let uploadedUrls = [];
       
+      // Upload images if any
       if (imageFiles.length > 0) {
-        console.log('Uploading images to Cloudinary...');
         const results = await uploadMultiple(imageFiles);
-        console.log('Upload results:', results);
         uploadedUrls = results.map((result) => result.url);
-        console.log('Uploaded URLs:', uploadedUrls);
-      } else {
-        console.log('No images to upload');
       }
 
+      // Prepare request data
       const requestData = {
         ...formData,
         budget_min: parseInt(formData.budget_min),
@@ -139,15 +139,12 @@ const PostRequest = () => {
         image_urls: uploadedUrls,
       };
       
-      console.log('Request data being sent:', requestData);
-
-      // FIX: Remove trailing slash
+      // Submit request
       const response = await api.post('/requests', requestData);
-      console.log('Request created:', response.data);
-      console.log('Image URLs in response:', response.data.image_urls);
       
       setSuccess('Request created successfully!');
 
+      // Reset form
       setFormData({
         item_name: '',
         description: '',
@@ -161,19 +158,20 @@ const PostRequest = () => {
       setImageFiles([]);
       setImagePreviews([]);
 
+      // Navigate back after success
       setTimeout(() => {
         navigate('/buyer/dashboard');
       }, 1500);
 
     } catch (err) {
       console.error('Error:', err);
-      console.error('Error response:', err.response);
       setError(err.response?.data?.detail || 'Failed to create request');
     } finally {
       setLoading(false);
     }
   };
 
+  // Animation variants
   const inputVariants = {
     focus: { scale: 1.01, transition: { duration: 0.2 } },
     blur: { scale: 1, transition: { duration: 0.2 } }
@@ -204,8 +202,39 @@ const PostRequest = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFFCE1] via-[#FFDDB0]/10 to-[#CFEBFF]/10 p-4 md:p-6">
-      <div className="max-w-xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
+      {/* Modern Reusable Navbar */}
+      <ModernNavbar
+        navItems={[
+          { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
+          { name: "Requests", path: "/buyer/requests", icon: "FileText" },
+          { name: "Auctions", path: "/buyer/auctions", icon: "Gavel" },
+          { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
+          { name: "History", path: "/buyer/history", icon: "History" },
+        ]}
+        logo={{
+          src: "/Logo.png",
+          alt: "MarketFlip",
+          link: "/buyer/dashboard",
+        }}
+        showProfile={true}
+        showLogout={true}
+        showNotifications={true}
+        logoutButton={{
+          label: "Logout",
+          icon: "LogOut",
+          onClick: () => {
+            // Your logout logic here
+          }
+        }}
+        profileButton={{
+          label: "Profile",
+          path: "/buyer/profile",
+          icon: "User"
+        }}
+      />
+
+      <div className="max-w-xl mx-auto pt-4">
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -249,6 +278,7 @@ const PostRequest = () => {
             />
             
             <CardContent className="p-5 md:p-6">
+              {/* Success Message */}
               <AnimatePresence>
                 {success && (
                   <motion.div
@@ -272,6 +302,7 @@ const PostRequest = () => {
                 )}
               </AnimatePresence>
 
+              {/* Error Message */}
               <AnimatePresence>
                 {error && (
                   <motion.div
@@ -289,6 +320,7 @@ const PostRequest = () => {
               </AnimatePresence>
 
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Item Name */}
                 <motion.div 
                   custom={0} variants={fieldVariants} initial="hidden" animate="visible"
                   onFocus={() => setFocused('item')}
@@ -319,6 +351,7 @@ const PostRequest = () => {
                   <p className="text-[10px] text-[#A0A0B0] mt-1">Be specific to get better offers</p>
                 </motion.div>
 
+                {/* Description */}
                 <motion.div 
                   custom={1} variants={fieldVariants} initial="hidden" animate="visible"
                   onFocus={() => setFocused('desc')}
@@ -347,6 +380,7 @@ const PostRequest = () => {
                   </motion.div>
                 </motion.div>
 
+                {/* Budget */}
                 <motion.div 
                   custom={2} variants={fieldVariants} initial="hidden" animate="visible"
                   className="grid grid-cols-2 gap-3"
@@ -409,6 +443,7 @@ const PostRequest = () => {
                   </div>
                 </motion.div>
 
+                {/* Pincode */}
                 <motion.div 
                   custom={3} variants={fieldVariants} initial="hidden" animate="visible"
                   onFocus={() => setFocused('pin')}
@@ -440,6 +475,7 @@ const PostRequest = () => {
                   <p className="text-[10px] text-[#A0A0B0] mt-1">Shop owners in your area will see your request</p>
                 </motion.div>
 
+                {/* Category */}
                 <motion.div 
                   custom={4} variants={fieldVariants} initial="hidden" animate="visible"
                   onFocus={() => setFocused('cat')}
@@ -472,6 +508,7 @@ const PostRequest = () => {
                   </motion.div>
                 </motion.div>
 
+                {/* Delivery Method */}
                 <motion.div 
                   custom={5} variants={fieldVariants} initial="hidden" animate="visible"
                 >
@@ -520,6 +557,7 @@ const PostRequest = () => {
                   </div>
                 </motion.div>
 
+                {/* Delivery Address */}
                 {formData.delivery_method === 'home_delivery' && (
                   <motion.div 
                     custom={6} variants={fieldVariants} initial="hidden" animate="visible"
@@ -543,6 +581,7 @@ const PostRequest = () => {
                   </motion.div>
                 )}
 
+                {/* Image Upload */}
                 <motion.div 
                   custom={7} variants={fieldVariants} initial="hidden" animate="visible"
                 >
@@ -581,6 +620,7 @@ const PostRequest = () => {
                     </label>
                   </div>
 
+                  {/* Image Previews */}
                   {imagePreviews.length > 0 && (
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-2">
                       {imagePreviews.map((preview, index) => (
@@ -603,6 +643,7 @@ const PostRequest = () => {
                     </div>
                   )}
 
+                  {/* Upload Progress */}
                   {uploading && (
                     <div className="mt-2">
                       <div className="flex items-center gap-2">
@@ -619,6 +660,7 @@ const PostRequest = () => {
                   )}
                 </motion.div>
 
+                {/* Submit Button */}
                 <motion.div 
                   custom={8} variants={fieldVariants} initial="hidden" animate="visible"
                   className="pt-2"
@@ -644,6 +686,7 @@ const PostRequest = () => {
                 </motion.div>
               </form>
 
+              {/* Footer Info */}
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
