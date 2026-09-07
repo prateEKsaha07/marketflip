@@ -155,7 +155,7 @@ async def cancelAuction(
         raise HTTPException(status_code=500, detail="Failed to cancel auction")
 
 
-# ====== INTERNAL: Close Auction with Winner ======
+# Close Auction with Winner
 @router.post("/{auction_id}/close-with-winner", status_code=200)
 async def close_auction_with_winner(
     auction_id: UUID,
@@ -187,7 +187,7 @@ async def close_auction_with_winner(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ====== PHASE 5B: Post-Sale Delivery/OTP Endpoints ======
+# Post-Sale Delivery/OTP Endpoints 
 
 @router.patch("/{auction_id}/delivery", response_model=AuctionResponse)
 async def set_delivery_method(

@@ -670,7 +670,7 @@ class AuctionService:
                     "verification_attempts": new_attempts,
                     "status": "completed",
                     "closed_at": datetime.now(timezone.utc).isoformat(),
-                    "completed_at": datetime.now(timezone.utc).isoformat()  # <-- ADDED
+                    "completed_at": datetime.now(timezone.utc).isoformat()
                 }
                 
                 result = self.supabase_admin.table("auctions") \
@@ -773,7 +773,7 @@ class AuctionService:
                 "status": "completed",
                 "closed_at": datetime.now(timezone.utc).isoformat(),
                 "completed_via_override": True,
-                "completed_at": datetime.now(timezone.utc).isoformat()  # <-- ADDED
+                "completed_at": datetime.now(timezone.utc).isoformat()
             }
             
             result = self.supabase_admin.table("auctions") \

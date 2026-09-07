@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
+// import MordernNavbar from 'https://framer.com/m/Modern-Navbar-VoWUeq.js@oVVLpffE3sD117Do5FBy';
+import Navbar from "../../components/ui/Navbar";
 import { 
   LogOut,
   Gavel,
@@ -172,6 +174,8 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
+    <Navbar />
+
       <div className="max-w-6xl mx-auto">
         {/* Header with User Profile */}
         <motion.div 

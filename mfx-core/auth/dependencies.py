@@ -36,9 +36,9 @@ if not SUPABASE_SERVICE_ROLE_KEY:
 
 # Clean URL - remove any trailing paths
 SUPABASE_URL = SUPABASE_URL.rstrip('/')
-# Remove /rest/v1 if present
+
 if SUPABASE_URL.endswith('/rest/v1'):
-    SUPABASE_URL = SUPABASE_URL[:-8]  # Remove '/rest/v1'
+    SUPABASE_URL = SUPABASE_URL[:-8]
 elif '/rest/v1' in SUPABASE_URL:
     SUPABASE_URL = SUPABASE_URL.split('/rest/v1')[0]
 
