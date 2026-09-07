@@ -30,14 +30,36 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-lottie': ['lottie-web'],
-          'vendor-ui': ['@mui/material', '@emotion/react', '@emotion/styled'],
-        }
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            // Group by package name
+            const match = id.match(/node_modules\/(?:@[^/]+\/)?([^/]+)/)
+            if (match) {
+              const packageName = match[1]
+              
+              // Map specific packages to vendor groups
+              if (['react', 'react-dom', 'react-router-dom', 'react-router'].includes(packageName)) {
+                return 'vendor-react'
+              }
+              if (packageName === 'lottie-web') {
+                return 'vendor-lottie'
+              }
+              if (['@mui', '@emotion'].includes(packageName)) {
+                return 'vendor-ui'
+              }
+              
+              // All other node_modules go to vendor
+              return 'vendor'
+            }
+          }
+        },
+        // Add these options to improve chunking
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
       }
     },
-
-    chunkSizeWarningLimit: 1000, // 1MB (adjust as needed)
-  },
+    chunkSizeWarningLimit: 1000,
+    // Enable sourcemaps for better debugging (optional)
+    sourcemap: false,
+  }
 })
