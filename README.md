@@ -113,8 +113,9 @@ npm run build
 - API documentation: <https://marketflip.onrender.com/docs>
 
 ## Project Documentation & Roadmap
-Our complete architecture specs, database schemas, and version roadmaps are live in Notion:
+complete architecture specs, database schemas, and version roadmaps are live in Notion: 
 **[View MarketFlip HQ Master Workspace (Read-Only)](https://emphasized-citrus-c5e.notion.site/MarketFlip-HQ-3cebcc73368d80b48018e8fd77c12461?source=copy_link)**
+*not being maintained check mfx-docs for more info*
 
 ## License
 
