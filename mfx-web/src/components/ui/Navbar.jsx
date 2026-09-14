@@ -286,7 +286,7 @@ const ModernNavbar = ({
               style={{ height: '32px' }}
             >
               {/* Rolling Pill - Active indicator */}
-              <motion.div
+              {/* <motion.div
                 className="absolute bg-gradient-to-r from-[#FFBE91] to-[#FFDDB0] rounded-full shadow-lg shadow-[#FFBE91]/25"
                 style={{
                   height: 'calc(100% - 6px)',
@@ -303,7 +303,7 @@ const ModernNavbar = ({
                   damping: 35,
                   mass: 0.8,
                 }}
-              />
+              /> */}
 
               {navItems.map((item, index) => {
                 const isActive = location.pathname === item.path;
