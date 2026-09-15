@@ -340,3 +340,49 @@ CREATE TABLE conversation_active_transactions (
 ---
 
 *This document is maintained by the Owner*
+
+
+ENDPOINT: PATCH /ai/parse-request/{log_id}
+AUTH:     buyer only
+BODY:     { buyer_action, edited_fields? }
+
+INPUT:
+  log_id      : str  (from URL path)
+  buyer_action: "accepted" | "edited" | "abandoned"
+  edited_fields: dict | null  (only when buyer_action == "edited")
+
+STEP 1 — AUTH CHECK
+  current_user = Depends(get_current_user)
+  IF current_user is None:
+      raise 401
+  IF current_user.role != "buyer":
+      raise 403 "Only buyers can log actions"
+
+STEP 2 — VALIDATE log_id
+  IF log_id is empty or malformed UUID:
+      raise 400 "Invalid log_id"
+  (optional — Supabase will reject with empty data anyway) - done
+
+STEP 3 — VALIDATE buyer_action
+  Pydantic LogActionIn already enforces enum
+  (Literal["accepted","edited","abandoned"])
+  → no manual check needed
+  If validation fails, FastAPI returns 422 automatically
+
+STEP 4 — CALL SERVICE
+  TRY:
+      ok = update_ai_log_action(
+          log_id=log_id,
+          action=buyer_action,
+          edited=edited_fields,
+      )
+  EXCEPT database error:
+      logger.error(...)
+      raise 500 "Failed to log action"
+
+STEP 5 — HANDLE NOT FOUND
+  IF ok == False:
+      raise 404 "Log not found"
+
+STEP 6 — RETURN
+  RETURN { "ok": true }

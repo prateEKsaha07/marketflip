@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional, List
 import logging
+from uuid import UUID
 
 from auth.dependencies import get_current_user
-from ai.schema import ParseRequestIn, ParseRequestOut
-from ai.service import parse_request
+from ai.schema import ParseRequestIn, ParseRequestOut, LogActionIn
+from ai.service import parse_request, update_ai_log_action
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai",tags=["ai"])
@@ -43,5 +44,28 @@ async def parse_request_endpoint(
         raise HTTPException(status_code=503,
                             detail="ai pasing is not avail right now")
 
-
+@router.patch("/parse-request/{log_id}")
+async def update_parsed_request(
+    log_id: UUID,
+    payload: LogActionIn,
+    current_user: dict = Depends(get_current_user),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="User not found")
+    if current_user.get("role") != "buyer":
+        raise HTTPException(status_code=403, detail="Only buyers can log actions")
+    try:
+        ok = update_ai_log_action(
+            log_id=str(log_id),
+            action=payload.buyer_action,
+            edited=payload.edited_fields,
+        )
+    except Exception as e:
+        logger.error(f"log_buyer_action failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to log action")
+    if not ok:
+        raise HTTPException(status_code=404, detail="Log not found")
     
+    return {"ok": True} # frontend should be expecting that 
+
+

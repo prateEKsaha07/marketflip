@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Literal, List
+from typing import Optional, Literal, List, Dict, Any
 
 class Confidence(BaseModel):
     item_name: Literal["high", "low"]
@@ -43,3 +43,7 @@ class ParseRequestOut(BaseModel):
     low_confidence_fields: List[str]
     raw_text: str
     log_id: Optional[str] = None
+
+class LogActionIn(BaseModel):
+    buyer_action: Literal["accepted", "edited", "abandoned"]
+    edited_fields: Optional[Dict[str, Any]] = None

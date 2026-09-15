@@ -38,6 +38,7 @@ from favorites.routes import router as favorites_router
 from reliability.routes import router as reliability_router
 from ml.routes import router as ml_router
 from reviews import router as reviews_router
+from ai import router as ai_router
 logger.info("All routers imported successfully")
 
 # INCLUDE ROUTERS
@@ -55,6 +56,7 @@ app.include_router(favorites_router)
 app.include_router(reliability_router)
 app.include_router(ml_router)
 app.include_router(reviews_router)
+app.include_router(ai_router)
 logger.info("All routers included successfully")
 
 # STARTUP EVENT

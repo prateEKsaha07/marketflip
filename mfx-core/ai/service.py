@@ -13,6 +13,7 @@ from ai.schema import parsed_request
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+logging.getLogger("google_genai.models").setLevel(logging.ERROR)
 
 supabase = create_client(
     supabase_url=os.environ["SUPABASE_URL"],

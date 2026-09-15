@@ -23,9 +23,20 @@
 
 **Date:** 2026-09-15
 **Changed**
-feat(ai): persist every parse attempt to ai_parse_logs
+feat(ai): AI request assistant — backend complete
 
-- insert_ai_log() writes raw_text, draft, tokens, latency, error
-- parse_request() logs both success and failure paths
-- data_source column separates seed (tests) from live (traffic)
-- log_id returned in response for buyer-action tracking
+- POST /ai/parse-request: NL text → structured draft (Gemini 3.1 Flash-Lite)
+- PATCH /ai/parse-request/{log_id}: record buyer action (accepted/edited/abandoned)
+- ai_parse_logs table: prompt, draft, tokens, latency, error, buyer_action
+- Category IDs validated against real categories table
+- data_source column separates test ('seed') from real traffic ('live')
+- Missing/low-confidence fields returned for frontend preview
+
+Verified (7/7):
+  200 happy path
+  400 empty text
+  403 non-buyer
+  200 patch accepted
+  200 patch edited
+  404 missing log
+  422 invalid action
