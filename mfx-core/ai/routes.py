@@ -5,7 +5,7 @@ from uuid import UUID
 
 from auth.dependencies import get_current_user
 from ai.schema import ParseRequestIn, ParseRequestOut, LogActionIn
-from ai.service import parse_request, update_ai_log_action
+from ai.service import parse_request, update_ai_log_action, get_categories
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai",tags=["ai"])
@@ -67,5 +67,10 @@ async def update_parsed_request(
         raise HTTPException(status_code=404, detail="Log not found")
     
     return {"ok": True} # frontend should be expecting that 
+
+@router.get("/categories")
+async def list_categories(current_user: dict = Depends(get_current_user)):
+    """Return all categories (id + name) for the preview dropdown."""
+    return get_categories()
 
 

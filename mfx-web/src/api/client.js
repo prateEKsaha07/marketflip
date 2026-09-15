@@ -105,6 +105,39 @@ export const deleteReview = (reviewId) => {
   return api.delete(`/reviews/${reviewId}`);
 };
 
+export const parseRequest = async (text) => {
+  const { data } = await api.post("/ai/parse-request", { text });
+  return data;
+};
+
+export const logAction = async (logId, action, editedFields = null) => {
+  const { data } = await api.patch(`/ai/parse-request/${logId}`, {
+    buyer_action: action,
+    edited_fields: editedFields,
+  });
+  return data;
+};
+
+export const getCategories = async () => {
+  const { data } = await api.get("/ai/categories");
+  return data;
+};
+
+export const uploadImage = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const { data } = await api.post("/upload/single", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+
+  if (!data.success) {
+    throw new Error("Upload failed");
+  }
+
+  return data.data.url; // Cloudinary secure_url
+};
+
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');

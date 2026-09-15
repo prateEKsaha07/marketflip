@@ -32,6 +32,17 @@
     border-color: hsl(var(--border));
   }
 
+  html,
+  body {
+    scrollbar-width: none;        /* Firefox */
+    -ms-overflow-style: none;     /* IE/Edge legacy */
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none;                /* Chrome, Safari, Edge */
+  }
+
   body {
     background-color: #FFFCE1;
     color: #1A1A2E;

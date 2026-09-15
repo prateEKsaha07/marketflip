@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
+import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PageTransition from './components/PageTransition';
 import './styles/auth.css';
@@ -378,6 +379,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <AnimatedRoutes />
+        <Toaster position="top-right" richColors />
       </BrowserRouter>
     </AuthProvider>
   );

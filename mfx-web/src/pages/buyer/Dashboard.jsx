@@ -31,6 +31,7 @@ import {
 import api from '../../api/client';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import SavedSearchesList from '../../components/SavedSearchesList';
+import AIAssistant from "../../components/ai-assistant";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -417,6 +418,9 @@ const Dashboard = () => {
           </span>
         </motion.div>
       </div>
+
+      {/* AI Assistant — floating button + panel */}
+      <AIAssistant />
     </div>
   );
 };
