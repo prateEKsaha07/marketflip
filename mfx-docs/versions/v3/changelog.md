@@ -18,8 +18,14 @@
 **Verified**
 - 5 test prompts pass (including gibberish → all null + low confidence)
 
-**Not done**
-- `routes.py`, logging to `ai_parse_logs`, PATCH endpoint, frontend preview card, eval set
-
 **Known limits**
 - 500 req/day free tier; no retry/timeout guard; categories fetched per call
+
+**Date:** 2026-09-15
+**Changed**
+feat(ai): persist every parse attempt to ai_parse_logs
+
+- insert_ai_log() writes raw_text, draft, tokens, latency, error
+- parse_request() logs both success and failure paths
+- data_source column separates seed (tests) from live (traffic)
+- log_id returned in response for buyer-action tracking
