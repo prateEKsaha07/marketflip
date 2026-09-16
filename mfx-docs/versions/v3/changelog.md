@@ -208,3 +208,52 @@ Buyer types → POST /ai/parse-request → Gemini extract
 - No rate limiting on endpoint
 - Categories fetched per parse (no cache)
 ```
+---
+
+## [v3.2] — 2026-09-16
+
+### Added
+
+**Backend**
+- `ai/providers/shop_auctions.py` — shop's auctions provider
+  with bid aggregation, outcome classification, and leader derivation
+- `QA_SHOP_SYSTEM_PROMPT` in `ai/prompts.py`
+- `role` column on `ai_ask_logs`
+
+**Frontend**
+- `<AIAssistant />` mounted on `src/pages/shop/Dashboard.jsx`
+- Role-aware example chips and placeholder in `AssistantInput.jsx`
+- Role-aware page resolver in `AssistantAnswer.jsx`
+
+### Changed
+
+- `ai/providers/registry.py` — `shop_auctions_provider` registered
+- `ai/qa.py` — `ask_question(question, user_id, role)` dispatches on role;
+  `log_ask` records role
+- `POST /ai/ask` — accepts both buyers and shop owners
+- `AssistantInput` and `AssistantAnswer` read role from `localStorage`
+
+### Fixed
+
+- `leading_bidder` in shop auctions — derived from actual highest bid,
+  not the stale `current_highest_bidder` column
+- `second_highest_bid` — guaranteed ≤ `current_highest_bid` by
+  computing both from the same sorted bids list
+
+### Verified
+
+- Standalone provider test: `shop_auctions.fetch(shop_id)` returns
+  correct aggregation for 4 seed auctions
+- Registry: shop question routes to `shop_auctions` only; buyer
+  question routes to buyer providers only
+- Q&A end-to-end: 5 shop prompts tested (active, sold, expired,
+  count, out-of-scope)
+- Buyer regression: unchanged behavior for all buyer questions
+- Frontend: chips differ by role, "View details" navigates to the
+  correct shop page
+
+### Known limits
+
+- Same as v3.1: no rate limiting, no retry, no conversation memory
+- Seed auctions in the DB still have stale `status` values from
+  before the close-auctions logic was finalized

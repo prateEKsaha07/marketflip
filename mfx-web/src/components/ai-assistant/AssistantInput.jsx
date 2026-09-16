@@ -1,11 +1,19 @@
-import { Loader2, Wand2, Sparkles } from "lucide-react";
+import { Loader2, Wand2, Sparkles, Mic } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
+import { toast } from "sonner";
 
-const EXAMPLE_PROMPTS = [
+const BUYER_EXAMPLES = [
   "how many bids do I have?",
   "which request expires soonest?",
   "used mountain bike under 8000, urgent, 560001",
   "iPhone 13 around 40k",
+];
+
+const SHOP_EXAMPLES = [
+  "how's my bike auction going?",
+  "how many auctions do I have?",
+  "did my last sale complete?",
+  "show me active auctions",
 ];
 
 export default function AssistantInput({
@@ -19,8 +27,24 @@ export default function AssistantInput({
   const reduceMotion = useReducedMotion();
   const canParse = text.trim().length > 3 && !isParsing;
 
+  const role =
+    typeof window !== "undefined" ? localStorage.getItem("role") : null;
+  const isShop = role === "shop_owner";
+
+  const examples = isShop ? SHOP_EXAMPLES : BUYER_EXAMPLES;
+
+  const placeholder = isShop
+    ? `Ask "how's my auction going?" or "who's leading?"`
+    : `Ask "how many bids do I have?" or describe what you want to buy…`;
+
   const applyExample = (example) => {
     setText(example);
+  };
+
+  const handleMicClick = () => {
+    toast("Voice input coming soon", {
+      description: "I'm working on it. For now, type your question.",
+    });
   };
 
   return (
@@ -28,20 +52,29 @@ export default function AssistantInput({
       {/* Helper text */}
       <div className="flex items-start gap-2 text-xs text-gray-500">
         <Sparkles size={14} className="text-indigo-400 flex-shrink-0 mt-0.5" />
-        <p>
-          Ask a question about your requests or bids, or describe something
-          you want to buy. Be specific —{" "}
-          <span className="text-gray-700 font-medium">item</span>,{" "}
-          <span className="text-gray-700 font-medium">budget</span>,{" "}
-          <span className="text-gray-700 font-medium">pincode</span>.
-        </p>
+        {isShop ? (
+          <p>
+            Ask about your auctions or bids. Try{" "}
+            <span className="text-gray-700 font-medium">
+              "how's my auction going?"
+            </span>
+          </p>
+        ) : (
+          <p>
+            Ask a question about your requests or bids, or describe something
+            you want to buy. Be specific —{" "}
+            <span className="text-gray-700 font-medium">item</span>,{" "}
+            <span className="text-gray-700 font-medium">budget</span>,{" "}
+            <span className="text-gray-700 font-medium">pincode</span>.
+          </p>
+        )}
       </div>
 
       {/* Textarea */}
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={`Ask "how many bids do I have?" or describe what you want to buy…`}
+        placeholder={placeholder}
         rows={5}
         disabled={isParsing}
         className="w-full resize-none rounded-xl border border-gray-200
@@ -58,7 +91,7 @@ export default function AssistantInput({
             Try an example:
           </span>
           <div className="flex flex-wrap gap-1.5">
-            {EXAMPLE_PROMPTS.map((example, idx) => (
+            {examples.map((example, idx) => (
               <motion.button
                 key={idx}
                 type="button"
@@ -102,8 +135,22 @@ export default function AssistantInput({
         </motion.div>
       )}
 
-      {/* Submit button — label changes based on question vs create intent */}
-      <div className="flex justify-end">
+      {/* Submit row — mic + ask */}
+      <div className="flex items-center justify-end gap-2">
+        <motion.button
+          type="button"
+          onClick={handleMicClick}
+          disabled={isParsing}
+          whileHover={reduceMotion ? {} : { scale: 1.08 }}
+          whileTap={reduceMotion ? {} : { scale: 0.92 }}
+          aria-label="Voice input (coming soon)"
+          className="p-2 rounded-lg text-gray-400 hover:text-indigo-500
+                     hover:bg-indigo-50 transition-colors
+                     disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Mic size={16} />
+        </motion.button>
+
         <button
           onClick={onParse}
           disabled={!canParse}

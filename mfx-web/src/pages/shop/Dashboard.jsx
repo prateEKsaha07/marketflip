@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
 import ModernNavbar from "../../components/ui/Navbar";
-import { 
+import {
   LogOut,
   Package,
   Search,
@@ -36,6 +36,7 @@ import {
 import api from '../../api/client';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import SavedSearchesList from '../../components/SavedSearchesList';
+import AIAssistant from '../../components/ai-assistant';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -53,7 +54,6 @@ const Dashboard = () => {
     completed: 0
   });
 
-  // Fetch data on mount
   useEffect(() => {
     fetchShopProfile();
     generateGreeting();
@@ -61,13 +61,12 @@ const Dashboard = () => {
     fetchBidStats();
   }, []);
 
-  // Generate time-based greeting
   const generateGreeting = () => {
     const hour = new Date().getHours();
     let timeGreeting = 'Good Evening';
     if (hour < 12) timeGreeting = 'Good Morning';
     else if (hour < 17) timeGreeting = 'Good Afternoon';
-    
+
     const greetings = [
       'Welcome back',
       'Great to see you',
@@ -79,7 +78,6 @@ const Dashboard = () => {
     setGreeting(`${timeGreeting}, ${randomGreeting}`);
   };
 
-  // Fetch shop profile
   const fetchShopProfile = async () => {
     try {
       setLoading(true);
@@ -94,7 +92,6 @@ const Dashboard = () => {
     }
   };
 
-  // Fetch unread chat count
   const fetchUnreadCount = async () => {
     try {
       const response = await api.get('/chat/unread-count');
@@ -104,29 +101,25 @@ const Dashboard = () => {
     }
   };
 
-  // Fetch bid statistics
   const fetchBidStats = async () => {
     try {
       const response = await api.get('/bids');
       const bids = response.data || [];
-      
-      // Calculate stats
+
       const total = bids.length;
       const pending = bids.filter(b => b.status === 'pending').length;
-      
-      // Selected bids where request is NOT completed
+
       const selected = bids.filter(b => {
         if (b.status !== 'selected') return false;
         const reqStatus = b.requests?.status || b.request?.status;
         return reqStatus !== 'completed';
       }).length;
-      
-      // Completed bids
+
       const completed = bids.filter(b => {
         const reqStatus = b.requests?.status || b.request?.status;
         return reqStatus === 'completed';
       }).length;
-      
+
       setStats({
         total_bids: total,
         pending: pending,
@@ -138,13 +131,11 @@ const Dashboard = () => {
     }
   };
 
-  // Handle logout
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
-  // Copy shop ID
   const copyShopId = async () => {
     if (user?.user_id) {
       await navigator.clipboard.writeText(user.user_id);
@@ -153,7 +144,6 @@ const Dashboard = () => {
     }
   };
 
-  // Copy GST number
   const copyGSTNumber = async () => {
     if (profile?.gst_number) {
       await navigator.clipboard.writeText(profile.gst_number);
@@ -162,60 +152,55 @@ const Dashboard = () => {
     }
   };
 
-  // Get user initials for avatar
   const getInitials = () => {
     const name = profile?.shop_name || profile?.full_name || user?.email?.split('@')[0] || 'User';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  // Get full name
   const getFullName = () => {
     return profile?.full_name || user?.email?.split('@')[0] || 'User';
   };
 
-  // Get shop name
   const getShopName = () => {
     return profile?.shop_name || null;
   };
 
-  // Get GST status
   const getGSTStatus = () => {
     return profile?.gst_number || null;
   };
 
-  // Stats Cards
   const statCards = [
-    { 
-      key: 'total', 
-      label: 'Total Bids', 
-      value: stats.total_bids, 
+    {
+      key: 'total',
+      label: 'Total Bids',
+      value: stats.total_bids,
       icon: <List size={18} className="text-[#FFBE91]" />,
       bg: 'bg-[#FFFCE1]',
       border: 'border-[#FFDDB0]',
       desc: 'All bids placed'
     },
-    { 
-      key: 'pending', 
-      label: 'Pending', 
-      value: stats.pending, 
+    {
+      key: 'pending',
+      label: 'Pending',
+      value: stats.pending,
       icon: <Clock size={18} className="text-amber-600" />,
       bg: 'bg-amber-50',
       border: 'border-amber-200',
       desc: 'Awaiting response'
     },
-    { 
-      key: 'selected', 
-      label: 'Selected', 
-      value: stats.selected, 
+    {
+      key: 'selected',
+      label: 'Selected',
+      value: stats.selected,
       icon: <CheckCircle size={18} className="text-emerald-600" />,
       bg: 'bg-emerald-50',
       border: 'border-emerald-200',
       desc: 'Won bids'
     },
-    { 
-      key: 'completed', 
-      label: 'Completed', 
-      value: stats.completed, 
+    {
+      key: 'completed',
+      label: 'Completed',
+      value: stats.completed,
       icon: <Award size={18} className="text-violet-600" />,
       bg: 'bg-violet-50',
       border: 'border-violet-200',
@@ -223,7 +208,6 @@ const Dashboard = () => {
     },
   ];
 
-  // Navigation cards
   const navItems = [
     {
       id: 'requests',
@@ -259,10 +243,9 @@ const Dashboard = () => {
     },
   ];
 
-  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: { 
+    visible: {
       opacity: 1,
       transition: { staggerChildren: 0.06 }
     }
@@ -270,14 +253,13 @@ const Dashboard = () => {
 
   const itemVariants = {
     hidden: { opacity: 0, y: 12 },
-    visible: { 
-      opacity: 1, 
+    visible: {
+      opacity: 1,
       y: 0,
       transition: { duration: 0.3, ease: "easeOut" }
     }
   };
 
-  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
@@ -291,7 +273,6 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
-      {/* Modern Reusable Navbar - Shop Side */}
       <ModernNavbar
         navItems={[
           { name: "Dashboard", path: "/shop/dashboard", icon: "LayoutDashboard" },
@@ -321,19 +302,17 @@ const Dashboard = () => {
       />
 
       <div className="max-w-6xl mx-auto">
-        {/* Header with User Profile */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
           className="bg-white/80 backdrop-blur-xl rounded-xl p-6 border border-[#EEECE6] shadow-sm mb-6"
         >
           <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-            {/* Avatar */}
             <div className="flex-shrink-0">
               {profile?.profile_photo_url ? (
-                <img 
-                  src={profile.profile_photo_url} 
+                <img
+                  src={profile.profile_photo_url}
                   alt={getFullName()}
                   className="w-16 h-16 rounded-xl object-cover border border-[#EEECE6]"
                 />
@@ -344,7 +323,6 @@ const Dashboard = () => {
               )}
             </div>
 
-            {/* User Info */}
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-bold text-[#1A1A2E]">
@@ -428,7 +406,6 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
               <NotificationDropdown />
 
@@ -438,7 +415,7 @@ const Dashboard = () => {
                   {unreadCount} unread
                 </div>
               )}
-              <Button 
+              <Button
                 onClick={() => navigate('/shop/profile')}
                 variant="outline"
                 className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] text-sm px-3 py-1.5 h-auto"
@@ -446,7 +423,7 @@ const Dashboard = () => {
                 <User size={14} className="mr-1.5" />
                 Profile
               </Button>
-              <Button 
+              <Button
                 onClick={handleLogout}
                 variant="ghost"
                 className="text-[#A0A0B0] hover:text-rose-500 hover:bg-rose-50 text-sm px-3 py-1.5 h-auto"
@@ -457,8 +434,7 @@ const Dashboard = () => {
           </div>
         </motion.div>
 
-        {/* Stats Grid - 4 KPIs */}
-        <motion.div 
+        <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
@@ -482,8 +458,7 @@ const Dashboard = () => {
           ))}
         </motion.div>
 
-        {/* Navigation Grid - 4 cards */}
-        <motion.div 
+        <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
@@ -511,8 +486,7 @@ const Dashboard = () => {
           ))}
         </motion.div>
 
-        {/* Saved Searches Section */}
-        <motion.div 
+        <motion.div
           variants={itemVariants}
           className="bg-white/80 backdrop-blur-xl rounded-xl p-4 border border-[#EEECE6] shadow-sm mb-6"
         >
@@ -526,8 +500,7 @@ const Dashboard = () => {
           <SavedSearchesList limit={3} showViewAll />
         </motion.div>
 
-        {/* Quick Actions */}
-        <motion.div 
+        <motion.div
           variants={itemVariants}
           className="bg-white/80 backdrop-blur-xl rounded-xl p-4 border border-[#EEECE6] shadow-sm"
         >
@@ -564,8 +537,7 @@ const Dashboard = () => {
           </div>
         </motion.div>
 
-        {/* Footer Note */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
@@ -577,6 +549,9 @@ const Dashboard = () => {
           </span>
         </motion.div>
       </div>
+
+      {/* AI Assistant — floating button + panel */}
+      <AIAssistant />
     </div>
   );
 };
