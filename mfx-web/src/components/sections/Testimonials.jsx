@@ -6,38 +6,38 @@ const testimonials = [
   {
     name: 'Prateek Saha',
     role: 'Buyer',
-    content: 'MarketFlip saved me hours of hunting. I got 5 bids within hours and saved ₹15,000 on my new laptop!',
+    content: 'MarketFlip saved me hours. Got 5 bids in hours and saved ₹15,000.',
     avatar: 'P',
     rating: 5,
     color: 'from-[#FFBE91] to-[#FFDDB0]',
-    delay: 0,
+    floatDelay: 0,
   },
   {
     name: 'Tech Store',
     role: 'Shop Owner',
-    content: 'I get new customers every week. Buyers come to me instead of me chasing them. Best decision ever!',
+    content: 'New customers every week. Buyers come to me now, not the other way.',
     avatar: 'T',
     rating: 5,
     color: 'from-[#FFDDB0] to-[#CFEBFF]',
-    delay: 0.1,
+    floatDelay: 0.6,
   },
   {
     name: 'Riya Sharma',
     role: 'Buyer',
-    content: 'Found exactly what I needed at the best price. Love the transparency and how easy it is to compare.',
+    content: 'Found exactly what I needed. Love the transparency.',
     avatar: 'R',
     rating: 4,
     color: 'from-[#CFEBFF] to-[#FFBE91]',
-    delay: 0.2,
+    floatDelay: 1.2,
   },
   {
     name: 'Sharma Electronics',
     role: 'Shop Owner',
-    content: 'MarketFlip brought us 20+ new customers in just one month. Highly recommended for local shops!',
+    content: '20+ new customers in one month. Recommended for local shops.',
     avatar: 'S',
     rating: 5,
     color: 'from-[#FFBE91] to-[#CFEBFF]',
-    delay: 0.3,
+    floatDelay: 1.8,
   },
 ];
 
@@ -45,162 +45,143 @@ const containerVariants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.12,
-      ease: "easeOut",
-      duration: 0.4,
-    }
-  }
+    transition: { staggerChildren: 0.07, delayChildren: 0.08 },
+  },
 };
 
 const itemVariants = {
-  hidden: { 
-    opacity: 0, 
-    y: 30,
-    scale: 0.96,
-  },
-  show: { 
-    opacity: 1, 
+  hidden: { opacity: 0, y: 14 },
+  show: {
+    opacity: 1,
     y: 0,
-    scale: 1,
-    transition: {
-      type: "spring",
-      stiffness: 350,
-      damping: 30,
-      duration: 0.6,
-    }
-  }
+    transition: { duration: 0.38, ease: [0.16, 1, 0.3, 1] },
+  },
 };
 
 const Testimonials = () => {
   return (
-    <section className="relative py-16 md:py-20 px-4 overflow-hidden">
-      {/* Background */}
+    <section className="relative py-12 px-4 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-[#FFFCE1] via-white/80 to-[#FFFCE1]" />
-      
-      <div className="relative z-10 max-w-6xl mx-auto">
-        {/* Section Header */}
+
+      <div className="relative z-10 max-w-3xl mx-auto">
+        {/* Header */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ 
-            duration: 0.5, 
-            ease: "easeOut",
-            delay: 0.1,
-          }}
-          viewport={{ once: true, margin: "-60px" }}
-          className="text-center mb-12"
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          viewport={{ once: true, margin: '-60px' }}
+          className="text-center mb-6"
         >
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2, duration: 0.4, ease: "easeOut" }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 mb-4 bg-[#FFBE91]/10 rounded-full border border-[#FFBE91]/20"
-          >
-            <MessageCircle size={12} className="text-[#FFBE91]" />
-            <span className="text-[10px] font-medium text-[#FFBE91] tracking-wide uppercase">Testimonials</span>
-          </motion.div>
-          
-          <h2 className="text-3xl md:text-4xl font-bold leading-tight">
-            <span className="text-[#1A1A2E]">What Our </span>
+          <div className="inline-flex items-center gap-1 px-2 py-0.5 mb-2 bg-[#FFBE91]/10 rounded-full border border-[#FFBE91]/20">
+            <MessageCircle size={9} className="text-[#FFBE91]" />
+            <span className="text-[8px] font-medium text-[#FFBE91] tracking-wide uppercase">
+              Testimonials
+            </span>
+          </div>
+
+          <h2 className="text-lg md:text-xl font-bold leading-tight">
+            <span className="text-[#1A1A2E]">What our </span>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFBE91] via-[#FFDDB0] to-[#CFEBFF]">
-              Users Say
+              users say
             </span>
           </h2>
-          
-          <p className="mt-2 text-sm text-[#4A4A5A] max-w-2xl mx-auto">
-            Real stories from real people who flipped how they buy.
-          </p>
         </motion.div>
 
-        {/* Testimonials Grid */}
-        <motion.div 
+        {/* Testimonials grid — auto rows so cards don't stretch */}
+        <motion.div
           variants={containerVariants}
           initial="hidden"
           whileInView="show"
-          viewport={{ once: true, margin: "-50px" }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-5"
+          viewport={{ once: true, margin: '-50px' }}
+          className="grid grid-cols-2 gap-2 auto-rows-min"
         >
           {testimonials.map((testimonial, index) => (
             <motion.div
               key={index}
               variants={itemVariants}
-              whileHover={{ 
-                y: -6,
-                transition: { 
-                  type: "spring", 
-                  stiffness: 400, 
-                  damping: 25 
-                }
+              whileHover={{
+                y: -2,
+                transition: { type: 'spring', stiffness: 400, damping: 25 },
               }}
-              className="group relative bg-white/70 backdrop-blur-sm p-6 rounded-xl border border-[#EEECE6] shadow-sm hover:shadow-lg transition-all duration-300"
+              className="group relative bg-white/70 backdrop-blur-sm p-2 rounded-md border border-[#EEECE6] shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden"
             >
-              {/* Quote Icon */}
-              <div className="absolute top-4 right-4 opacity-20 group-hover:opacity-40 transition-opacity duration-300">
-                <Quote className="w-7 h-7 text-[#1A1A2E]" />
+              {/* Idle floating blob */}
+              <motion.div
+                aria-hidden="true"
+                className={`absolute -top-4 -right-4 w-12 h-12 rounded-full bg-gradient-to-br ${testimonial.color} blur-2xl`}
+                animate={{
+                  y: [0, -3, 0],
+                  x: [0, 2, 0],
+                  opacity: [0.14, 0.24, 0.14],
+                }}
+                transition={{
+                  duration: 6,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                  delay: testimonial.floatDelay,
+                }}
+              />
+
+              {/* Quote icon */}
+              <div className="absolute top-1.5 right-2 opacity-10 group-hover:opacity-25 transition-opacity duration-300">
+                <Quote className="w-3 h-3 text-[#1A1A2E]" />
               </div>
-              
+
               {/* Rating */}
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.8 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2, duration: 0.3 }}
-                className="flex gap-0.5 mb-3"
-              >
+              <div className="relative flex gap-0.5 mb-1">
                 {[...Array(5)].map((_, i) => (
                   <Star
                     key={i}
-                    className={`w-3.5 h-3.5 ${
-                      i < testimonial.rating 
-                        ? 'text-[#FFBE91] fill-[#FFBE91]' 
+                    className={`w-1.5 h-1.5 ${
+                      i < testimonial.rating
+                        ? 'text-[#FFBE91] fill-[#FFBE91]'
                         : 'text-[#EEECE6]'
                     }`}
                   />
                 ))}
-              </motion.div>
+              </div>
 
               {/* Content */}
-              <p className="text-sm text-[#1A1A2E] leading-relaxed italic">
+              <p className="relative text-[10px] text-[#1A1A2E] leading-snug italic pr-3">
                 "{testimonial.content}"
               </p>
 
-              {/* Avatar & Name */}
-              <div className="flex items-center gap-3 mt-5">
-                <motion.div 
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  whileInView={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.3, duration: 0.4, type: "spring", stiffness: 300 }}
-                  className={`w-10 h-10 rounded-full bg-gradient-to-br ${testimonial.color} flex items-center justify-center text-sm font-bold text-[#1A1A2E] shadow-sm flex-shrink-0`}
+              {/* Avatar & name — inline compact */}
+              <div className="relative flex items-center gap-1.5 mt-1.5">
+                <div
+                  className={`w-4 h-4 rounded-full bg-gradient-to-br ${testimonial.color} flex items-center justify-center text-[7px] font-bold text-[#1A1A2E] shadow-sm flex-shrink-0`}
                 >
                   {testimonial.avatar}
-                </motion.div>
-                <div>
-                  <p className="text-sm font-semibold text-[#1A1A2E]">{testimonial.name}</p>
-                  <p className="text-[10px] text-[#A0A0B0]">{testimonial.role}</p>
                 </div>
+                <p className="text-[8px] font-semibold text-[#1A1A2E] leading-tight truncate">
+                  {testimonial.name}
+                  <span className="text-[#A0A0B0] font-normal"> · {testimonial.role}</span>
+                </p>
               </div>
 
-              {/* Subtle glow on hover */}
-              <div className={`absolute inset-0 rounded-xl bg-gradient-to-br ${testimonial.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none`} />
+              {/* Hover glow */}
+              <div
+                className={`absolute inset-0 rounded-md bg-gradient-to-br ${testimonial.color} opacity-0 group-hover:opacity-[0.04] transition-opacity duration-300 pointer-events-none`}
+              />
             </motion.div>
           ))}
         </motion.div>
 
-        {/* Trust Badge */}
+        {/* Trust badge */}
         <motion.div
-          initial={{ opacity: 0, y: 15 }}
+          initial={{ opacity: 0, y: 8 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4, ease: "easeOut" }}
+          transition={{ duration: 0.4, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
           viewport={{ once: true }}
-          className="flex items-center justify-center gap-6 mt-10"
+          className="flex flex-wrap items-center justify-center gap-2 mt-6"
         >
-          <div className="flex items-center gap-2 text-sm text-[#4A4A5A]">
-            <Users size={14} className="text-[#FFBE91]" />
+          <div className="flex items-center gap-1 text-[9px] text-[#4A4A5A]">
+            <Users size={9} className="text-[#FFBE91]" />
             <span>Trusted by 100+</span>
           </div>
-          <div className="w-px h-5 bg-[#EEECE6]" />
-          <div className="flex items-center gap-2 text-sm text-[#4A4A5A]">
-            <Sparkles size={14} className="text-[#FFDDB0]" />
+          <div className="w-px h-2.5 bg-[#EEECE6]" />
+          <div className="flex items-center gap-1 text-[9px] text-[#4A4A5A]">
+            <Sparkles size={9} className="text-[#FFDDB0]" />
             <span>4.8 ★ Average Rating</span>
           </div>
         </motion.div>

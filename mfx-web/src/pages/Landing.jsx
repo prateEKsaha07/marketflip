@@ -28,11 +28,6 @@ const Landing = () => {
 
   if (loading) {
     return <LoadingAnimation message="Loading your experience..." />;
-    // return (
-    //   <div className="min-h-screen flex items-center justify-center bg-[#FFFCE1]">
-    //     <div className="animate-pulse text-2xl font-bold text-[#FFBE91]">Loading...</div>
-    //   </div>
-    // );
   }
 
   return (

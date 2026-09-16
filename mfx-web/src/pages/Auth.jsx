@@ -2,23 +2,22 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { 
-  Mail, 
-  Lock, 
-  Eye, 
-  EyeOff, 
-  Store, 
-  User, 
-  Home, 
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  Store,
+  User,
+  Home,
   Sparkles,
-  ShoppingBag,
-  TrendingUp,
-  Star,
+  FileText,
+  Gavel,
+  Shield,
   ArrowRight,
   ArrowLeft,
-  Check,
   Phone,
-  MapPin
+  MapPin,
 } from 'lucide-react';
 import api from '../api/client';
 
@@ -31,7 +30,7 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [signupStep, setSignupStep] = useState(0);
-  
+
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [signupData, setSignupData] = useState({
     email: '',
@@ -44,7 +43,6 @@ const Auth = () => {
     phone: '',
   });
 
-  // Signup steps configuration
   const signupSteps = [
     {
       title: 'Email & Password',
@@ -128,14 +126,13 @@ const Auth = () => {
       await api.post('/auth/signup', payload);
 
       const loginResult = await login(signupData.email, signupData.password);
-      
+
       if (loginResult.success) {
         if (signupData.role === 'buyer') navigate('/buyer/dashboard');
         else navigate('/shop/dashboard');
       } else {
         setError('Account created. Please login.');
       }
-
     } catch (err) {
       setError(err.response?.data?.detail || 'Signup failed');
     } finally {
@@ -144,25 +141,27 @@ const Auth = () => {
   };
 
   const handleNextStep = () => {
-    // Validate current step fields
     const currentStep = signupSteps[signupStep];
-    let hasError = false;
 
     for (const field of currentStep.fields) {
       if (!signupData[field] || signupData[field].trim() === '') {
         setError(`Please fill in ${field.replace('_', ' ')}`);
-        hasError = true;
         return;
       }
     }
 
-    // Special validation for password
-    if (currentStep.fields.includes('password') && signupData.password !== signupData.confirmPassword) {
+    if (
+      currentStep.fields.includes('password') &&
+      signupData.password !== signupData.confirmPassword
+    ) {
       setError('Passwords do not match');
       return;
     }
 
-    if (currentStep.fields.includes('pincode') && signupData.pincode.length !== 6) {
+    if (
+      currentStep.fields.includes('pincode') &&
+      signupData.pincode.length !== 6
+    ) {
       setError('Pincode must be 6 digits');
       return;
     }
@@ -176,45 +175,48 @@ const Auth = () => {
     setError('');
   };
 
+  // ===== Motion variants =====
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
+    visible: {
+      opacity: 1,
       y: 0,
-      transition: { duration: 0.4, ease: "easeOut" }
-    }
+      transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+    },
   };
 
   const slideVariants = {
     enter: (direction) => ({
       x: direction > 0 ? 30 : -30,
-      opacity: 0
+      opacity: 0,
     }),
     center: {
       x: 0,
       opacity: 1,
-      transition: { duration: 0.3, ease: "easeOut" }
+      transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] },
     },
     exit: (direction) => ({
       x: direction < 0 ? 30 : -30,
       opacity: 0,
-      transition: { duration: 0.2, ease: "easeIn" }
-    })
+      transition: { duration: 0.2, ease: 'easeIn' },
+    }),
   };
 
   const buttonHover = {
     scale: 1.02,
-    transition: { type: "spring", stiffness: 400, damping: 25 }
+    transition: { type: 'spring', stiffness: 400, damping: 25 },
   };
 
-  const inputFocus = {
-    scale: 1.01,
-    transition: { duration: 0.2 }
-  };
+  // ===== Input styling (borderless, soft blend) =====
+  const inputClass =
+    'w-full pl-10 pr-10 py-2.5 text-sm bg-white/60 rounded-lg ' +
+    'text-[#1A1A2E] placeholder:text-[#A0A0B0] ' +
+    'focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#FFBE91]/40 ' +
+    'transition-all duration-300';
 
   const renderSignupFields = () => {
     const step = signupSteps[signupStep];
-    
+
     return (
       <motion.div
         key={signupStep}
@@ -223,22 +225,30 @@ const Auth = () => {
         initial="enter"
         animate="center"
         exit="exit"
-        className="space-y-3"
+        className="space-y-3.5 py-1"
       >
         {/* Progress Indicator */}
         <div className="flex items-center gap-1.5 mb-4">
           {signupSteps.map((_, index) => (
-            <div
+            <motion.div
               key={index}
-              className={`flex-1 h-0.5 rounded-full transition-all ${
-                index <= signupStep ? 'bg-[#1A1A2E]' : 'bg-[#EEECE6]'
-              }`}
+              className="flex-1 h-0.5 rounded-full"
+              animate={{
+                backgroundColor:
+                  index <= signupStep ? '#1A1A2E' : 'rgba(238,236,230,0.6)',
+              }}
+              transition={{ duration: 0.3 }}
             />
           ))}
         </div>
 
         {/* Step Header */}
-        <div className="flex items-center gap-2 mb-3">
+        <motion.div
+          className="flex items-center gap-2 mb-4"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+        >
           <span className="text-[#A0A0B0]">{step.icon}</span>
           <div>
             <h3 className="text-sm font-medium text-[#1A1A2E]">{step.title}</h3>
@@ -247,22 +257,26 @@ const Auth = () => {
           <span className="ml-auto text-[10px] text-[#A0A0B0]">
             {signupStep + 1}/{signupSteps.length}
           </span>
-        </div>
+        </motion.div>
 
         {step.fields.includes('email') && (
-          <motion.div 
-            className="relative"
-            whileHover="hover"
-            variants={inputFocus}
+          <motion.div
+            className="relative px-1"
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.05, duration: 0.3 }}
           >
-            <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
+            <Mail
+              size={14}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A0A0B0] z-10 pointer-events-none"
+            />
             <input
               type="email"
               name="email"
               value={signupData.email}
               onChange={handleSignupChange}
               placeholder="Email address"
-              className="w-full pl-9 pr-3 py-2 text-sm bg-[#F8F6F0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all"
+              className={inputClass}
               required
             />
           </motion.div>
@@ -270,62 +284,81 @@ const Auth = () => {
 
         {step.fields.includes('password') && (
           <>
-            <motion.div 
-              className="relative"
-              whileHover="hover"
-              variants={inputFocus}
+            <motion.div
+              className="relative px-1"
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1, duration: 0.3 }}
             >
-              <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
+              <Lock
+                size={14}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A0A0B0] z-10 pointer-events-none"
+              />
               <input
                 type={showPassword ? 'text' : 'password'}
                 name="password"
                 value={signupData.password}
                 onChange={handleSignupChange}
                 placeholder="Password"
-                className="w-full pl-9 pr-9 py-2 text-sm bg-[#F8F6F0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all"
+                className={inputClass}
                 required
               />
               <button
                 type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors z-10"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             </motion.div>
 
-            <motion.div 
-              className="relative"
-              whileHover="hover"
-              variants={inputFocus}
+            <motion.div
+              className="relative px-1"
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.15, duration: 0.3 }}
             >
-              <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
+              <Lock
+                size={14}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A0A0B0] z-10 pointer-events-none"
+              />
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
                 name="confirmPassword"
                 value={signupData.confirmPassword}
                 onChange={handleSignupChange}
                 placeholder="Confirm password"
-                className="w-full pl-9 pr-9 py-2 text-sm bg-[#F8F6F0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all"
+                className={inputClass}
                 required
               />
               <button
                 type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors z-10"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               >
-                {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                {showConfirmPassword ? (
+                  <EyeOff size={14} />
+                ) : (
+                  <Eye size={14} />
+                )}
               </button>
             </motion.div>
           </>
         )}
 
         {step.fields.includes('role') && (
-          <div className="flex gap-1.5 bg-[#F8F6F0] rounded-lg p-0.5">
+          <motion.div
+            className="flex gap-1.5 bg-white/60 rounded-lg p-1 relative mx-1"
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.05, duration: 0.3 }}
+          >
             <button
               type="button"
-              className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
-                signupData.role === 'buyer' ? 'bg-white shadow-sm text-[#1A1A2E]' : 'text-[#A0A0B0] hover:text-[#1A1A2E]'
+              className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all duration-300 relative z-10 ${
+                signupData.role === 'buyer'
+                  ? 'text-[#1A1A2E]'
+                  : 'text-[#A0A0B0] hover:text-[#1A1A2E]'
               }`}
               onClick={() => setSignupData({ ...signupData, role: 'buyer' })}
             >
@@ -333,64 +366,87 @@ const Auth = () => {
             </button>
             <button
               type="button"
-              className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
-                signupData.role === 'shop_owner' ? 'bg-white shadow-sm text-[#1A1A2E]' : 'text-[#A0A0B0] hover:text-[#1A1A2E]'
+              className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all duration-300 relative z-10 ${
+                signupData.role === 'shop_owner'
+                  ? 'text-[#1A1A2E]'
+                  : 'text-[#A0A0B0] hover:text-[#1A1A2E]'
               }`}
-              onClick={() => setSignupData({ ...signupData, role: 'shop_owner' })}
+              onClick={() =>
+                setSignupData({ ...signupData, role: 'shop_owner' })
+              }
             >
               Shop Owner
             </button>
-          </div>
-        )}
-
-        {step.fields.includes('shop_name') && signupData.role === 'shop_owner' && (
-          <motion.div 
-            className="relative"
-            whileHover="hover"
-            variants={inputFocus}
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            transition={{ duration: 0.3 }}
-          >
-            <Store size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
-            <input
-              type="text"
-              name="shop_name"
-              value={signupData.shop_name}
-              onChange={handleSignupChange}
-              placeholder="Shop name"
-              className="w-full pl-9 pr-3 py-2 text-sm bg-[#F8F6F0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all"
-              required={signupData.role === 'shop_owner'}
+            <motion.div
+              className="absolute top-1 bottom-1 rounded-md bg-white shadow-sm"
+              animate={{
+                left: signupData.role === 'buyer' ? '4px' : '50%',
+                right: signupData.role === 'buyer' ? '50%' : '4px',
+              }}
+              transition={{ type: 'spring', stiffness: 400, damping: 32 }}
             />
           </motion.div>
         )}
 
+        {step.fields.includes('shop_name') &&
+          signupData.role === 'shop_owner' && (
+            <motion.div
+              className="relative px-1"
+              initial={{ opacity: 0, height: 0, x: -8 }}
+              animate={{ opacity: 1, height: 'auto', x: 0 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              style={{ overflow: 'hidden' }}
+            >
+              <Store
+                size={14}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A0A0B0] z-10 pointer-events-none"
+              />
+              <input
+                type="text"
+                name="shop_name"
+                value={signupData.shop_name}
+                onChange={handleSignupChange}
+                placeholder="Shop name"
+                className={inputClass}
+                required={signupData.role === 'shop_owner'}
+              />
+            </motion.div>
+          )}
+
         {step.fields.includes('address') && (
-          <motion.div 
-            className="relative"
-            whileHover="hover"
-            variants={inputFocus}
+          <motion.div
+            className="relative px-1"
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.05, duration: 0.3 }}
           >
-            <Home size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
+            <Home
+              size={14}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A0A0B0] z-10 pointer-events-none"
+            />
             <input
               type="text"
               name="address"
               value={signupData.address}
               onChange={handleSignupChange}
               placeholder="Address"
-              className="w-full pl-9 pr-3 py-2 text-sm bg-[#F8F6F0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all"
+              className={inputClass}
               required
             />
           </motion.div>
         )}
 
         {step.fields.includes('pincode') && (
-          <motion.div 
-            className="relative"
-            whileHover="hover"
-            variants={inputFocus}
+          <motion.div
+            className="relative px-1"
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1, duration: 0.3 }}
           >
-            <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
+            <MapPin
+              size={14}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A0A0B0] z-10 pointer-events-none"
+            />
             <input
               type="text"
               name="pincode"
@@ -398,40 +454,44 @@ const Auth = () => {
               onChange={handleSignupChange}
               placeholder="Pincode"
               maxLength="6"
-              className="w-full pl-9 pr-3 py-2 text-sm bg-[#F8F6F0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all"
+              className={inputClass}
               required
             />
           </motion.div>
         )}
 
         {step.fields.includes('phone') && (
-          <motion.div 
-            className="relative"
-            whileHover="hover"
-            variants={inputFocus}
+          <motion.div
+            className="relative px-1"
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.15, duration: 0.3 }}
           >
-            <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
+            <Phone
+              size={14}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A0A0B0] z-10 pointer-events-none"
+            />
             <input
               type="tel"
               name="phone"
               value={signupData.phone}
               onChange={handleSignupChange}
               placeholder="Phone number"
-              className="w-full pl-9 pr-3 py-2 text-sm bg-[#F8F6F0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all"
+              className={inputClass}
               required
             />
           </motion.div>
         )}
 
         {/* Navigation Buttons */}
-        <div className="flex gap-2 pt-2">
+        <div className="flex gap-2 pt-3 px-1">
           {signupStep > 0 && (
             <motion.button
               whileHover={buttonHover}
               whileTap={{ scale: 0.98 }}
               type="button"
               onClick={handlePrevStep}
-              className="flex-1 py-2 text-sm font-medium bg-[#F8F6F0] hover:bg-[#EEECE6] text-[#1A1A2E] rounded-lg transition-all"
+              className="flex-1 py-2.5 text-sm font-medium bg-white/60 hover:bg-white text-[#1A1A2E] rounded-lg transition-all duration-300"
             >
               <ArrowLeft size={16} className="inline mr-1.5" />
               Back
@@ -443,7 +503,9 @@ const Auth = () => {
               whileTap={{ scale: 0.98 }}
               type="button"
               onClick={handleNextStep}
-              className={`${signupStep > 0 ? 'flex-1' : 'w-full'} py-2 text-sm font-medium bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white rounded-lg transition-all`}
+              className={`${
+                signupStep > 0 ? 'flex-1' : 'w-full'
+              } py-2.5 text-sm font-medium bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white rounded-lg transition-all duration-300 shadow-lg shadow-[#1A1A2E]/10 hover:shadow-xl hover:shadow-[#1A1A2E]/20`}
             >
               Next
               <ArrowRight size={16} className="inline ml-1.5" />
@@ -454,7 +516,7 @@ const Auth = () => {
               whileTap={{ scale: 0.98 }}
               type="submit"
               disabled={loading}
-              className="w-full py-2 text-sm font-medium bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white rounded-lg transition-all disabled:opacity-50"
+              className="w-full py-2.5 text-sm font-medium bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white rounded-lg transition-all duration-300 shadow-lg shadow-[#1A1A2E]/10 hover:shadow-xl hover:shadow-[#1A1A2E]/20 disabled:opacity-50"
             >
               {loading ? 'Creating...' : 'Create Account'}
             </motion.button>
@@ -465,90 +527,190 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Ambient background blobs */}
+      <motion.div
+        className="absolute -top-20 -left-20 w-80 h-80 rounded-full bg-[#FFBE91]/15 blur-3xl pointer-events-none"
+        animate={{
+          x: [0, 40, -20, 0],
+          y: [0, -30, 20, 0],
+          scale: [1, 1.1, 0.95, 1],
+        }}
+        transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="absolute -bottom-20 -right-20 w-96 h-96 rounded-full bg-[#CFEBFF]/15 blur-3xl pointer-events-none"
+        animate={{
+          x: [0, -50, 30, 0],
+          y: [0, 40, -20, 0],
+          scale: [1, 0.9, 1.1, 1],
+        }}
+        transition={{
+          duration: 25,
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: 2,
+        }}
+      />
+      <motion.div
+        className="absolute top-1/3 right-1/4 w-64 h-64 rounded-full bg-[#FFDDB0]/10 blur-3xl pointer-events-none"
+        animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.7, 0.4] }}
+        transition={{
+          duration: 18,
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: 1,
+        }}
+      />
+
       {/* Back Button */}
-      <motion.button 
+      <motion.button
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.2 }}
         whileHover={{ x: -3 }}
-        onClick={() => navigate('/')} 
+        onClick={() => navigate('/')}
         className="fixed top-4 left-4 md:top-6 md:left-6 z-50 flex items-center gap-1.5 text-xs text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors"
       >
         <Home size={14} />
         <span>Back</span>
       </motion.button>
 
-      <motion.div 
+      <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="flex w-full max-w-4xl min-h-[560px] bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden"
+        className="relative flex w-full max-w-4xl min-h-[560px] bg-white/50 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-[#1A1A2E]/5 overflow-hidden"
       >
         {/* Left Side - Brand (Hidden on Signup) */}
         <AnimatePresence mode="wait">
           {isSignIn && (
-            <motion.div 
+            <motion.div
               key="brand"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
               className="hidden md:flex w-[38%] relative overflow-hidden bg-gradient-to-br from-[#1A1A2E] via-[#2A2A3E] to-[#1A1A2E] p-8 flex-col justify-center flex-shrink-0"
             >
-              <div className="absolute inset-0 opacity-5">
-                <div className="absolute top-10 right-10 w-32 h-32 rounded-full bg-white/10" />
-                <div className="absolute bottom-10 left-10 w-24 h-24 rounded-full bg-white/5" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-white/5" />
-              </div>
-              
+              <motion.div
+                className="absolute top-10 right-10 w-32 h-32 rounded-full bg-[#FFBE91]/10 blur-2xl"
+                animate={{
+                  x: [0, 20, -10, 0],
+                  y: [0, -20, 10, 0],
+                  scale: [1, 1.15, 0.95, 1],
+                }}
+                transition={{
+                  duration: 16,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }}
+              />
+              <motion.div
+                className="absolute bottom-10 left-10 w-24 h-24 rounded-full bg-[#CFEBFF]/10 blur-2xl"
+                animate={{
+                  x: [0, -15, 15, 0],
+                  y: [0, 15, -10, 0],
+                  scale: [1, 0.9, 1.1, 1],
+                }}
+                transition={{
+                  duration: 20,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                  delay: 2,
+                }}
+              />
+              <motion.div
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-[#FFDDB0]/8 blur-2xl"
+                animate={{ scale: [1, 1.2, 1], opacity: [0.4, 0.7, 0.4] }}
+                transition={{
+                  duration: 14,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                  delay: 1,
+                }}
+              />
+
               <div className="relative z-10">
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
                   className="flex items-center gap-2 mb-2"
                 >
-                  <Sparkles size={18} className="text-[#FFBE91]" />
-                  <h1 className="text-xl font-semibold text-white">MarketFlip</h1>
+                  <motion.div
+                    animate={{
+                      rotate: [0, 10, 0],
+                      scale: [1, 1.1, 1],
+                    }}
+                    transition={{
+                      duration: 4,
+                      repeat: Infinity,
+                      ease: 'easeInOut',
+                    }}
+                  >
+                    <Sparkles size={18} className="text-[#FFBE91]" />
+                  </motion.div>
+                  <h1 className="text-xl font-semibold text-white">
+                    MarketFlip
+                  </h1>
                 </motion.div>
-                
-                <motion.p 
+
+                <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.2 }}
                   className="text-sm text-white/60 mb-6"
                 >
-                  Flip How You Buy.
+                  Where buyers set the price.
                 </motion.p>
-                
-                <motion.div 
+
+                <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
                   className="space-y-2.5"
                 >
-                  <div className="flex items-center gap-2.5 text-sm text-white/70">
-                    <ShoppingBag size={14} className="text-[#FFBE91]" />
-                    <span>Post what you need</span>
-                  </div>
-                  <div className="flex items-center gap-2.5 text-sm text-white/70">
-                    <TrendingUp size={14} className="text-[#FFDDB0]" />
-                    <span>Sellers compete</span>
-                  </div>
-                  <div className="flex items-center gap-2.5 text-sm text-white/70">
-                    <Star size={14} className="text-[#CFEBFF]" />
-                    <span>Choose the best deal</span>
-                  </div>
+                  {[
+                    {
+                      icon: <FileText size={14} className="text-[#FFBE91]" />,
+                      text: 'Post requests or start auctions',
+                    },
+                    {
+                      icon: <Gavel size={14} className="text-[#FFDDB0]" />,
+                      text: 'Let shops compete for you',
+                    },
+                    {
+                      icon: <Shield size={14} className="text-[#CFEBFF]" />,
+                      text: 'Every handoff verified',
+                    },
+                  ].map((item, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{
+                        delay: 0.4 + i * 0.1,
+                        duration: 0.4,
+                        ease: [0.16, 1, 0.3, 1],
+                      }}
+                      className="flex items-center gap-2.5 text-sm text-white/70"
+                    >
+                      {item.icon}
+                      <span>{item.text}</span>
+                    </motion.div>
+                  ))}
                 </motion.div>
 
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: 0.4 }}
+                  transition={{ delay: 0.7 }}
                   className="mt-6 pt-4 border-t border-white/10"
                 >
-                  <span className="text-xs text-white/40">Join the community</span>
+                  <span className="text-xs text-white/40">
+                    Join the community
+                  </span>
                 </motion.div>
               </div>
             </motion.div>
@@ -556,36 +718,55 @@ const Auth = () => {
         </AnimatePresence>
 
         {/* Right Side - Forms */}
-        <div className="flex-1 p-6 md:p-8 flex flex-col">
+        <div className="flex-1 p-6 md:p-10 flex flex-col min-w-0">
           {/* Toggle */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex bg-[#F8F6F0] rounded-lg p-0.5 mb-5 w-full max-w-[200px]"
+            className="flex bg-white/40 backdrop-blur-sm rounded-lg p-1 mb-6 w-full max-w-[200px] relative"
           >
             <button
-              className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
-                isSignIn ? 'bg-white shadow-sm text-[#1A1A2E]' : 'text-[#A0A0B0] hover:text-[#1A1A2E]'
+              className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all duration-300 relative z-10 ${
+                isSignIn
+                  ? 'text-[#1A1A2E]'
+                  : 'text-[#A0A0B0] hover:text-[#1A1A2E]'
               }`}
-              onClick={() => { setIsSignIn(true); setError(''); setSignupStep(0); }}
+              onClick={() => {
+                setIsSignIn(true);
+                setError('');
+                setSignupStep(0);
+              }}
             >
               Sign In
             </button>
             <button
-              className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
-                !isSignIn ? 'bg-white shadow-sm text-[#1A1A2E]' : 'text-[#A0A0B0] hover:text-[#1A1A2E]'
+              className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all duration-300 relative z-10 ${
+                !isSignIn
+                  ? 'text-[#1A1A2E]'
+                  : 'text-[#A0A0B0] hover:text-[#1A1A2E]'
               }`}
-              onClick={() => { setIsSignIn(false); setError(''); setSignupStep(0); }}
+              onClick={() => {
+                setIsSignIn(false);
+                setError('');
+                setSignupStep(0);
+              }}
             >
               Sign Up
             </button>
+            <motion.div
+              className="absolute top-1 bottom-1 rounded-md bg-white shadow-sm"
+              animate={{
+                left: isSignIn ? '4px' : '50%',
+                right: isSignIn ? '50%' : '4px',
+              }}
+              transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+            />
           </motion.div>
 
           {/* Form Container */}
-          <div className="flex-1 relative overflow-hidden">
+          <div className="flex-1 min-w-0 relative px-1">
             <AnimatePresence mode="wait" custom={isSignIn ? 1 : -1}>
               {isSignIn ? (
-                // Sign In Form
                 <motion.div
                   key="signin"
                   custom={1}
@@ -593,86 +774,130 @@ const Auth = () => {
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  className="absolute inset-0"
+                  className="absolute inset-0 px-2"
                 >
                   <div>
-                    <h2 className="text-base font-semibold text-[#1A1A2E]">Welcome Back</h2>
-                    <p className="text-xs text-[#A0A0B0] mb-4">Sign in to your account</p>
+                    <motion.h2
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.05 }}
+                      className="text-base font-semibold text-[#1A1A2E]"
+                    >
+                      Welcome Back
+                    </motion.h2>
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.1 }}
+                      className="text-xs text-[#A0A0B0] mb-4"
+                    >
+                      Sign in to your account
+                    </motion.p>
 
-                    {error && (
-                      <div className="bg-rose-50/80 backdrop-blur-sm rounded-lg p-2.5 mb-3 text-rose-700 text-xs flex items-center gap-2">
-                        <span className="w-1 h-1 rounded-full bg-rose-400" />
-                        {error}
-                      </div>
-                    )}
+                    <AnimatePresence>
+                      {error && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0, y: -4 }}
+                          animate={{ opacity: 1, height: 'auto', y: 0 }}
+                          exit={{ opacity: 0, height: 0, y: -4 }}
+                          className="bg-rose-50/60 backdrop-blur-sm rounded-lg p-2.5 mb-3 text-rose-700 text-xs flex items-center gap-2 overflow-hidden"
+                        >
+                          <span className="w-1 h-1 rounded-full bg-rose-400" />
+                          {error}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
-                    <form onSubmit={handleLoginSubmit} className="space-y-3">
-                      <motion.div 
+                    <form onSubmit={handleLoginSubmit} className="space-y-3.5">
+                      <motion.div
                         className="relative"
-                        whileHover="hover"
-                        variants={inputFocus}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.15, duration: 0.3 }}
                       >
-                        <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
+                        <Mail
+                          size={14}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A0A0B0] z-10 pointer-events-none"
+                        />
                         <input
                           type="email"
                           name="email"
                           value={loginData.email}
                           onChange={handleLoginChange}
                           placeholder="Email address"
-                          className="w-full pl-9 pr-3 py-2 text-sm bg-[#F8F6F0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all"
+                          className={inputClass}
                           required
                         />
                       </motion.div>
 
-                      <motion.div 
+                      <motion.div
                         className="relative"
-                        whileHover="hover"
-                        variants={inputFocus}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2, duration: 0.3 }}
                       >
-                        <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
+                        <Lock
+                          size={14}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A0A0B0] z-10 pointer-events-none"
+                        />
                         <input
                           type={showPassword ? 'text' : 'password'}
                           name="password"
                           value={loginData.password}
                           onChange={handleLoginChange}
                           placeholder="Password"
-                          className="w-full pl-9 pr-9 py-2 text-sm bg-[#F8F6F0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all"
+                          className={inputClass}
                           required
                         />
                         <button
                           type="button"
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors"
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors z-10"
                           onClick={() => setShowPassword(!showPassword)}
                         >
-                          {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                          {showPassword ? (
+                            <EyeOff size={14} />
+                          ) : (
+                            <Eye size={14} />
+                          )}
                         </button>
                       </motion.div>
 
-                      <motion.button 
+                      <motion.button
                         whileHover={buttonHover}
                         whileTap={{ scale: 0.98 }}
-                        type="submit" 
-                        className="w-full py-2 text-sm font-medium bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white rounded-lg transition-all disabled:opacity-50"
+                        type="submit"
+                        className="w-full py-2.5 text-sm font-medium bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white rounded-lg transition-all duration-300 shadow-lg shadow-[#1A1A2E]/10 hover:shadow-xl hover:shadow-[#1A1A2E]/20 disabled:opacity-50"
                         disabled={loading}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.25, duration: 0.3 }}
                       >
                         {loading ? 'Signing in...' : 'Sign In'}
                       </motion.button>
                     </form>
 
-                    <p className="text-center text-xs text-[#A0A0B0] mt-4">
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.3 }}
+                      className="text-center text-xs text-[#A0A0B0] mt-4"
+                    >
                       Don't have an account?{' '}
                       <button
                         type="button"
                         className="text-[#1A1A2E] font-medium hover:underline transition-all"
-                        onClick={() => { setIsSignIn(false); setError(''); setSignupStep(0); }}
+                        onClick={() => {
+                          setIsSignIn(false);
+                          setError('');
+                          setSignupStep(0);
+                        }}
                       >
                         Sign Up
                       </button>
-                    </p>
+                    </motion.p>
                   </div>
                 </motion.div>
               ) : (
-                // Sign Up Form - Progressive
                 <motion.div
                   key="signup"
                   custom={-1}
@@ -680,31 +905,50 @@ const Auth = () => {
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  className="absolute inset-0"
+                  className="absolute inset-0 px-2"
                 >
                   <div>
-                    <h2 className="text-base font-semibold text-[#1A1A2E]">Create Account</h2>
-                    <p className="text-xs text-[#A0A0B0] mb-3">Join MarketFlip today</p>
+                    <h2 className="text-base font-semibold text-[#1A1A2E]">
+                      Create Account
+                    </h2>
+                    <p className="text-xs text-[#A0A0B0] mb-3">
+                      Join MarketFlip today
+                    </p>
 
-                    {error && (
-                      <div className="bg-rose-50/80 backdrop-blur-sm rounded-lg p-2.5 mb-3 text-rose-700 text-xs flex items-center gap-2">
-                        <span className="w-1 h-1 rounded-full bg-rose-400" />
-                        {error}
-                      </div>
-                    )}
+                    <AnimatePresence>
+                      {error && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0, y: -4 }}
+                          animate={{ opacity: 1, height: 'auto', y: 0 }}
+                          exit={{ opacity: 0, height: 0, y: -4 }}
+                          className="bg-rose-50/60 backdrop-blur-sm rounded-lg p-2.5 mb-3 text-rose-700 text-xs flex items-center gap-2 overflow-hidden"
+                        >
+                          <span className="w-1 h-1 rounded-full bg-rose-400" />
+                          {error}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
-                    <form onSubmit={handleSignupSubmit} className="max-h-[380px] overflow-y-auto pr-1">
+                    <form
+                      onSubmit={handleSignupSubmit}
+                      className="max-h-[380px] overflow-y-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    >
                       {renderSignupFields()}
                     </form>
 
-                    {/* ====== LEGAL DISCLAIMER - ADDED ====== */}
-                    <div className="mt-3 text-[10px] text-[#A0A0B0] text-center leading-relaxed border-t border-[#EEECE6] pt-3">
+                    <div className="mt-3 text-[10px] text-[#A0A0B0] text-center leading-relaxed pt-3">
                       By creating an account, you agree to our{' '}
-                      <Link to="/privacy" className="text-[#FFBE91] hover:underline transition-colors">
+                      <Link
+                        to="/privacy"
+                        className="text-[#FFBE91] hover:underline transition-colors"
+                      >
                         Privacy Policy
-                      </Link>
-                      {' '}and{' '}
-                      <Link to="/terms" className="text-[#FFBE91] hover:underline transition-colors">
+                      </Link>{' '}
+                      and{' '}
+                      <Link
+                        to="/terms"
+                        className="text-[#FFBE91] hover:underline transition-colors"
+                      >
                         Terms of Service
                       </Link>
                     </div>
@@ -714,7 +958,11 @@ const Auth = () => {
                       <button
                         type="button"
                         className="text-[#1A1A2E] font-medium hover:underline transition-all"
-                        onClick={() => { setIsSignIn(true); setError(''); setSignupStep(0); }}
+                        onClick={() => {
+                          setIsSignIn(true);
+                          setError('');
+                          setSignupStep(0);
+                        }}
                       >
                         Sign In
                       </button>
