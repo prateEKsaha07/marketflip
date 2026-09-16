@@ -47,3 +47,14 @@ class ParseRequestOut(BaseModel):
 class LogActionIn(BaseModel):
     buyer_action: Literal["accepted", "edited", "abandoned"]
     edited_fields: Optional[Dict[str, Any]] = None
+
+
+class AskIn(BaseModel):
+    question: str = Field(..., min_length=3, max_length=300)
+
+
+class AskOut(BaseModel):
+    answer: str
+    raw_question: str
+    providers_used: List[str]
+    log_id: Optional[str] = None

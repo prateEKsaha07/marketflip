@@ -4,8 +4,9 @@ import logging
 from uuid import UUID
 
 from auth.dependencies import get_current_user
-from ai.schema import ParseRequestIn, ParseRequestOut, LogActionIn
+from ai.schema import ParseRequestIn, ParseRequestOut, LogActionIn, AskIn, AskOut
 from ai.service import parse_request, update_ai_log_action, get_categories
+from ai.qa import ask_question
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai",tags=["ai"])
@@ -72,5 +73,27 @@ async def update_parsed_request(
 async def list_categories(current_user: dict = Depends(get_current_user)):
     """Return all categories (id + name) for the preview dropdown."""
     return get_categories()
+
+@router.post("/ask", response_model=AskOut)
+async def ask_endpoint(
+    payload: AskIn,
+    current_user: dict = Depends(get_current_user),
+):
+    """Answer a quick question about the buyer's data (buyer only)."""
+    if current_user.get("role") != "buyer":
+        raise HTTPException(status_code=403, detail="Only buyers can ask questions")
+
+    if not payload.question.strip():
+        raise HTTPException(status_code=400, detail="Question is required")
+
+    try:
+        result = ask_question(payload.question, current_user["id"])
+        return result
+    except RuntimeError as e:
+        logger.error(f"Ask failed: {e}")
+        raise HTTPException(status_code=503, detail="Assistant unavailable")
+    except Exception:
+        logger.exception("Unexpected error in ask_endpoint")
+        raise HTTPException(status_code=500, detail="Internal error")
 
 

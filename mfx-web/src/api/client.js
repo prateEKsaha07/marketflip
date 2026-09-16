@@ -135,8 +135,14 @@ export const uploadImage = async (file) => {
     throw new Error("Upload failed");
   }
 
-  return data.data.url; // Cloudinary secure_url
+  return data.data.url;
 };
+
+export const askQuestion = async (question) => {
+  const { data } = await api.post("/ai/ask", { question });
+  return data;
+};
+
 
 api.interceptors.request.use(
   (config) => {

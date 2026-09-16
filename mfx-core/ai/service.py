@@ -25,21 +25,21 @@ model = "gemini-3.1-flash-lite"
 
 REQUIRED_FIELDS = ["item_name", "budget_min", "budget_max", "pincode"]
 OPTIONAL_FIELDS = ["description", "category_id", "urgency"]
+from ai.prompts import SYSTEM_PROMPT
+# SYSTEM_PROMPT = """You extract structured request data from a buyer's natural-language description.
 
-SYSTEM_PROMPT = """You extract structured request data from a buyer's natural-language description.
-
-Rules:
-- urgency MUST be exactly one of: "flexible", "soon", "urgent".
-    - "urgent" → user says urgent / asap / today / immediately
-    - "soon" → user says this week / in a few days
-    - "flexible" → no time pressure, or user says no rush
-- budget_min and budget_max are integers. If user gives one number, set budget_min = 80% of it, budget_max = 120% of it.
-- Never set budget_min to 0 unless the user explicitly says "free".
-- pincode MUST be exactly 6 digits.
-- description should add detail not already in item_name. If nothing to add, return null.
-- If a field is not mentioned, return null. Do NOT guess.
-- Mark confidence "low" for inferred fields.
-- category_id must be a UUID from the provided category list. If you cannot match, return null."""
+# Rules:
+# - urgency MUST be exactly one of: "flexible", "soon", "urgent".
+#     - "urgent" → user says urgent / asap / today / immediately
+#     - "soon" → user says this week / in a few days
+#     - "flexible" → no time pressure, or user says no rush
+# - budget_min and budget_max are integers. If user gives one number, set budget_min = 80% of it, budget_max = 120% of it.
+# - Never set budget_min to 0 unless the user explicitly says "free".
+# - pincode MUST be exactly 6 digits.
+# - description should add detail not already in item_name. If nothing to add, return null.
+# - If a field is not mentioned, return null. Do NOT guess.
+# - Mark confidence "low" for inferred fields.
+# - category_id must be a UUID from the provided category list. If you cannot match, return null."""
 
 # Helpers
 def validate_and_clean(parsed: dict, categories: list[dict]) -> dict:

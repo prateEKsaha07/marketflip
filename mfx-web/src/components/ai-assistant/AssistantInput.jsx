@@ -2,10 +2,10 @@ import { Loader2, Wand2, Sparkles } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 
 const EXAMPLE_PROMPTS = [
+  "how many bids do I have?",
+  "which request expires soonest?",
   "used mountain bike under 8000, urgent, 560001",
-  "iPhone 13 around 40k, flexible timing",
-  "2 dining chairs, budget 5k-8k, Bangalore",
-  "study table by this weekend",
+  "iPhone 13 around 40k",
 ];
 
 export default function AssistantInput({
@@ -29,20 +29,19 @@ export default function AssistantInput({
       <div className="flex items-start gap-2 text-xs text-gray-500">
         <Sparkles size={14} className="text-indigo-400 flex-shrink-0 mt-0.5" />
         <p>
-          Describe what you want in your own words. Include{" "}
+          Ask a question about your requests or bids, or describe something
+          you want to buy. Be specific —{" "}
           <span className="text-gray-700 font-medium">item</span>,{" "}
           <span className="text-gray-700 font-medium">budget</span>,{" "}
-          <span className="text-gray-700 font-medium">pincode</span>, and{" "}
-          <span className="text-gray-700 font-medium">how soon</span> you need
-          it. The more detail, the better the match.
+          <span className="text-gray-700 font-medium">pincode</span>.
         </p>
       </div>
 
-      {/* Textarea with richer placeholder */}
+      {/* Textarea */}
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={`e.g. "Looking for a used mountain bike under ₹8,000 in 560001. Need it urgently."`}
+        placeholder={`Ask "how many bids do I have?" or describe what you want to buy…`}
         rows={5}
         disabled={isParsing}
         className="w-full resize-none rounded-xl border border-gray-200
@@ -103,7 +102,7 @@ export default function AssistantInput({
         </motion.div>
       )}
 
-      {/* Parse button */}
+      {/* Submit button — label changes based on question vs create intent */}
       <div className="flex justify-end">
         <button
           onClick={onParse}
@@ -118,11 +117,11 @@ export default function AssistantInput({
           {isParsing ? (
             <>
               <Loader2 size={16} className="animate-spin" />
-              <span>Parsing…</span>
+              <span>Thinking…</span>
             </>
           ) : (
             <>
-              <span>Parse</span>
+              <span>Ask</span>
               <Wand2 size={16} />
             </>
           )}

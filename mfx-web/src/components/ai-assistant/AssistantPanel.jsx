@@ -2,9 +2,20 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Sparkles, X } from "lucide-react";
 
-import { parseRequest } from "../../api/client";
+import { parseRequest, askQuestion } from "../../api/client";
 import AssistantInput from "./AssistantInput";
 import AssistantPreview from "./AssistantPreview";
+import AssistantAnswer from "./AssistantAnswer";
+
+const looksLikeQuestion = (text) => {
+  const t = text.toLowerCase().trim();
+  if (t.endsWith("?")) return true;
+  const starters = [
+    "how", "what", "which", "when", "where", "who", "why",
+    "show", "list", "tell me", "do i", "have i", "did i",
+  ];
+  return starters.some((w) => t.startsWith(w));
+};
 
 export default function AssistantPanel({ isOpen, onClose }) {
   const reduceMotion = useReducedMotion();
@@ -15,22 +26,19 @@ export default function AssistantPanel({ isOpen, onClose }) {
   const [lowConf, setLowConf] = useState([]);
   const [logId, setLogId] = useState(null);
   const [error, setError] = useState(null);
+  const [answerResult, setAnswerResult] = useState(null);
 
-  // Esc to close + lock body scroll
   useEffect(() => {
     if (!isOpen) return;
-
     const onKey = (e) => {
       if (e.key === "Escape") handleClose();
     };
     window.addEventListener("keydown", onKey);
-
-    const prevOverflow = document.body.style.overflow;
+    const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
+      document.body.style.overflow = prev;
     };
   }, [isOpen]);
 
@@ -53,6 +61,34 @@ export default function AssistantPanel({ isOpen, onClose }) {
     }
   };
 
+  const handleAsk = async () => {
+    setState("asking");
+    setError(null);
+    try {
+      const result = await askQuestion(text);
+      setAnswerResult({
+        question: text,
+        answer: result.answer,
+        logId: result.log_id,
+      });
+      setState("answered");
+    } catch (err) {
+      const msg =
+        err?.response?.data?.detail ||
+        "Couldn't get an answer. Please try again.";
+      setError(typeof msg === "string" ? msg : "Ask failed");
+      setState("idle");
+    }
+  };
+
+  const handleSubmit = () => {
+    if (looksLikeQuestion(text)) {
+      handleAsk();
+    } else {
+      handleParse();
+    }
+  };
+
   const handleReset = () => {
     setState("idle");
     setText("");
@@ -61,6 +97,7 @@ export default function AssistantPanel({ isOpen, onClose }) {
     setLowConf([]);
     setLogId(null);
     setError(null);
+    setAnswerResult(null);
   };
 
   const handleClose = () => {
@@ -72,7 +109,6 @@ export default function AssistantPanel({ isOpen, onClose }) {
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop blur — delayed + pulse-in */}
           <motion.div
             key="backdrop"
             className="fixed inset-0 z-[55] pointer-events-auto"
@@ -80,10 +116,7 @@ export default function AssistantPanel({ isOpen, onClose }) {
             animate={{
               opacity: [0, 1, 0.92, 1],
               backdropFilter: [
-                "blur(0px)",
-                "blur(14px)",
-                "blur(10px)",
-                "blur(12px)",
+                "blur(0px)", "blur(14px)", "blur(10px)", "blur(12px)",
               ],
               backgroundColor: [
                 "rgba(255,252,225,0)",
@@ -107,22 +140,13 @@ export default function AssistantPanel({ isOpen, onClose }) {
             aria-hidden="true"
           />
 
-          {/* Panel */}
           <motion.div
             key="panel"
             role="dialog"
             aria-label="AI assistant"
-            initial={
-              reduceMotion
-                ? { opacity: 1 }
-                : { opacity: 0, y: 20, scale: 0.98 }
-            }
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 20, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={
-              reduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, y: 20, scale: 0.98 }
-            }
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 20, scale: 0.98 }}
             transition={{
               duration: reduceMotion ? 0 : 0.22,
               delay: 0.08,
@@ -136,11 +160,7 @@ export default function AssistantPanel({ isOpen, onClose }) {
           >
             <header className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
               <motion.span
-                animate={
-                  reduceMotion
-                    ? {}
-                    : { rotate: [0, 10, 0], scale: [1, 1.1, 1] }
-                }
+                animate={reduceMotion ? {} : { rotate: [0, 10, 0], scale: [1, 1.1, 1] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                 className="text-indigo-500"
               >
@@ -160,14 +180,20 @@ export default function AssistantPanel({ isOpen, onClose }) {
             </header>
 
             <div className="overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {state === "idle" || state === "parsing" ? (
+              {state === "idle" || state === "parsing" || state === "asking" ? (
                 <AssistantInput
                   text={text}
                   setText={setText}
-                  onParse={handleParse}
-                  isParsing={state === "parsing"}
+                  onParse={handleSubmit}
+                  isParsing={state === "parsing" || state === "asking"}
                   error={error}
-                  onRetry={handleParse}
+                  onRetry={handleSubmit}
+                />
+              ) : state === "answered" && answerResult ? (
+                <AssistantAnswer
+                  question={answerResult.question}
+                  answer={answerResult.answer}
+                  onAskAnother={handleReset}
                 />
               ) : (
                 <AssistantPreview
