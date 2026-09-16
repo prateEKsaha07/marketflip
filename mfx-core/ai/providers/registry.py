@@ -6,23 +6,27 @@ import logging
 
 from . import requests as requests_provider
 from . import bids as bids_provider
+from . import shop_auctions as shop_auctions_provider
 
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# To add a new provider (e.g., auctions):
-#   1. Create ai/providers/auctions.py with the standard contract
+# To add a new provider:
+#   1. Create ai/providers/<name>.py with the standard contract
 #   2. Import it above
 #   3. Add it to ALL_PROVIDERS below
 # No changes needed in qa.py, routes.py, or the frontend.
 # ============================================================
 
 ALL_PROVIDERS = [
+    # buyer-side
     requests_provider,
     bids_provider,
-    # auctions_provider,   # phase 3.2
-    # purchases_provider,  # phase 3.3
-    # chats_provider,      # phase 3.4
+    # shop-side
+    shop_auctions_provider,
+    # future
+    # shop_bids_provider,       # phase 3.3
+    # shop_reliability_provider,# phase 3.4
 ]
 
 # keyword → provider lookup, built once
@@ -47,7 +51,6 @@ def pick_providers(question: str, role: str = "buyer") -> list:
     # fallback: no keyword matched → fetch everything for this role
     if not matched:
         matched = [p for p in ALL_PROVIDERS if p.ROLE in (role, "both")]
-
         for p in matched:
             seen.add(p.PROVIDER_NAME)
 
@@ -80,30 +83,40 @@ def fetch_context(question: str, user_id: str, role: str = "buyer"):
 
 # -------------------------------------------------
 # standalone test
-#   python -m ai.providers.registry <buyer_uuid> "<question>"
-#   or set TEST_BUYER_ID / TEST_QUESTION and run:
-#   python -m ai.providers.registry
+#   python -m ai.providers.registry <user_uuid> "<question>" [role]
+#   role defaults to "buyer" — pass "shop_owner" to test shop providers
+#
+#   Examples:
+#     python -m ai.providers.registry <buyer_uuid> "how many bids do I have?"
+#     python -m ai.providers.registry <shop_uuid> "how's my bike auction going?" shop_owner
 
-TEST_BUYER_ID = ""                                   # ← optional
+TEST_USER_ID = ""                                    # ← optional
 TEST_QUESTION = "how many bids do I have?"           # ← optional
+TEST_ROLE = "buyer"                                  # ← "buyer" or "shop_owner"
 
 if __name__ == "__main__":
     import sys
     import json
 
     if len(sys.argv) > 2:
-        buyer_id, question = sys.argv[1], sys.argv[2]
+        user_id = sys.argv[1]
+        question = sys.argv[2]
+        role = sys.argv[3] if len(sys.argv) > 3 else TEST_ROLE
     else:
-        buyer_id, question = TEST_BUYER_ID, TEST_QUESTION
+        user_id = TEST_USER_ID
+        question = TEST_QUESTION
+        role = TEST_ROLE
 
-    if not buyer_id:
-        print('Usage: python -m ai.providers.registry <buyer_uuid> "<question>"')
-        print("   or: set TEST_BUYER_ID and TEST_QUESTION at the top of this file")
+    if not user_id:
+        print('Usage: python -m ai.providers.registry <user_uuid> "<question>" [role]')
+        print('   role is optional, defaults to "buyer"')
+        print('   Example: python -m ai.providers.registry <uuid> "how many bids?" shop_owner')
         sys.exit(1)
 
     print(f"Question: {question}")
-    print(f"Buyer:    {buyer_id}\n")
+    print(f"User:     {user_id}")
+    print(f"Role:     {role}\n")
 
-    context, used = fetch_context(question, buyer_id)
+    context, used = fetch_context(question, user_id, role=role)
     print(f"Providers used: {used}\n")
     print(json.dumps(context, indent=2, default=str))

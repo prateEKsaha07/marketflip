@@ -79,15 +79,24 @@ async def ask_endpoint(
     payload: AskIn,
     current_user: dict = Depends(get_current_user),
 ):
-    """Answer a quick question about the buyer's data (buyer only)."""
-    if current_user.get("role") != "buyer":
-        raise HTTPException(status_code=403, detail="Only buyers can ask questions")
+    """Answer a quick question about the user's data (buyer or shop)."""
+    role = current_user.get("role")
 
-    if not payload.question.strip():
+    if role not in ("buyer", "shop_owner"):
+        raise HTTPException(
+            status_code=403,
+            detail="Only buyers and shop owners can ask questions",
+        )
+
+    if not payload.question or not payload.question.strip():
         raise HTTPException(status_code=400, detail="Question is required")
 
     try:
-        result = ask_question(payload.question, current_user["id"])
+        result = ask_question(
+            payload.question,
+            current_user["id"],
+            role=role,
+        )
         return result
     except RuntimeError as e:
         logger.error(f"Ask failed: {e}")
@@ -95,5 +104,3 @@ async def ask_endpoint(
     except Exception:
         logger.exception("Unexpected error in ask_endpoint")
         raise HTTPException(status_code=500, detail="Internal error")
-
-

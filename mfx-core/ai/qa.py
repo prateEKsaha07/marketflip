@@ -1,5 +1,6 @@
 """
-Q&A pipeline — asks Gemini a question with the buyer's data as context.
+Q&A pipeline — asks Gemini a question with the user's data as context.
+Supports both buyers and shop owners.
 """
 
 import time
@@ -10,7 +11,11 @@ from google import genai
 from google.genai import types
 from supabase import create_client
 
-from .prompts import QA_SYSTEM_PROMPT, build_qa_prompt
+from .prompts import (
+    QA_SYSTEM_PROMPT,
+    QA_SHOP_SYSTEM_PROMPT,
+    build_qa_prompt,
+)
 from .providers.registry import fetch_context
 
 load_dotenv()
@@ -26,8 +31,15 @@ supabase = create_client(
 MODEL = "gemini-3.1-flash-lite"
 
 
+def _system_prompt_for(role: str) -> str:
+    if role == "shop_owner":
+        return QA_SHOP_SYSTEM_PROMPT
+    return QA_SYSTEM_PROMPT
+
+
 def log_ask(
-    buyer_id: str,
+    user_id: str,
+    role: str,
     question: str,
     answer: str | None,
     providers_used: list[str],
@@ -38,7 +50,8 @@ def log_ask(
     tokens_out: int | None = None,
 ) -> str:
     payload = {
-        "buyer_id": buyer_id,
+        "buyer_id": user_id,          # column name kept for backward compat
+        "role": role,
         "question": question,
         "answer": answer,
         "providers_used": providers_used,
@@ -52,17 +65,23 @@ def log_ask(
     return response.data[0]["id"]
 
 
-def ask_question(question: str, buyer_id: str, data_source: str = "live") -> dict:
+def ask_question(
+    question: str,
+    user_id: str,
+    role: str = "buyer",
+    data_source: str = "live",
+) -> dict:
     start = time.perf_counter()
 
-    context, providers_used = fetch_context(question, buyer_id, role="buyer")
+    context, providers_used = fetch_context(question, user_id, role=role)
+    system_prompt = _system_prompt_for(role)
 
     try:
         response = client.models.generate_content(
             model=MODEL,
             contents=build_qa_prompt(question, context),
             config=types.GenerateContentConfig(
-                system_instruction=QA_SYSTEM_PROMPT,
+                system_instruction=system_prompt,
                 temperature=0.2,
                 max_output_tokens=200,
             ),
@@ -70,7 +89,8 @@ def ask_question(question: str, buyer_id: str, data_source: str = "live") -> dic
     except Exception as e:
         latency_ms = int((time.perf_counter() - start) * 1000)
         log_ask(
-            buyer_id=buyer_id,
+            user_id=user_id,
+            role=role,
             question=question,
             answer=None,
             providers_used=providers_used,
@@ -85,7 +105,8 @@ def ask_question(question: str, buyer_id: str, data_source: str = "live") -> dic
 
     usage = response.usage_metadata
     log_id = log_ask(
-        buyer_id=buyer_id,
+        user_id=user_id,
+        role=role,
         question=question,
         answer=answer,
         providers_used=providers_used,
@@ -103,28 +124,30 @@ def ask_question(question: str, buyer_id: str, data_source: str = "live") -> dic
     }
 
 
-# -------------------------------------------------
-# standalone test
-#   python -m ai.qa <buyer_uuid> "<question>"
-#   or set TEST_BUYER_ID / TEST_QUESTION below
-
-TEST_BUYER_ID = ""
+TEST_USER_ID = ""
 TEST_QUESTION = "how many bids do I have?"
+TEST_ROLE = "buyer"
 
 if __name__ == "__main__":
     import sys
 
     if len(sys.argv) > 2:
-        buyer_id, question = sys.argv[1], sys.argv[2]
+        user_id = sys.argv[1]
+        question = sys.argv[2]
+        role = sys.argv[3] if len(sys.argv) > 3 else TEST_ROLE
     else:
-        buyer_id, question = TEST_BUYER_ID, TEST_QUESTION
+        user_id = TEST_USER_ID
+        question = TEST_QUESTION
+        role = TEST_ROLE
 
-    if not buyer_id:
-        print('Usage: python -m ai.qa <buyer_uuid> "<question>"')
+    if not user_id:
+        print('Usage: python -m ai.qa <user_uuid> "<question>" [role]')
         sys.exit(1)
 
-    print(f"Question: {question}\n")
-    result = ask_question(question, buyer_id)
+    print(f"Question: {question}")
+    print(f"Role:     {role}\n")
+
+    result = ask_question(question, user_id, role=role)
     print("Answer:")
     print(result["answer"])
     print(f"\nProviders used: {result['providers_used']}")
