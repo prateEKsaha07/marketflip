@@ -1,22 +1,19 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
-import { Button } from '@/components/ui/button';
 import ModernNavbar from "../../components/ui/Navbar";
 import { 
   ArrowLeft, 
   Package, 
   CheckCircle, 
-  Clock, 
   XCircle,
   AlertCircle,
   Search,
-  DollarSign,
   Eye,
+  EyeOff,
   ChevronRight,
   Loader2,
-  TrendingUp,
   MapPin,
   Truck,
   Store,
@@ -28,12 +25,44 @@ import {
   RefreshCw,
   Home,
   Building2,
-  Star
+  Star,
+  IndianRupee,
+  Trophy,
+  Sparkles,
+  X
 } from 'lucide-react';
 import api from '../../api/client';
 import ReviewModal from '../../components/review/ReviewModal';
 import ReviewBadge from '../../components/review/ReviewBadge';
 import { checkUserReviewed } from '../../api/client';
+
+/* ---------- Small building blocks ---------- */
+const StatusPill = ({ status }) => {
+  const config = (() => {
+    switch (status) {
+      case 'sold':
+        return { cls: 'bg-blue-50 text-blue-700', label: 'Awaiting delivery', Icon: Truck };
+      case 'completed':
+        return { cls: 'bg-emerald-50 text-emerald-700', label: 'Completed', Icon: CheckCircle };
+      default:
+        return { cls: 'bg-[#F8F6F0] text-[#4A4A5A]', label: status, Icon: AlertCircle };
+    }
+  })();
+  const { cls, label, Icon } = config;
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium ${cls}`}>
+      <Icon size={8} />
+      {label}
+    </span>
+  );
+};
+
+const MetaLine = ({ icon: Icon, children, accent = '' }) => (
+  <span className={`inline-flex items-center gap-1 text-[10px] ${accent || 'text-[#A0A0B0]'}`}>
+    <Icon size={9} className="flex-shrink-0" />
+    <span className="truncate">{children}</span>
+  </span>
+);
 
 const MyWonAuctions = () => {
   const navigate = useNavigate();
@@ -51,146 +80,105 @@ const MyWonAuctions = () => {
   const [deliveryAddresses, setDeliveryAddresses] = useState({});
   const [deliveryMethods, setDeliveryMethods] = useState({});
 
-  // Review states
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedReviewTarget, setSelectedReviewTarget] = useState(null);
   const [reviewCheckStatus, setReviewCheckStatus] = useState({});
   const [reviewStats, setReviewStats] = useState({});
 
-  // Get user's won auctions from all auctions
+  // Ref map for auto-focusing the address textarea per auction
+  const addressRefs = useRef({});
+
   const filteredAuctions = useMemo(() => {
     let filtered = [...auctions];
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(a => a.status === statusFilter);
-    }
-
+    if (statusFilter !== 'all') filtered = filtered.filter(a => a.status === statusFilter);
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(a => 
-        a.item_name.toLowerCase().includes(query) ||
-        (a.description && a.description.toLowerCase().includes(query))
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(a =>
+        a.item_name.toLowerCase().includes(q) ||
+        (a.description && a.description.toLowerCase().includes(q))
       );
     }
-
-    if (categoryFilter) {
-      filtered = filtered.filter(a => a.category === categoryFilter);
-    }
-
+    if (categoryFilter) filtered = filtered.filter(a => a.category === categoryFilter);
     filtered.sort((a, b) => new Date(b.closed_at || b.created_at) - new Date(a.closed_at || a.created_at));
     return filtered;
   }, [auctions, statusFilter, searchQuery, categoryFilter]);
 
-  // Fetch won auctions on mount
-  useEffect(() => {
-    fetchWonAuctions();
-  }, []);
+  useEffect(() => { fetchWonAuctions(); }, []);
 
-  // Fetch won auctions from API
   const fetchWonAuctions = async () => {
     setLoading(true);
     setError('');
     try {
-      // Fetch all auctions and filter for won ones
       const response = await api.get('/auctions?status=all');
       const allAuctions = response.data || [];
-      
-      // Filter auctions where current user is the winner (current_highest_bidder)
-      const won = allAuctions.filter(a => 
-        a.current_highest_bidder === user?.id && 
+      const won = allAuctions.filter(a =>
+        a.current_highest_bidder === user?.id &&
         ['sold', 'completed'].includes(a.status)
       );
       setAuctions(won);
-
-      // Check review status for completed auctions
       for (const auction of won) {
         if (auction.status === 'completed' && auction.shop_id) {
           await checkReviewStatusForCompleted(auction.id, auction.shop_id);
         }
       }
     } catch (err) {
-      console.error('Fetch won auctions error:', err);
       setError('Failed to load won auctions: ' + (err.response?.data?.detail || err.message));
     } finally {
       setLoading(false);
     }
   };
 
-  // ===== Review Functions =====
   const checkReviewStatusForCompleted = async (auctionId, reviewedId) => {
     try {
       const response = await checkUserReviewed('auction', auctionId);
-      setReviewCheckStatus(prev => ({
-        ...prev,
-        [auctionId]: response.data
-      }));
-      
-      // Also fetch review stats for the shop
+      setReviewCheckStatus(prev => ({ ...prev, [auctionId]: response.data }));
       if (reviewedId) {
         const statsResponse = await api.get(`/reviews/stats/${reviewedId}`);
-        setReviewStats(prev => ({
-          ...prev,
-          [reviewedId]: statsResponse.data
-        }));
+        setReviewStats(prev => ({ ...prev, [reviewedId]: statsResponse.data }));
       }
-    } catch (err) {
-      console.error('Failed to check review status:', err);
-    }
+    } catch (err) {}
   };
 
   const handleReviewSuccess = (auctionId) => {
-    // Update the review check status to hide the review button
-    setReviewCheckStatus(prev => ({
-      ...prev,
-      [auctionId]: { has_reviewed: true }
-    }));
-    
-    // Refresh stats for the shop
+    setReviewCheckStatus(prev => ({ ...prev, [auctionId]: { has_reviewed: true } }));
     const auction = auctions.find(a => a.id === auctionId);
     if (auction?.shop_id) {
       api.get(`/reviews/stats/${auction.shop_id}`)
-        .then(res => {
-          setReviewStats(prev => ({
-            ...prev,
-            [auction.shop_id]: res.data
-          }));
-        })
-        .catch(console.error);
+        .then(res => setReviewStats(prev => ({ ...prev, [auction.shop_id]: res.data })))
+        .catch(() => {});
+    }
+  };
+
+  const handleSelectDeliveryMethod = (auctionId, method) => {
+    setDeliveryMethods(prev => ({ ...prev, [auctionId]: method }));
+    setError('');
+
+    if (method === 'home_delivery') {
+      setTimeout(() => {
+        addressRefs.current[auctionId]?.focus();
+      }, 220);
     }
   };
 
   const handleSetDeliveryMethod = async (auctionId) => {
     const method = deliveryMethods[auctionId] || '';
     const address = deliveryAddresses[auctionId] || '';
-
-    if (!method) {
-      setError('Please select a delivery method');
-      return;
-    }
-
+    if (!method) { setError('Please select a delivery method'); return; }
     if (method === 'home_delivery' && !address.trim()) {
-      setError('Please enter your delivery address');
-      return;
+      setError('Please enter your delivery address'); return;
     }
-
     setActionLoading(auctionId);
-    setError('');
-    setSuccessMessage('');
-    
+    setError(''); setSuccessMessage('');
     try {
       const response = await api.patch(`/auctions/${auctionId}/delivery`, {
         delivery_method: method,
         delivery_address: method === 'home_delivery' ? address : null
       });
-      
-      if (response.data.verification_code) {
-        setSuccessMessage(`Delivery method set! OTP: ${response.data.verification_code}`);
-      } else {
-        setSuccessMessage('Delivery method set successfully!');
-      }
+      setSuccessMessage(response.data.verification_code
+        ? `Delivery set · OTP: ${response.data.verification_code}`
+        : 'Delivery method set');
       await fetchWonAuctions();
     } catch (err) {
-      console.error('Set delivery method error:', err);
       setError('Failed to set delivery method: ' + (err.response?.data?.detail || err.message));
     } finally {
       setActionLoading(null);
@@ -198,20 +186,31 @@ const MyWonAuctions = () => {
   };
 
   const handleSwitchToPickup = async (auctionId) => {
-    if (!window.confirm('Switch to pickup? The shop will need to verify the OTP in person.')) return;
-    
+    if (!window.confirm('Switch to pickup? The shop will verify the OTP in person.')) return;
     setActionLoading(auctionId);
-    setError('');
-    setSuccessMessage('');
+    setError(''); setSuccessMessage('');
     try {
       const response = await api.patch(`/auctions/${auctionId}/switch-to-pickup`);
       if (response.data.verification_code) {
-        setSuccessMessage(`Switched to pickup! OTP: ${response.data.verification_code}`);
+        setSuccessMessage(`Switched to pickup · OTP: ${response.data.verification_code}`);
       }
       await fetchWonAuctions();
     } catch (err) {
-      console.error('Switch to pickup error:', err);
       setError('Failed to switch to pickup: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleOverrideComplete = async (auctionId) => {
+    if (!window.confirm('Override completion? This will mark the transaction as complete.')) return;
+    setActionLoading(auctionId);
+    try {
+      await api.patch(`/auctions/${auctionId}/override-complete`);
+      setSuccessMessage('Transaction completed via override');
+      await fetchWonAuctions();
+    } catch (err) {
+      setError('Failed to override: ' + (err.response?.data?.detail || err.message));
     } finally {
       setActionLoading(null);
     }
@@ -219,63 +218,23 @@ const MyWonAuctions = () => {
 
   const handleCopyOtp = (auctionId, code) => {
     navigator.clipboard.writeText(code);
-    setOtpCopied({ ...otpCopied, [auctionId]: true });
-    setTimeout(() => {
-      setOtpCopied({ ...otpCopied, [auctionId]: false });
-    }, 2000);
+    setOtpCopied(prev => ({ ...prev, [auctionId]: true }));
+    setTimeout(() => setOtpCopied(prev => ({ ...prev, [auctionId]: false })), 2000);
   };
 
   const toggleOtpVisibility = (auctionId) => {
-    setOtpVisible({ ...otpVisible, [auctionId]: !otpVisible[auctionId] });
-  };
-
-  const getStatusBadge = (status) => {
-    switch(status) {
-      case 'sold': 
-        return { 
-          bg: 'bg-blue-100', 
-          text: 'text-blue-700', 
-          label: 'Awaiting Delivery', 
-          icon: <Truck size={12} />,
-          dot: 'bg-blue-500'
-        };
-      case 'completed': 
-        return { 
-          bg: 'bg-emerald-100', 
-          text: 'text-emerald-700', 
-          label: 'Completed', 
-          icon: <CheckCircle size={12} />,
-          dot: 'bg-emerald-500'
-        };
-      default: 
-        return { 
-          bg: 'bg-gray-100', 
-          text: 'text-gray-700', 
-          label: status, 
-          icon: <AlertCircle size={12} />,
-          dot: 'bg-gray-500'
-        };
-    }
+    setOtpVisible(prev => ({ ...prev, [auctionId]: !prev[auctionId] }));
   };
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: { staggerChildren: 0.05 }
-    }
+    visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
   };
-
   const itemVariants = {
-    hidden: { opacity: 0, y: 12 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: { duration: 0.3, ease: "easeOut" }
-    }
+    hidden: { opacity: 0, y: 8 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } }
   };
 
-  // Get counts for filter tabs
   const counts = {
     all: auctions.length,
     sold: auctions.filter(a => a.status === 'sold').length,
@@ -284,25 +243,23 @@ const MyWonAuctions = () => {
 
   const statusTabs = [
     { id: 'all', label: 'All', count: counts.all },
-    { id: 'sold', label: 'Awaiting Delivery', count: counts.sold },
+    { id: 'sold', label: 'Awaiting', count: counts.sold },
     { id: 'completed', label: 'Completed', count: counts.completed },
   ];
 
-  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 size={24} className="animate-spin text-[#1A1A2E]" />
-          <p className="text-xs text-[#A0A0B0]">Loading your won auctions...</p>
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 size={20} className="animate-spin text-[#1A1A2E]" />
+          <p className="text-[11px] text-[#A0A0B0]">Loading won auctions…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
-      {/* Modern Reusable Navbar */}
+    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-3 sm:p-4 md:p-6 pb-20 md:pb-6">
       <ModernNavbar
         navItems={[
           { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
@@ -311,148 +268,138 @@ const MyWonAuctions = () => {
           { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
           { name: "History", path: "/buyer/history", icon: "History" },
         ]}
-        logo={{
-          src: "/Logo.png",
-          alt: "MarketFlip",
-          link: "/buyer/dashboard",
-        }}
+        logo={{ src: "/Logo.png", alt: "MarketFlip", link: "/buyer/dashboard" }}
         showProfile={true}
         showLogout={true}
         showNotifications={true}
-        logoutButton={{
-          label: "Logout",
-          icon: "LogOut",
-          onClick: () => {
-            // Your logout logic here
-          }
-        }}
-        profileButton={{
-          label: "Profile",
-          path: "/buyer/profile",
-          icon: "User"
-        }}
+        logoutButton={{ label: "Logout", icon: "LogOut", onClick: () => {} }}
+        profileButton={{ label: "Profile", path: "/buyer/profile", icon: "User" }}
       />
 
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <motion.div 
+      <div className="max-w-4xl mx-auto">
+        {/* Back */}
+        <motion.button
+          initial={{ opacity: 0, x: -6 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3 }}
+          whileTap={{ scale: 0.94 }}
+          onClick={() => navigate('/buyer/auctions')}
+          className="flex items-center gap-1.5 mb-3 -ml-1 px-2 py-1.5 text-[11px] text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors rounded-lg hover:bg-[#F5F3EF]"
+        >
+          <ArrowLeft size={12} />
+          Back to auctions
+        </motion.button>
+
+        {/* Hero */}
+        <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="flex flex-wrap justify-between items-center gap-3 mb-6"
+          transition={{ duration: 0.4 }}
+          className="relative overflow-hidden rounded-2xl mb-3 sm:mb-4 p-4 bg-gradient-primary bg-[length:200%_200%] animate-gradient"
         >
-          <div className="flex items-center gap-3">
-            <Button 
-              onClick={() => navigate('/buyer/auctions')}
-              variant="ghost"
-              className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
-            >
-              <ArrowLeft size={14} className="mr-1.5" />
-              Dashboard
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold text-[#1A1A2E] flex items-center gap-2">
-                <Trophy size={20} className="text-[#FFBE91]" />
-                My Won Auctions
-              </h1>
-              <p className="text-xs text-[#A0A0B0] mt-0.5">
-                {auctions.length} won auctions · {counts.sold} awaiting delivery
+          <motion.div
+            animate={{ x: [0, 25, 0], y: [0, -18, 0] }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute -top-16 -right-12 w-48 h-48 rounded-full bg-lightCream/70 blur-3xl pointer-events-none"
+          />
+          <div className="relative flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/50 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+              <Trophy size={18} className="text-[#1A1A2E]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-[15px] font-bold text-[#1A1A2E] truncate">Won Auctions</h1>
+              <p className="text-[10px] text-[#1A1A2E]/70 mt-0.5 truncate">
+                {counts.all} won · {counts.sold} awaiting · {counts.completed} completed
               </p>
             </div>
           </div>
-          <Button 
-            onClick={() => navigate('/buyer/auctions/browse')}
-            className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-4 py-1.5 h-auto flex items-center gap-1.5"
-          >
-            <Store size={14} />
-            Browse More
-          </Button>
         </motion.div>
 
-        {/* Success/Error Messages */}
-        {successMessage && (
-          <div className="bg-emerald-50/80 backdrop-blur-sm rounded-lg p-3 mb-4 text-emerald-700 text-xs flex items-center gap-2 border border-emerald-100">
-            <CheckCircle size={14} />
-            {successMessage}
-            <button 
-              onClick={() => setSuccessMessage('')}
-              className="ml-auto text-emerald-500 hover:text-emerald-700"
+        {/* Messages */}
+        <AnimatePresence>
+          {successMessage && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: 'auto', marginBottom: 10 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              className="p-2.5 bg-emerald-50 rounded-2xl flex items-start gap-2 overflow-hidden"
             >
-              ×
-            </button>
-          </div>
-        )}
+              <CheckCircle size={13} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+              <p className="text-[11px] font-medium text-emerald-700 flex-1 break-words">
+                {successMessage}
+              </p>
+              <button onClick={() => setSuccessMessage('')} className="text-emerald-500 hover:text-emerald-700 flex-shrink-0 p-0.5">
+                <X size={11} />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {error && (
-          <div className="bg-rose-50/80 backdrop-blur-sm rounded-lg p-3 mb-4 text-rose-700 text-xs flex items-center gap-2 border border-rose-100">
-            <AlertCircle size={14} />
-            {error}
-            <button 
-              onClick={() => setError('')}
-              className="ml-auto text-rose-500 hover:text-rose-700"
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: 'auto', marginBottom: 10 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              className="p-2.5 bg-rose-50 rounded-2xl flex items-start gap-2 overflow-hidden"
             >
-              ×
-            </button>
-          </div>
-        )}
+              <AlertCircle size={13} className="text-rose-600 flex-shrink-0 mt-0.5" />
+              <p className="text-[11px] font-medium text-rose-600 flex-1 break-words">{error}</p>
+              <button onClick={() => setError('')} className="text-rose-500 hover:text-rose-700 flex-shrink-0 p-0.5">
+                <X size={11} />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Status Filter Tabs */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
+        {/* Tabs + search inline */}
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="flex flex-wrap gap-1 mb-4 bg-white/60 backdrop-blur-sm p-1 rounded-xl border border-[#EEECE6]"
+          className="flex flex-col sm:flex-row gap-2 mb-3"
         >
-          {statusTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setStatusFilter(tab.id)}
-              className={`
-                flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all text-xs font-medium
-                ${statusFilter === tab.id 
-                  ? 'bg-[#FFBE91] text-[#1A1A2E] shadow-md' 
-                  : 'text-[#4A4A5A] hover:text-[#1A1A2E] hover:bg-[#FFDDB0]/30'
-                }
-              `}
-            >
-              {tab.label}
-              <span className={`
-                ml-1 px-1.5 py-0.5 rounded-full text-[9px]
-                ${statusFilter === tab.id 
-                  ? 'bg-[#1A1A2E]/10 text-[#1A1A2E]' 
-                  : 'bg-[#FFDDB0]/30 text-[#4A4A5A]'
-                }
-              `}>
-                {tab.count}
-              </span>
-            </button>
-          ))}
-        </motion.div>
-
-        {/* Search & Filter */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="flex flex-wrap gap-2 mb-4"
-        >
-          <div className="flex-1 min-w-[150px] relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
-            <input
-              type="text"
-              placeholder="Search won auctions..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs bg-white/80 border border-[#EEECE6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
-            />
+          <div className="flex gap-1 p-1 bg-white/70 backdrop-blur-xl rounded-2xl overflow-x-auto flex-shrink-0">
+            {statusTabs.map((tab) => {
+              const active = statusFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-medium transition-all min-w-fit ${
+                    active ? 'bg-[#1A1A2E] text-white' : 'text-[#A0A0B0] hover:text-[#4A4A5A]'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${
+                    active ? 'bg-white/20 text-white' : 'bg-[#F8F6F0] text-[#A0A0B0]'
+                  }`}>{tab.count}</span>
+                </button>
+              );
+            })}
           </div>
-          <div className="w-40">
+          <div className="flex-1 flex items-center gap-2">
+            <div className="flex-1 relative">
+              <Search size={11} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
+              <input
+                type="text"
+                placeholder="Search…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-8 py-1.5 text-[11px] bg-white/70 backdrop-blur-xl border-0 rounded-full text-[#1A1A2E] placeholder-[#A0A0B0] focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/40 transition-all"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A0A0B0]">
+                  <X size={10} />
+                </button>
+              )}
+            </div>
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs bg-white/80 border border-[#EEECE6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all appearance-none"
+              className="px-2.5 py-1.5 text-[10px] bg-white/70 backdrop-blur-xl border-0 rounded-full text-[#1A1A2E] focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/40 appearance-none max-w-[110px]"
             >
-              <option value="">All Categories</option>
+              <option value="">All</option>
               <option value="electronics">Electronics</option>
               <option value="furniture">Furniture</option>
               <option value="clothing">Clothing</option>
@@ -461,62 +408,48 @@ const MyWonAuctions = () => {
               <option value="vehicles">Vehicles</option>
               <option value="other">Other</option>
             </select>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={fetchWonAuctions}
+              className="p-1.5 text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors rounded-full hover:bg-[#F5F3EF] flex-shrink-0"
+            >
+              <RefreshCw size={12} />
+            </motion.button>
           </div>
-          <Button
-            onClick={() => {
-              setSearchQuery('');
-              setCategoryFilter('');
-              setStatusFilter('all');
-            }}
-            variant="ghost"
-            className="text-[#A0A0B0] hover:text-[#1A1A2E] text-xs px-3 py-2 h-auto"
-          >
-            Clear
-          </Button>
-          <Button
-            onClick={fetchWonAuctions}
-            variant="ghost"
-            className="text-[#A0A0B0] hover:text-[#1A1A2E] text-xs px-3 py-2 h-auto"
-          >
-            <RefreshCw size={13} className="mr-1" />
-            Refresh
-          </Button>
         </motion.div>
 
-        {/* Auctions List */}
+        {/* List */}
         {filteredAuctions.length === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white/60 backdrop-blur-xl rounded-xl p-8 text-center shadow-sm border border-[#EEECE6]"
+            className="bg-white/70 backdrop-blur-xl rounded-2xl p-8 text-center"
           >
-            <div className="w-12 h-12 rounded-xl bg-[#F5F3EF] flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 rounded-2xl bg-[#F8F6F0] flex items-center justify-center mx-auto mb-3">
               <Trophy size={20} className="text-[#A0A0B0]" />
             </div>
-            <h3 className="text-sm font-medium text-[#1A1A2E]">No won auctions</h3>
-            <p className="text-xs text-[#A0A0B0] mt-1">
+            <h3 className="text-[12px] font-medium text-[#1A1A2E]">No won auctions</h3>
+            <p className="text-[10px] text-[#A0A0B0] mt-0.5">
               {statusFilter === 'all' ? 'Your won auctions will appear here' : `No ${statusFilter} auctions`}
             </p>
-            <Button 
+            <motion.button
+              whileTap={{ scale: 0.95 }}
               onClick={() => navigate('/buyer/auctions/browse')}
-              className="mt-3 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-4 py-1.5 h-auto"
+              className="mt-3 inline-flex items-center gap-1.5 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-[11px] font-medium px-4 py-2 rounded-xl transition-colors"
             >
-              <Store size={13} className="mr-1.5" />
+              <Store size={11} />
               Browse Auctions
-            </Button>
+            </motion.button>
           </motion.div>
         ) : (
-          <motion.div 
+          <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="space-y-4"
+            className="space-y-2.5"
           >
             {filteredAuctions.map((auction) => {
-              const status = getStatusBadge(auction.status);
-              const firstImage = auction.image_urls && auction.image_urls.length > 0 
-                ? auction.image_urls[0] 
-                : null;
+              const firstImage = auction.image_urls?.[0];
               const isSold = auction.status === 'sold';
               const isCompleted = auction.status === 'completed';
               const isActionLoading = actionLoading === auction.id;
@@ -528,360 +461,323 @@ const MyWonAuctions = () => {
               const isOverridden = auction.completed_via_override === true;
               const isOtpVisible = otpVisible[auction.id] || false;
               const isOtpCopied = otpCopied[auction.id] || false;
-              const deliveryMethod = deliveryMethods[auction.id] || auction.delivery_method || '';
-              const deliveryAddress = deliveryAddresses[auction.id] || auction.delivery_address || '';
+              const selectedDelivery = deliveryMethods[auction.id] || '';
 
               return (
                 <motion.div
                   key={auction.id}
                   variants={itemVariants}
-                  className="bg-white/80 backdrop-blur-xl rounded-xl p-4 border border-[#EEECE6] hover:shadow-md transition-all"
+                  className="bg-white/70 backdrop-blur-xl rounded-2xl"
                 >
-                  <div className="flex flex-col gap-4">
-                    {/* Header Row */}
-                    <div className="flex flex-wrap items-start gap-3">
-                      {/* Image */}
-                      {firstImage ? (
-                        <img
-                          src={firstImage}
-                          alt={auction.item_name}
-                          className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-                        />
+                  {/* Top row */}
+                  <div
+                    className="p-3 flex items-start gap-3 cursor-pointer active:bg-[#F8F6F0]/60 transition-colors rounded-t-2xl"
+                    onClick={() => navigate(`/buyer/auctions/${auction.id}`)}
+                  >
+                    {firstImage ? (
+                      <img
+                        src={firstImage}
+                        alt={auction.item_name}
+                        className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-[#F8F6F0] flex items-center justify-center flex-shrink-0">
+                        <Package size={18} className="text-[#A0A0B0]" />
+                      </div>
+                    )}
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <h3 className="text-[12px] font-semibold text-[#1A1A2E] truncate">
+                          {auction.item_name}
+                        </h3>
+                        <StatusPill status={auction.status} />
+                        {isOverridden && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-amber-50 text-amber-700">
+                            <ShieldCheck size={8} />
+                            Override
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5">
+                        <MetaLine icon={IndianRupee} accent="text-emerald-600 font-semibold">
+                          {(auction.current_highest_bid || auction.starting_price)?.toLocaleString('en-IN')}
+                        </MetaLine>
+                        {auction.pincode && <MetaLine icon={MapPin}>{auction.pincode}</MetaLine>}
+                        {auction.delivery_method && (
+                          <MetaLine icon={Truck}>
+                            {auction.delivery_method === 'home_delivery' ? 'Home' : 'Pickup'}
+                          </MetaLine>
+                        )}
+                      </div>
+
+                      <p className="text-[9px] text-[#A0A0B0] mt-1">
+                        Won {new Date(auction.closed_at || auction.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+
+                    <ChevronRight size={14} className="text-[#A0A0B0] flex-shrink-0 mt-1" />
+                  </div>
+
+                  {/* Action bar for sold */}
+                  {isSold && (
+                    <div className="px-3 pb-3">
+                      {!auction.delivery_method ? (
+                        <div className="bg-[#F8F6F0]/70 rounded-xl p-3 space-y-3">
+                          <p className="text-[10px] font-medium text-[#4A4A5A]">
+                            Set delivery method
+                          </p>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 'home_delivery', label: 'Home Delivery', icon: Home },
+                              { value: 'pickup', label: 'Pickup', icon: Building2 },
+                            ].map(({ value, label, icon: Icon }) => {
+                              const active = selectedDelivery === value;
+                              return (
+                                <motion.button
+                                  key={value}
+                                  type="button"
+                                  whileTap={{ scale: 0.97 }}
+                                  onClick={() => handleSelectDeliveryMethod(auction.id, value)}
+                                  className={`flex items-center justify-center gap-1.5 px-3 py-2 text-[10px] rounded-lg transition-all ${
+                                    active
+                                      ? 'bg-[#1A1A2E] text-white font-medium'
+                                      : 'bg-white text-[#4A4A5A] hover:bg-white/90'
+                                  }`}
+                                >
+                                  <Icon size={11} />
+                                  {label}
+                                </motion.button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Address input — no clipping */}
+                          <AnimatePresence initial={false}>
+                            {selectedDelivery === 'home_delivery' && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ duration: 0.2, ease: 'easeOut' }}
+                                className="overflow-hidden"
+                              >
+                                <div className="pt-1">
+                                  <label className="block text-[9px] uppercase tracking-wide text-[#A0A0B0] mb-1.5 ml-0.5">
+                                    Delivery address
+                                  </label>
+                                  <textarea
+                                    ref={(el) => {
+                                      if (el) addressRefs.current[auction.id] = el;
+                                    }}
+                                    value={deliveryAddresses[auction.id] || ''}
+                                    onChange={(e) =>
+                                      setDeliveryAddresses(prev => ({ ...prev, [auction.id]: e.target.value }))
+                                    }
+                                    placeholder="House / street / landmark / city"
+                                    className="block w-full box-border px-3 py-2.5 text-[11px] leading-relaxed bg-white border-0 rounded-lg text-[#1A1A2E] placeholder-[#A0A0B0] focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/40 focus:ring-inset resize-none"
+                                    rows={3}
+                                  />
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+
+                          <motion.button
+                            whileTap={{ scale: 0.97 }}
+                            onClick={() => handleSetDeliveryMethod(auction.id)}
+                            disabled={isActionLoading}
+                            className="w-full flex items-center justify-center gap-1.5 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-[11px] font-medium py-2 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {isActionLoading ? <Loader2 size={12} className="animate-spin" /> : <Truck size={11} />}
+                            Confirm delivery method
+                          </motion.button>
+                        </div>
                       ) : (
-                        <div className="w-16 h-16 rounded-lg bg-[#F8F6F0] flex items-center justify-center flex-shrink-0">
-                          <Package size={24} className="text-[#A0A0B0]" />
+                        <div className="space-y-2.5">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
+                            <span className="flex items-center gap-1 text-[#4A4A5A]">
+                              <Truck size={10} />
+                              <span className="font-medium text-[#1A1A2E]">
+                                {auction.delivery_method === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
+                              </span>
+                            </span>
+                            {auction.delivery_confirmed_by_shop === true && (
+                              <span className="text-emerald-600 font-medium flex items-center gap-1">
+                                <CheckCircle size={9} />
+                                Confirmed
+                              </span>
+                            )}
+                            {auction.delivery_confirmed_by_shop === false && (
+                              <span className="text-rose-600 font-medium flex items-center gap-1">
+                                <XCircle size={9} />
+                                Denied
+                              </span>
+                            )}
+                          </div>
+
+                          {auction.delivery_confirmed_by_shop === false && auction.delivery_method === 'home_delivery' && (
+                            <motion.button
+                              whileTap={{ scale: 0.97 }}
+                              onClick={() => handleSwitchToPickup(auction.id)}
+                              disabled={isActionLoading}
+                              className="w-full flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-medium py-2 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              {isActionLoading ? <Loader2 size={12} className="animate-spin" /> : <Building2 size={11} />}
+                              Switch to Pickup
+                            </motion.button>
+                          )}
+
+                          {(auction.delivery_confirmed_by_shop === true || auction.delivery_method === 'pickup') && hasOtp && (
+                            <div className="bg-violet-50/80 rounded-xl p-2.5">
+                              <div className="flex items-center gap-1.5 mb-1.5">
+                                <Key size={10} className="text-violet-600" />
+                                <span className="text-[9px] font-semibold uppercase tracking-wider text-violet-700">
+                                  OTP
+                                </span>
+                                <span className="text-[9px] text-[#A0A0B0] ml-auto">
+                                  {Math.max(0, attemptsRemaining)} attempts left
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                <div className="flex-1 bg-white rounded-lg py-1.5 px-3">
+                                  <p className="text-[15px] font-bold tracking-[0.35em] text-[#1A1A2E] font-mono text-center">
+                                    {isOtpVisible ? otpCode : '••••••'}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => toggleOtpVisibility(auction.id)}
+                                  className="p-2 bg-white rounded-lg hover:bg-[#F5F3EF] transition-colors"
+                                  aria-label="Toggle OTP visibility"
+                                >
+                                  {isOtpVisible ? <EyeOff size={12} className="text-[#4A4A5A]" /> : <Eye size={12} className="text-[#4A4A5A]" />}
+                                </button>
+                                <button
+                                  onClick={() => handleCopyOtp(auction.id, otpCode)}
+                                  className="p-2 bg-white rounded-lg hover:bg-[#F5F3EF] transition-colors"
+                                  aria-label="Copy OTP"
+                                >
+                                  {isOtpCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} className="text-violet-600" />}
+                                </button>
+                              </div>
+
+                              {attempts >= maxAttempts && (
+                                <div className="mt-2 pt-2 border-t border-violet-100">
+                                  <p className="text-[9px] text-amber-700 flex items-center gap-1 mb-1.5">
+                                    <AlertTriangle size={9} />
+                                    Max attempts reached
+                                  </p>
+                                  <button
+                                    onClick={() => handleOverrideComplete(auction.id)}
+                                    disabled={isActionLoading}
+                                    className="w-full bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-medium py-1.5 rounded-lg transition-colors"
+                                  >
+                                    {isActionLoading ? <Loader2 size={10} className="animate-spin inline" /> : 'Override Completion'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
+                    </div>
+                  )}
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-sm font-medium text-[#1A1A2E]">
-                            {auction.item_name}
-                          </h3>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${status.bg} ${status.text}`}>
-                            {status.icon}
-                            {status.label}
+                  {/* Completed strip */}
+                  {isCompleted && (
+                    <div className="px-3 pb-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 bg-emerald-50/60 rounded-xl p-2.5">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
+                          <span className="flex items-center gap-1 text-emerald-600 font-medium">
+                            <CheckCircle size={10} />
+                            Completed
                           </span>
                           {isOverridden && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">
-                              <ShieldCheck size={12} />
+                            <span className="flex items-center gap-1 text-amber-600">
+                              <ShieldCheck size={9} />
                               Override
                             </span>
                           )}
                         </div>
-                        
-                        <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-[#A0A0B0]">
-                          <span className="flex items-center gap-1">
-                            <DollarSign size={11} />
-                            Won for: ₹{(auction.current_highest_bid || auction.starting_price).toLocaleString()}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <MapPin size={11} />
-                            {auction.pincode}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Package size={11} />
-                            {auction.bid_count || 0} bids
-                          </span>
-                          {auction.delivery_method && (
-                            <span className="flex items-center gap-1 text-[#4A4A5A]">
-                              <Truck size={11} />
-                              {auction.delivery_method === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
+
+                        <div className="flex items-center gap-2">
+                          {auction.shop_id && reviewStats[auction.shop_id] && (
+                            <ReviewBadge
+                              averageRating={reviewStats[auction.shop_id].average_rating}
+                              totalReviews={reviewStats[auction.shop_id].total_reviews}
+                              size="sm"
+                            />
+                          )}
+
+                          {!reviewCheckStatus[auction.id]?.has_reviewed ? (
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const shopName = auction.shop_name || auction.shop?.shop_name || 'the shop';
+                                setSelectedReviewTarget({
+                                  targetType: 'auction',
+                                  targetId: auction.id,
+                                  reviewedId: auction.shop_id,
+                                  reviewedName: shopName
+                                });
+                                setShowReviewModal(true);
+                              }}
+                              className="flex items-center gap-1 px-2.5 py-1 bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E] text-[10px] font-medium rounded-full transition-colors"
+                            >
+                              <Star size={9} className="fill-[#1A1A2E]" />
+                              Review
+                            </motion.button>
+                          ) : (
+                            <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+                              <CheckCircle size={9} />
+                              Reviewed
                             </span>
                           )}
                         </div>
-
-                        <div className="mt-1 text-[10px] text-[#A0A0B0]">
-                          Won on: {new Date(auction.closed_at || auction.created_at).toLocaleString()}
-                        </div>
                       </div>
-
-                      {/* View Button */}
-                      <Button
-                        onClick={() => navigate(`/buyer/auctions/${auction.id}`)}
-                        variant="ghost"
-                        className="text-[#A0A0B0] hover:text-[#1A1A2E] text-xs px-3 py-1 h-auto flex-shrink-0"
-                      >
-                        <Eye size={13} className="mr-1" />
-                        View
-                      </Button>
                     </div>
-
-                    {/* Action Section - Only for Sold auctions */}
-                    {isSold && (
-                      <div className="border-t border-[#EEECE6] pt-3 mt-1">
-                        {/* Delivery Method Selection - Only if not set */}
-                        {!auction.delivery_method ? (
-                          <div className="space-y-3">
-                            <div className="text-xs text-[#4A4A5A] font-medium">
-                              Set your delivery preference:
-                            </div>
-                            <div className="flex flex-wrap gap-4">
-                              <label className="flex items-center gap-2 text-xs cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name={`delivery-${auction.id}`}
-                                  value="home_delivery"
-                                  checked={deliveryMethods[auction.id] === 'home_delivery'}
-                                  onChange={(e) => {
-                                    setDeliveryMethods({ ...deliveryMethods, [auction.id]: e.target.value });
-                                    setError('');
-                                  }}
-                                  className="accent-[#1A1A2E]"
-                                />
-                                <Home size={14} className="text-[#4A4A5A]" />
-                                Home Delivery
-                              </label>
-                              <label className="flex items-center gap-2 text-xs cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name={`delivery-${auction.id}`}
-                                  value="pickup"
-                                  checked={deliveryMethods[auction.id] === 'pickup'}
-                                  onChange={(e) => {
-                                    setDeliveryMethods({ ...deliveryMethods, [auction.id]: e.target.value });
-                                    setError('');
-                                  }}
-                                  className="accent-[#1A1A2E]"
-                                />
-                                <Building2 size={14} className="text-[#4A4A5A]" />
-                                Pickup
-                              </label>
-                            </div>
-
-                            {deliveryMethods[auction.id] === 'home_delivery' && (
-                              <div className="mt-2">
-                                <label className="text-[10px] text-[#A0A0B0] block mb-1">
-                                  Delivery Address *
-                                </label>
-                                <textarea
-                                  value={deliveryAddresses[auction.id] || ''}
-                                  onChange={(e) => setDeliveryAddresses({ ...deliveryAddresses, [auction.id]: e.target.value })}
-                                  placeholder="Enter your full delivery address"
-                                  className="w-full px-3 py-1.5 text-xs bg-white border border-[#EEECE6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all resize-none"
-                                  rows={2}
-                                />
-                              </div>
-                            )}
-
-                            <Button
-                              onClick={() => handleSetDeliveryMethod(auction.id)}
-                              disabled={isActionLoading}
-                              className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-4 py-1.5 h-auto flex items-center gap-1.5"
-                            >
-                              {isActionLoading ? (
-                                <Loader2 size={13} className="animate-spin" />
-                              ) : (
-                                <Truck size={13} />
-                              )}
-                              Set Delivery Method
-                            </Button>
-                          </div>
-                        ) : (
-                          /* Delivery Method Set - Show OTP or Status */
-                          <div>
-                            <div className="flex flex-wrap items-center gap-4">
-                              <div className="flex items-center gap-2 text-xs text-[#4A4A5A]">
-                                <Truck size={14} className="text-[#A0A0B0]" />
-                                <span className="font-medium">Delivery Method:</span>
-                                <span className="text-[#1A1A2E]">
-                                  {auction.delivery_method === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
-                                </span>
-                              </div>
-
-                              {/* Show delivery status */}
-                              {auction.delivery_confirmed_by_shop === true && (
-                                <span className="text-emerald-600 text-xs font-medium flex items-center gap-1">
-                                  <CheckCircle size={12} />
-                                  Confirmed by Shop
-                                </span>
-                              )}
-                              {auction.delivery_confirmed_by_shop === false && (
-                                <span className="text-rose-600 text-xs font-medium flex items-center gap-1">
-                                  <XCircle size={12} />
-                                  Denied by Shop
-                                </span>
-                              )}
-
-                              {/* Show Switch to Pickup button if denied */}
-                              {auction.delivery_confirmed_by_shop === false && auction.delivery_method === 'home_delivery' && (
-                                <Button
-                                  onClick={() => handleSwitchToPickup(auction.id)}
-                                  disabled={isActionLoading}
-                                  variant="ghost"
-                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs px-3 py-1 h-auto"
-                                >
-                                  {isActionLoading ? (
-                                    <Loader2 size={13} className="animate-spin" />
-                                  ) : (
-                                    <Building2 size={13} className="mr-1" />
-                                  )}
-                                  Switch to Pickup
-                                </Button>
-                              )}
-                            </div>
-
-                            {/* OTP Display - Only if delivery confirmed or pickup */}
-                            {(auction.delivery_confirmed_by_shop === true || auction.delivery_method === 'pickup') && hasOtp && (
-                              <div className="mt-3 border-t border-[#EEECE6] pt-3">
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <div className="flex items-center gap-2">
-                                    <Key size={14} className="text-[#A0A0B0]" />
-                                    <span className="text-xs text-[#4A4A5A] font-medium">OTP Code:</span>
-                                    <div 
-                                      className="font-mono text-lg font-bold text-[#1A1A2E] bg-[#F8F6F0] px-3 py-1 rounded-lg select-all"
-                                    >
-                                      {isOtpVisible ? otpCode : '••••••'}
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      onClick={() => toggleOtpVisibility(auction.id)}
-                                      variant="ghost"
-                                      className="text-[#A0A0B0] hover:text-[#1A1A2E] text-xs px-2 py-1 h-auto"
-                                    >
-                                      {isOtpVisible ? 'Hide' : 'Show'}
-                                    </Button>
-                                    <Button
-                                      onClick={() => handleCopyOtp(auction.id, otpCode)}
-                                      variant="ghost"
-                                      className="text-[#A0A0B0] hover:text-[#1A1A2E] text-xs px-2 py-1 h-auto flex items-center gap-1"
-                                    >
-                                      {isOtpCopied ? (
-                                        <Check size={13} className="text-emerald-500" />
-                                      ) : (
-                                        <Copy size={13} />
-                                      )}
-                                      {isOtpCopied ? 'Copied!' : 'Copy'}
-                                    </Button>
-                                  </div>
-
-                                  <div className="text-[10px] text-[#A0A0B0]">
-                                    Attempts remaining: {Math.max(0, attemptsRemaining)}
-                                  </div>
-                                  {attempts >= maxAttempts && (
-                                    <div className="text-[10px] text-amber-600 flex items-center gap-1">
-                                      <AlertTriangle size={12} />
-                                      Max attempts reached. You can override if needed.
-                                      <Button
-                                        onClick={async () => {
-                                          if (window.confirm('Override completion? This will mark the transaction as complete.')) {
-                                            setActionLoading(auction.id);
-                                            try {
-                                              await api.patch(`/auctions/${auction.id}/override-complete`);
-                                              setSuccessMessage('Transaction completed via override!');
-                                              await fetchWonAuctions();
-                                            } catch (err) {
-                                              setError('Failed to override: ' + (err.response?.data?.detail || err.message));
-                                            } finally {
-                                              setActionLoading(null);
-                                            }
-                                          }
-                                        }}
-                                        disabled={isActionLoading}
-                                        className="text-amber-600 hover:text-amber-700 text-xs underline"
-                                      >
-                                        {isActionLoading ? <Loader2 size={12} className="animate-spin" /> : 'Override'}
-                                      </Button>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Completed Section with Review */}
-                    {isCompleted && (
-                      <div className="border-t border-[#EEECE6] pt-3 mt-1">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex flex-wrap items-center gap-3 text-xs">
-                            <span className="flex items-center gap-1.5 text-emerald-600">
-                              <CheckCircle size={14} />
-                              Transaction completed
-                            </span>
-                            {isOverridden && (
-                              <span className="flex items-center gap-1.5 text-amber-600">
-                                <ShieldCheck size={14} />
-                                Completed via override
-                              </span>
-                            )}
-                            {auction.delivery_method && (
-                              <span className="text-[#A0A0B0]">
-                                Delivery: {auction.delivery_method === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Review Section */}
-                          <div className="flex items-center gap-3">
-                            {/* Review Stats */}
-                            {auction.shop_id && reviewStats[auction.shop_id] && (
-                              <ReviewBadge 
-                                averageRating={reviewStats[auction.shop_id].average_rating}
-                                totalReviews={reviewStats[auction.shop_id].total_reviews}
-                                size="sm"
-                              />
-                            )}
-                            
-                            {/* Review Button */}
-                            {!reviewCheckStatus[auction.id]?.has_reviewed ? (
-                              <Button
-                                onClick={() => {
-                                  // Get shop name from auction data
-                                  // Since we don't have shop details in auction object, use auction.shop_id
-                                  // We'll need to fetch shop name or use a placeholder
-                                  const shopName = auction.shop_name || auction.shop?.shop_name || 'the shop';
-                                  setSelectedReviewTarget({
-                                    targetType: 'auction',
-                                    targetId: auction.id,
-                                    reviewedId: auction.shop_id,
-                                    reviewedName: shopName
-                                  });
-                                  setShowReviewModal(true);
-                                }}
-                                size="sm"
-                                className="bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 text-xs px-3 py-1 h-auto"
-                              >
-                                <Star size={12} className="mr-1 fill-yellow-400 text-yellow-400" />
-                                Leave Review
-                              </Button>
-                            ) : (
-                              <span className="text-xs text-green-600 flex items-center gap-1 bg-green-50 px-2 py-1 rounded">
-                                <CheckCircle size={12} />
-                                Reviewed
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </motion.div>
               );
             })}
           </motion.div>
         )}
 
-        {/* Footer Note */}
-        <motion.div 
+        {/* Footer */}
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="mt-4 text-center text-[10px] text-[#A0A0B0]"
+          className="mt-5 text-center px-2"
         >
-          <span className="flex items-center justify-center gap-1">
-            <span className="text-[#FFBE91]">🏆</span>
-            Won auctions require delivery method selection · Keep your OTP code safe for handoff
-          </span>
+          <p className="text-[9px] text-[#A0A0B0] flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 leading-relaxed">
+            <Sparkles size={9} className="text-[#FFBE91] flex-shrink-0" />
+            <span>Set delivery method and share OTP with shop to complete</span>
+          </p>
         </motion.div>
       </div>
 
-      {/* Review Modal */}
+      {/* Mobile sticky CTA */}
+      <motion.div
+        initial={{ y: 60, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.2, type: 'spring', stiffness: 260, damping: 26 }}
+        className="fixed bottom-0 left-0 right-0 md:hidden p-3 bg-white/90 backdrop-blur-xl border-t border-[#EEECE6] z-40"
+      >
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => navigate('/buyer/auctions/browse')}
+          className="w-full flex items-center justify-center gap-2 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-[12px] font-semibold py-2.5 rounded-xl transition-colors"
+        >
+          <Store size={13} />
+          Browse More Auctions
+        </motion.button>
+      </motion.div>
+
       <ReviewModal
         isOpen={showReviewModal}
         onClose={() => {
@@ -893,36 +789,11 @@ const MyWonAuctions = () => {
         reviewedId={selectedReviewTarget?.reviewedId}
         reviewedName={selectedReviewTarget?.reviewedName}
         onSuccess={() => {
-          if (selectedReviewTarget) {
-            handleReviewSuccess(selectedReviewTarget.targetId);
-          }
+          if (selectedReviewTarget) handleReviewSuccess(selectedReviewTarget.targetId);
         }}
       />
     </div>
   );
 };
-
-// Trophy icon (since it's not imported from lucide-react)
-const Trophy = ({ size = 20, className = '' }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width={size} 
-    height={size} 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-    <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-    <path d="M4 22h16" />
-    <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
-    <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-    <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-  </svg>
-);
 
 export default MyWonAuctions;

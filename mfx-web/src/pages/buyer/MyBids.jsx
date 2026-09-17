@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
-import { Button } from '@/components/ui/button';
 import ModernNavbar from "../../components/ui/Navbar";
 import { 
   ArrowLeft, 
@@ -13,7 +12,6 @@ import {
   XCircle,
   AlertCircle,
   Search,
-  DollarSign,
   Eye,
   ChevronRight,
   Loader2,
@@ -21,7 +19,11 @@ import {
   MapPin,
   Store,
   Award,
-  RefreshCw
+  RefreshCw,
+  IndianRupee,
+  X,
+  Crown,
+  Sparkles
 } from 'lucide-react';
 import api from '../../api/client';
 
@@ -34,7 +36,6 @@ const BuyerMyBids = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [error, setError] = useState('');
 
-  // Filter and sort bids
   const filteredBids = useMemo(() => {
     let filtered = [...bids];
 
@@ -50,7 +51,7 @@ const BuyerMyBids = () => {
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(b => 
+      filtered = filtered.filter(b =>
         b.item_name.toLowerCase().includes(query) ||
         (b.description && b.description.toLowerCase().includes(query))
       );
@@ -60,31 +61,24 @@ const BuyerMyBids = () => {
     return filtered;
   }, [bids, statusFilter, searchQuery]);
 
-  // Fetch bids on mount
   useEffect(() => {
     fetchMyBids();
   }, []);
 
-  // Fetch user's bids from API
   const fetchMyBids = async () => {
     setLoading(true);
     setError('');
     try {
-      // Get all auctions
       const response = await api.get('/auctions?status=all');
       const allAuctions = response.data || [];
-      
-      // Get user's bids
+
       const bidsResponse = await api.get('/bids/auction-bids');
       const userBids = bidsResponse.data || [];
-      
-      // Get all auction IDs the user bid on
+
       const auctionIdsWithBids = new Set(userBids.map(b => b.auction_id));
-      
-      // Filter to only auctions the user bid on
+
       let myBidAuctions = allAuctions.filter(a => auctionIdsWithBids.has(a.id));
-      
-      // Enhance with bid info
+
       myBidAuctions = myBidAuctions.map(auction => {
         const userBid = userBids.find(b => b.auction_id === auction.id);
         const isWinner = auction.current_highest_bidder === user?.user_id;
@@ -93,16 +87,16 @@ const BuyerMyBids = () => {
         const isCompleted = auction.status === 'completed';
         const isExpired = auction.status === 'expired';
         const isCancelled = auction.status === 'cancelled';
-        
+
         let statusLabel = 'Bidding';
         if (isCompleted) statusLabel = 'Completed';
-        else if (isSold && isWinner) statusLabel = 'Won - Awaiting Delivery';
-        else if (isSold && !isWinner) statusLabel = 'Sold - Not Won';
-        else if (isExpired && isWinner) statusLabel = 'Won - Expired';
-        else if (isExpired && !isWinner) statusLabel = 'Expired - Not Won';
+        else if (isSold && isWinner) statusLabel = 'Won — Awaiting Delivery';
+        else if (isSold && !isWinner) statusLabel = 'Sold — Not Won';
+        else if (isExpired && isWinner) statusLabel = 'Won — Expired';
+        else if (isExpired && !isWinner) statusLabel = 'Expired';
         else if (isCancelled) statusLabel = 'Cancelled';
         else if (isActive) statusLabel = 'Bidding';
-        
+
         return {
           ...auction,
           user_bid_amount: userBid?.bid_amount || 0,
@@ -111,58 +105,47 @@ const BuyerMyBids = () => {
           auction_status: auction.status
         };
       });
-      
+
       setBids(myBidAuctions);
     } catch (err) {
-      console.error('Fetch bids error:', err);
       setError('Failed to load your bids: ' + (err.response?.data?.detail || err.message));
     } finally {
       setLoading(false);
     }
   };
 
-  // Get status badge configuration
   const getStatusBadge = (bid) => {
     if (bid.auction_status === 'active') {
-      return { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Bidding', icon: <Clock size={12} /> };
+      return { cls: 'bg-emerald-50 text-emerald-700', label: 'Bidding', icon: Clock };
     }
     if (bid.auction_status === 'sold' && bid.is_winner) {
-      return { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Won! 🏆', icon: <Award size={12} /> };
+      return { cls: 'bg-blue-50 text-blue-700', label: 'Won', icon: Award };
     }
     if (bid.auction_status === 'sold' && !bid.is_winner) {
-      return { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Lost', icon: <XCircle size={12} /> };
+      return { cls: 'bg-[#F8F6F0] text-[#4A4A5A]', label: 'Lost', icon: XCircle };
     }
     if (bid.auction_status === 'completed' && bid.is_winner) {
-      return { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Completed ✅', icon: <CheckCircle size={12} /> };
+      return { cls: 'bg-emerald-50 text-emerald-700', label: 'Completed', icon: CheckCircle };
     }
     if (bid.auction_status === 'expired') {
-      return { bg: 'bg-rose-100', text: 'text-rose-700', label: 'Expired', icon: <XCircle size={12} /> };
+      return { cls: 'bg-rose-50 text-rose-700', label: 'Expired', icon: XCircle };
     }
     if (bid.auction_status === 'cancelled') {
-      return { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Cancelled', icon: <AlertCircle size={12} /> };
+      return { cls: 'bg-[#F8F6F0] text-[#4A4A5A]', label: 'Cancelled', icon: AlertCircle };
     }
-    return { bg: 'bg-gray-100', text: 'text-gray-700', label: bid.auction_status, icon: <AlertCircle size={12} /> };
+    return { cls: 'bg-[#F8F6F0] text-[#4A4A5A]', label: bid.auction_status, icon: AlertCircle };
   };
 
-  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: { staggerChildren: 0.05 }
-    }
+    visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 12 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: { duration: 0.3, ease: "easeOut" }
-    }
+    hidden: { opacity: 0, y: 8 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } }
   };
 
-  // Counts for filter tabs
   const counts = {
     all: bids.length,
     active: bids.filter(b => b.auction_status === 'active').length,
@@ -177,21 +160,19 @@ const BuyerMyBids = () => {
     { id: 'lost', label: 'Lost', count: counts.lost },
   ];
 
-  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 size={24} className="animate-spin text-[#1A1A2E]" />
-          <p className="text-xs text-[#A0A0B0]">Loading your bids...</p>
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 size={20} className="animate-spin text-[#1A1A2E]" />
+          <p className="text-[11px] text-[#A0A0B0]">Loading your bids…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
-      {/* Modern Reusable Navbar */}
+    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-3 sm:p-4 md:p-6">
       <ModernNavbar
         navItems={[
           { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
@@ -200,276 +181,298 @@ const BuyerMyBids = () => {
           { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
           { name: "History", path: "/buyer/history", icon: "History" },
         ]}
-        logo={{
-          src: "/Logo.png",
-          alt: "MarketFlip",
-          link: "/buyer/dashboard",
-        }}
+        logo={{ src: "/Logo.png", alt: "MarketFlip", link: "/buyer/dashboard" }}
         showProfile={true}
         showLogout={true}
         showNotifications={true}
-        logoutButton={{
-          label: "Logout",
-          icon: "LogOut",
-          onClick: () => {
-            // Your logout logic here
-          }
-        }}
-        profileButton={{
-          label: "Profile",
-          path: "/buyer/profile",
-          icon: "User"
-        }}
+        logoutButton={{ label: "Logout", icon: "LogOut", onClick: () => {} }}
+        profileButton={{ label: "Profile", path: "/buyer/profile", icon: "User" }}
       />
 
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <motion.div 
+      <div className="max-w-5xl mx-auto">
+        {/* Back button */}
+        <motion.button
+          initial={{ opacity: 0, x: -6 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3 }}
+          whileTap={{ scale: 0.94 }}
+          onClick={() => navigate('/buyer/auctions')}
+          className="flex items-center gap-1.5 mb-3 -ml-1 px-2 py-1.5 text-[11px] text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors rounded-lg hover:bg-[#F5F3EF]"
+        >
+          <ArrowLeft size={12} />
+          Back to auctions
+        </motion.button>
+
+        {/* Animated Hero */}
+        <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="flex flex-wrap justify-between items-center gap-3 mb-6"
+          transition={{ duration: 0.4 }}
+          className="relative overflow-hidden rounded-2xl mb-4 sm:mb-5 p-4 sm:p-5 bg-gradient-primary bg-[length:200%_200%] animate-gradient"
         >
-          <div className="flex items-center gap-3">
-            <Button 
-              onClick={() => navigate('/buyer/auctions')}
-              variant="ghost"
-              className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
-            >
-              <ArrowLeft size={14} className="mr-1.5" />
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold text-[#1A1A2E] flex items-center gap-2">
-                <TrendingUp size={20} className="text-[#FFBE91]" />
-                My Bids
-              </h1>
-              <p className="text-xs text-[#A0A0B0] mt-0.5">
-                {bids.length} total bids · {counts.active} active
-              </p>
+          <motion.div
+            animate={{ x: [0, 25, 0], y: [0, -18, 0] }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute -top-16 -right-12 w-48 h-48 rounded-full bg-lightCream/70 blur-3xl pointer-events-none"
+          />
+          <motion.div
+            animate={{ x: [0, -20, 0], y: [0, 20, 0] }}
+            transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute -bottom-20 -left-10 w-56 h-56 rounded-full bg-softBlue/50 blur-3xl pointer-events-none"
+          />
+
+          <div className="relative flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <motion.h1
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1, duration: 0.35 }}
+                className="text-base sm:text-[15px] font-bold text-[#1A1A2E] flex items-center gap-2"
+              >
+                <TrendingUp size={14} className="flex-shrink-0" />
+                <span className="truncate">My Bids</span>
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.35 }}
+                className="text-[10px] text-[#1A1A2E]/70 mt-0.5 truncate"
+              >
+                {counts.all} total · {counts.active} bidding · {counts.won} won
+              </motion.p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={fetchMyBids}
+                className="p-1.5 rounded-lg bg-white/40 backdrop-blur-sm hover:bg-white/60 transition-colors"
+                title="Refresh"
+              >
+                <RefreshCw size={12} className="text-[#1A1A2E]" />
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate('/buyer/auctions/browse')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1A1A2E] text-white text-[11px] font-medium rounded-full hover:bg-[#2A2A3E] transition-colors"
+              >
+                <Store size={11} />
+                Browse
+              </motion.button>
             </div>
           </div>
-          <Button 
-            onClick={() => navigate('/buyer/auctions/browse')}
-            className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-4 py-1.5 h-auto flex items-center gap-1.5"
-          >
-            <Store size={14} />
-            Browse Auctions
-          </Button>
         </motion.div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="bg-rose-50/80 backdrop-blur-sm rounded-lg p-3 mb-4 text-rose-700 text-xs flex items-center gap-2 border border-rose-100">
-            <AlertCircle size={14} />
-            {error}
-          </div>
-        )}
+        {/* Error */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              className="p-3 bg-rose-50 rounded-2xl flex items-start gap-2 overflow-hidden"
+            >
+              <AlertCircle size={14} className="text-rose-600 flex-shrink-0 mt-0.5" />
+              <p className="text-[11px] font-medium text-rose-600 flex-1">{error}</p>
+              <button
+                onClick={() => setError('')}
+                className="text-rose-500 hover:text-rose-700 flex-shrink-0"
+              >
+                <X size={12} />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Status Filter Tabs */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
+        {/* Status tabs */}
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="flex flex-wrap gap-1 mb-4 bg-white/60 backdrop-blur-sm p-1 rounded-xl border border-[#EEECE6]"
+          className="flex gap-1 p-1 bg-white/70 backdrop-blur-xl rounded-2xl mb-3 overflow-x-auto"
         >
-          {statusTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setStatusFilter(tab.id)}
-              className={`
-                flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all text-xs font-medium
-                ${statusFilter === tab.id 
-                  ? 'bg-[#FFBE91] text-[#1A1A2E] shadow-md' 
-                  : 'text-[#4A4A5A] hover:text-[#1A1A2E] hover:bg-[#FFDDB0]/30'
-                }
-              `}
-            >
-              {tab.label}
-              <span className={`
-                ml-1 px-1.5 py-0.5 rounded-full text-[9px]
-                ${statusFilter === tab.id 
-                  ? 'bg-[#1A1A2E]/10 text-[#1A1A2E]' 
-                  : 'bg-[#FFDDB0]/30 text-[#4A4A5A]'
-                }
-              `}>
-                {tab.count}
-              </span>
-            </button>
-          ))}
+          {statusTabs.map((tab) => {
+            const active = statusFilter === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setStatusFilter(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-medium transition-all min-w-fit ${
+                  active
+                    ? 'bg-[#1A1A2E] text-white'
+                    : 'text-[#A0A0B0] hover:text-[#4A4A5A] hover:bg-[#F8F6F0]'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${
+                  active ? 'bg-white/20 text-white' : 'bg-[#F8F6F0] text-[#A0A0B0]'
+                }`}>
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
         </motion.div>
 
         {/* Search */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="flex flex-wrap gap-2 mb-4"
+          className="flex items-center gap-2 mb-4"
         >
-          <div className="flex-1 min-w-[150px] relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
+          <div className="flex-1 relative">
+            <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0]" />
             <input
               type="text"
-              placeholder="Search your bids..."
+              placeholder="Search your bids…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs bg-white/80 border border-[#EEECE6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+              className="w-full pl-8 pr-3 py-2 text-[11px] bg-white/70 backdrop-blur-xl border-0 rounded-full text-[#1A1A2E] placeholder-[#A0A0B0] focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/40 transition-all"
             />
           </div>
-          <Button
-            onClick={() => {
-              setSearchQuery('');
-              setStatusFilter('all');
-            }}
-            variant="ghost"
-            className="text-[#A0A0B0] hover:text-[#1A1A2E] text-xs px-3 py-2 h-auto"
-          >
-            Clear
-          </Button>
-          <Button
-            onClick={fetchMyBids}
-            variant="ghost"
-            className="text-[#A0A0B0] hover:text-[#1A1A2E] text-xs px-3 py-2 h-auto"
-          >
-            <RefreshCw size={13} className="mr-1" />
-            Refresh
-          </Button>
+          {(searchQuery || statusFilter !== 'all') && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('all');
+              }}
+              className="text-[10px] text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors px-2 whitespace-nowrap"
+            >
+              Clear
+            </motion.button>
+          )}
         </motion.div>
 
-        {/* Bids List */}
+        {/* Bids list */}
         {filteredBids.length === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white/60 backdrop-blur-xl rounded-xl p-8 text-center shadow-sm border border-[#EEECE6]"
+            className="bg-white/70 backdrop-blur-xl rounded-2xl p-8 text-center"
           >
-            <div className="w-12 h-12 rounded-xl bg-[#F5F3EF] flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 rounded-2xl bg-[#F8F6F0] flex items-center justify-center mx-auto mb-3">
               <Gavel size={20} className="text-[#A0A0B0]" />
             </div>
-            <h3 className="text-sm font-medium text-[#1A1A2E]">No bids found</h3>
-            <p className="text-xs text-[#A0A0B0] mt-1">
-              {statusFilter === 'all' ? 'You haven\'t placed any bids yet' : `No ${statusFilter} bids`}
+            <h3 className="text-[12px] font-medium text-[#1A1A2E]">No bids found</h3>
+            <p className="text-[10px] text-[#A0A0B0] mt-0.5">
+              {statusFilter === 'all'
+                ? "You haven't placed any bids yet"
+                : `No ${statusFilter} bids`}
             </p>
-            <Button 
+            <motion.button
+              whileTap={{ scale: 0.95 }}
               onClick={() => navigate('/buyer/auctions/browse')}
-              className="mt-3 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-4 py-1.5 h-auto"
+              className="mt-3 inline-flex items-center gap-1.5 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-[11px] font-medium px-4 py-2 rounded-xl transition-colors"
             >
+              <Store size={11} />
               Browse Auctions
-            </Button>
+            </motion.button>
           </motion.div>
         ) : (
-          <motion.div 
+          <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="space-y-3"
+            className="space-y-2.5"
           >
             {filteredBids.map((bid) => {
               const status = getStatusBadge(bid);
-              const firstImage = bid.image_urls && bid.image_urls.length > 0 
-                ? bid.image_urls[0] 
-                : null;
+              const StatusIcon = status.icon;
+              const firstImage = bid.image_urls && bid.image_urls.length > 0 ? bid.image_urls[0] : null;
               const isWon = bid.is_winner && ['sold', 'completed'].includes(bid.auction_status);
-              
-              // Determine detail path
-              let detailPath = `/buyer/auctions/${bid.id}`;
-              if (isWon && bid.auction_status === 'sold') {
-                detailPath = `/buyer/my-won-auctions`;
-              }
+              const isActive = bid.auction_status === 'active';
+              const isOutbid = isActive && !bid.is_winner;
 
               return (
                 <motion.div
                   key={bid.id}
                   variants={itemVariants}
-                  className={`bg-white/80 backdrop-blur-xl rounded-xl p-4 border ${
-                    isWon ? 'border-emerald-200' : 'border-[#EEECE6]'
-                  } hover:shadow-md transition-all group`}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.995 }}
+                  onClick={() => {
+                    if (isWon && bid.auction_status === 'sold') {
+                      navigate('/buyer/my-won-auctions');
+                    } else {
+                      navigate(`/buyer/auctions/${bid.id}`);
+                    }
+                  }}
+                  className={`bg-white/70 backdrop-blur-xl rounded-2xl p-3 sm:p-4 transition-all cursor-pointer group ${
+                    isWon ? 'ring-1 ring-emerald-100' : ''
+                  }`}
                 >
-                  <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-start gap-3">
                     {/* Image */}
                     {firstImage ? (
                       <img
                         src={firstImage}
                         alt={bid.item_name}
-                        className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover flex-shrink-0"
                       />
                     ) : (
-                      <div className="w-16 h-16 rounded-lg bg-[#F8F6F0] flex items-center justify-center flex-shrink-0">
-                        <Package size={24} className="text-[#A0A0B0]" />
+                      <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-[#F8F6F0] flex items-center justify-center flex-shrink-0">
+                        <Package size={20} className="text-[#A0A0B0]" />
                       </div>
                     )}
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-sm font-medium text-[#1A1A2E]">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <h3 className="text-[12px] sm:text-[13px] font-semibold text-[#1A1A2E] truncate">
                           {bid.item_name}
                         </h3>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${status.bg} ${status.text}`}>
-                          {status.icon}
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium ${status.cls}`}>
+                          <StatusIcon size={8} />
                           {status.label}
                         </span>
-                        {isWon && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700">
-                            <Award size={12} />
-                            Won!
+                        {isActive && bid.is_winner && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-100 text-emerald-800">
+                            <Crown size={8} />
+                            Winning
+                          </span>
+                        )}
+                        {isOutbid && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-amber-100 text-amber-800">
+                            Outbid
                           </span>
                         )}
                       </div>
-                      
-                      <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-[#A0A0B0]">
-                        <span className="flex items-center gap-1">
-                          <DollarSign size={11} />
-                          Your Bid: ₹{bid.user_bid_amount.toLocaleString()}
+
+                      {/* Bid info */}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[10px]">
+                        <span className="flex items-center gap-0.5 font-medium text-[#1A1A2E]">
+                          <IndianRupee size={9} className="text-[#FFBE91]" />
+                          Your bid: {bid.user_bid_amount?.toLocaleString('en-IN')}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <Gavel size={11} />
-                          Current: ₹{bid.current_highest_bid || bid.starting_price}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Store size={11} />
-                          {bid.shop_name || 'Unknown Shop'}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <MapPin size={11} />
-                          {bid.pincode}
+                        <span className="flex items-center gap-0.5 text-[#4A4A5A]">
+                          <IndianRupee size={9} />
+                          Current: {(bid.current_highest_bid || bid.starting_price)?.toLocaleString('en-IN')}
                         </span>
                       </div>
 
-                      {bid.auction_status === 'active' && bid.end_time && (
-                        <div className="mt-1 flex items-center gap-1 text-[10px] text-emerald-600">
-                          <Clock size={10} />
-                          Ends: {new Date(bid.end_time).toLocaleString()}
-                        </div>
-                      )}
+                      {/* Meta */}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-[9px] text-[#A0A0B0]">
+                        <span className="flex items-center gap-0.5">
+                          <Store size={9} />
+                          {bid.shop_name || 'Unknown'}
+                        </span>
+                        <span className="flex items-center gap-0.5">
+                          <MapPin size={9} />
+                          {bid.pincode}
+                        </span>
+                        {isActive && bid.end_time && (
+                          <span className="flex items-center gap-0.5 text-emerald-600">
+                            <Clock size={9} />
+                            Ends {new Date(bid.end_time).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-                      <Button
-                        onClick={() => {
-                          if (isWon && bid.auction_status === 'sold') {
-                            navigate('/buyer/my-won-auctions');
-                          } else {
-                            navigate(`/buyer/auctions/${bid.id}`);
-                          }
-                        }}
-                        variant="ghost"
-                        className="text-[#A0A0B0] hover:text-[#1A1A2E] text-xs px-3 py-1 h-auto"
-                      >
-                        <Eye size={13} className="mr-1" />
-                        View
-                      </Button>
-                      {isWon && bid.auction_status === 'sold' && (
-                        <Button
-                          onClick={() => navigate('/buyer/my-won-auctions')}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1 h-auto"
-                        >
-                          <Award size={13} className="mr-1" />
-                          Complete Delivery
-                        </Button>
-                      )}
-                      <ChevronRight size={16} className="text-[#A0A0B0] group-hover:translate-x-1 transition-transform" />
-                    </div>
+                    {/* Chevron */}
+                    <ChevronRight size={14} className="text-[#A0A0B0] group-hover:translate-x-0.5 group-hover:text-[#1A1A2E] transition-all flex-shrink-0 mt-1" />
                   </div>
                 </motion.div>
               );
@@ -477,17 +480,17 @@ const BuyerMyBids = () => {
           </motion.div>
         )}
 
-        {/* Footer Note */}
-        <motion.div 
+        {/* Footer */}
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="mt-4 text-center text-[10px] text-[#A0A0B0]"
+          className="mt-5 text-center"
         >
-          <span className="flex items-center justify-center gap-1">
-            <span className="text-[#FFBE91]">⚡</span>
-            Shows all auctions you've bid on · Track your won auctions in "My Won Auctions"
-          </span>
+          <p className="text-[9px] text-[#A0A0B0] flex items-center justify-center gap-1">
+            <Sparkles size={9} className="text-[#FFBE91]" />
+            All auctions you've bid on · Won auctions appear in "My Won Auctions"
+          </p>
         </motion.div>
       </div>
     </div>

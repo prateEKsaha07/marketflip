@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { AlertCircle, Check, ClipboardCheck, ImagePlus, Loader2, X } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  ClipboardCheck,
+  ImagePlus,
+  Loader2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
@@ -110,7 +117,6 @@ export default function AssistantPreview({
       try {
         referenceImageUrl = await uploadImage(imageFile);
       } catch (err) {
-        console.error("Image upload failed:", err);
         const msg =
           err?.response?.data?.detail || "Failed to upload image";
         toast.error(typeof msg === "string" ? msg : "Failed to upload image");
@@ -125,9 +131,7 @@ export default function AssistantPreview({
     const action =
       Object.keys(editedFields).length > 0 ? "edited" : "accepted";
 
-    logAction(logId, action, editedFields).catch((err) =>
-      console.warn("logAction failed:", err)
-    );
+    logAction(logId, action, editedFields).catch(() => {});
 
     let categoryName = "electronics";
     if (form.category_id && categories.length > 0) {
@@ -136,14 +140,14 @@ export default function AssistantPreview({
     }
 
     const payload = {
-  item_name: form.item_name,
-  description: form.description || null,
-  budget_min: Number(form.budget_min),
-  budget_max: Number(form.budget_max),
-  pincode: form.pincode,
-  category: categoryName,
-  image_urls: referenceImageUrl ? [referenceImageUrl] : [],  
-};
+      item_name: form.item_name,
+      description: form.description || null,
+      budget_min: Number(form.budget_min),
+      budget_max: Number(form.budget_max),
+      pincode: form.pincode,
+      category: categoryName,
+      image_urls: referenceImageUrl ? [referenceImageUrl] : [],
+    };
 
     try {
       const { data } = await api.post("/requests", payload);
@@ -158,9 +162,7 @@ export default function AssistantPreview({
   };
 
   const handleCancel = async () => {
-    logAction(logId, "abandoned").catch((err) =>
-      console.warn("logAction failed:", err)
-    );
+    logAction(logId, "abandoned").catch(() => {});
     onCancel();
   };
 
@@ -171,15 +173,23 @@ export default function AssistantPreview({
     <motion.div
       initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
       className="p-4 flex flex-col gap-4"
     >
-      <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-        <ClipboardCheck size={16} className="text-indigo-500" />
-        <span>Review extracted details</span>
+      {/* Section header */}
+      <div className="flex items-center gap-2.5">
+        <span className="w-7 h-7 rounded-full grid place-items-center
+                         bg-[#1A1A2E] text-[#FFFCE1]">
+          <ClipboardCheck size={13} strokeWidth={2.2} />
+        </span>
+        <span className="text-[12px] font-semibold text-[#1A1A2E] tracking-tight">
+          Review extracted details
+        </span>
       </div>
 
-      <div className="flex flex-col gap-3 max-h-[420px] overflow-y-auto pr-1">
+      {/* Fields */}
+      <div className="flex flex-col gap-3 max-h-[420px] overflow-y-auto pr-1
+                      [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <FieldRow
           label={FIELD_LABELS.item_name}
           missing={isMissing("item_name")}
@@ -300,14 +310,15 @@ export default function AssistantPreview({
           </select>
         </FieldRow>
 
-        {/* -------- Image upload -------- */}
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-gray-600">
-            Reference image (optional)
+        {/* Image upload */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[11px] font-medium text-[#A0A0B0] uppercase tracking-wide">
+            Reference image · optional
           </label>
 
           {imagePreview ? (
-            <div className="relative rounded-lg overflow-hidden border border-gray-200">
+            <div className="relative rounded-xl overflow-hidden
+                            ring-1 ring-[#1A1A2E]/5">
               <img
                 src={imagePreview}
                 alt="preview"
@@ -317,12 +328,14 @@ export default function AssistantPreview({
                 type="button"
                 onClick={removeImage}
                 disabled={submitting || uploading}
-                className="absolute top-2 right-2 bg-black/60 hover:bg-black/80
-                           text-white rounded-full p-1 transition
-                           disabled:opacity-50"
+                className="absolute top-2 right-2 bg-[#1A1A2E]/80 hover:bg-[#1A1A2E]
+                           text-[#FFFCE1] rounded-full p-1.5 transition
+                           disabled:opacity-50
+                           focus:outline-none focus-visible:ring-2
+                           focus-visible:ring-[#FFBE91]"
                 aria-label="Remove image"
               >
-                <X size={14} />
+                <X size={12} strokeWidth={2.2} />
               </button>
             </div>
           ) : (
@@ -331,13 +344,14 @@ export default function AssistantPreview({
               onClick={() => fileInputRef.current?.click()}
               disabled={submitting || uploading}
               className="flex items-center justify-center gap-2
-                         border-2 border-dashed border-gray-200 rounded-lg
-                         py-6 cursor-pointer hover:border-indigo-300
-                         hover:bg-indigo-50/30 transition w-full
-                         disabled:opacity-50 disabled:cursor-not-allowed"
+                         rounded-xl bg-[#F8F6F0]/60 hover:bg-[#F8F6F0]
+                         py-5 cursor-pointer transition w-full
+                         disabled:opacity-50 disabled:cursor-not-allowed
+                         focus:outline-none focus-visible:ring-2
+                         focus-visible:ring-[#FFBE91]/40"
             >
-              <ImagePlus size={18} className="text-gray-400" />
-              <span className="text-sm text-gray-500">
+              <ImagePlus size={16} className="text-[#A0A0B0]" />
+              <span className="text-[11px] text-[#4A4A5A] font-medium">
                 Add a reference image
               </span>
             </button>
@@ -353,34 +367,43 @@ export default function AssistantPreview({
         </div>
       </div>
 
-      <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+      {/* Actions */}
+      <div className="flex justify-end gap-2 pt-3 border-t border-[#EEECE6]">
         <button
           onClick={handleCancel}
           disabled={submitting || uploading}
-          className="inline-flex items-center gap-1.5 rounded-lg border
-                     border-gray-200 px-3 py-2 text-sm font-medium text-gray-700
-                     hover:bg-gray-50 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-full
+                     px-3 py-1.5 text-[11px] font-medium
+                     text-[#4A4A5A] hover:text-[#1A1A2E] hover:bg-[#F8F6F0]
+                     transition-colors duration-150
+                     disabled:opacity-50
+                     focus:outline-none focus-visible:ring-2
+                     focus-visible:ring-[#FFBE91]"
         >
-          <X size={14} />
+          <X size={12} strokeWidth={2.2} />
           Cancel
         </button>
         <button
           onClick={handleConfirm}
           disabled={submitting || uploading}
-          className="inline-flex items-center gap-1.5 rounded-lg
-                     bg-indigo-500 px-4 py-2 text-sm font-medium text-white
-                     hover:bg-indigo-600 disabled:opacity-50
-                     disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 rounded-full
+                     bg-[#1A1A2E] px-4 py-1.5 text-[11px] font-medium
+                     text-[#FFFCE1] hover:bg-[#2A2A3E]
+                     transition-colors duration-150
+                     disabled:opacity-50 disabled:cursor-not-allowed
+                     focus:outline-none focus-visible:ring-2
+                     focus-visible:ring-[#FFBE91] focus-visible:ring-offset-2
+                     focus-visible:ring-offset-white"
         >
           {submitting || uploading ? (
             <>
-              <Loader2 size={14} className="animate-spin" />
+              <Loader2 size={12} strokeWidth={2.2} className="animate-spin" />
               {uploading ? "Uploading…" : "Submitting…"}
             </>
           ) : (
             <>
-              <Check size={14} />
-              Confirm &amp; Post
+              <Check size={12} strokeWidth={2.2} />
+              Confirm & Post
             </>
           )}
         </button>
@@ -389,24 +412,27 @@ export default function AssistantPreview({
   );
 }
 
+/* ---------- Field row ---------- */
 function FieldRow({ label, missing, lowConf, children }) {
   const reduceMotion = useReducedMotion();
   return (
-    <div className="flex flex-col gap-1">
-      <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+    <div className="flex flex-col gap-1.5">
+      <label className="flex items-center gap-1.5 text-[11px] font-medium
+                        text-[#A0A0B0] uppercase tracking-wide">
         {label}
         {missing && (
           <motion.span
             animate={reduceMotion ? {} : { opacity: [1, 0.4, 1] }}
             transition={{ duration: 1.5, repeat: Infinity }}
-            className="text-amber-500"
+            className="text-amber-500 inline-flex"
           >
-            <AlertCircle size={12} />
+            <AlertCircle size={11} strokeWidth={2.2} />
           </motion.span>
         )}
         {!missing && lowConf && (
-          <span className="text-xs text-gray-400 font-normal">
-            (low confidence)
+          <span className="text-[10px] text-[#A0A0B0]/70 font-normal
+                           normal-case tracking-normal">
+            · low confidence
           </span>
         )}
       </label>
@@ -415,12 +441,13 @@ function FieldRow({ label, missing, lowConf, children }) {
   );
 }
 
+/* ---------- Input styling ---------- */
 function inputClass(isMissing) {
   const base =
-    "w-full rounded-lg border px-3 py-2 text-sm text-gray-900 " +
-    "focus:outline-none focus:ring-2 focus:ring-indigo-400 " +
-    "focus:border-transparent transition";
+    "w-full rounded-lg border px-3 py-2 text-[12px] text-[#1A1A2E] " +
+    "transition-all duration-150 " +
+    "focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/40 focus:border-[#FFBE91]";
   return isMissing
     ? `${base} border-amber-300 bg-amber-50/40`
-    : `${base} border-gray-200`;
+    : `${base} border-[#EEECE6] bg-white hover:border-[#1A1A2E]/20`;
 }

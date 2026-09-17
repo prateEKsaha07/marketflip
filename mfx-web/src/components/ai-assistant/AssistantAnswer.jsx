@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Command } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
@@ -31,7 +31,6 @@ function resolvePagePath(pageLine, role) {
   const name = pageLine.replace("→", "").trim().toLowerCase();
   const routes = isShop ? SHOP_ROUTES : BUYER_ROUTES;
 
-  // longest key first so "my auctions" matches before "auctions"
   const keys = Object.keys(routes).sort((a, b) => b.length - a.length);
   for (const key of keys) {
     if (name.includes(key)) return routes[key];
@@ -45,7 +44,6 @@ export default function AssistantAnswer({ question, answer, onAskAnother }) {
   const { user } = useAuth();
   const reduceMotion = useReducedMotion();
 
-  // read role from context, fall back to localStorage
   const roleFromContext = user?.role;
   const roleFromStorage =
     typeof window !== "undefined" ? localStorage.getItem("role") : null;
@@ -64,48 +62,75 @@ export default function AssistantAnswer({ question, answer, onAskAnother }) {
     <motion.div
       initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
       className="p-4 flex flex-col gap-3"
     >
-      <div className="self-end max-w-[85%] rounded-2xl bg-indigo-500
-                      text-white px-4 py-2 text-sm">
+      {/* Question bubble — right aligned, ink */}
+      <div className="self-end max-w-[85%] rounded-2xl rounded-br-md
+                      bg-[#1A1A2E] text-[#FFFCE1]
+                      px-3.5 py-2 text-[12px] leading-relaxed">
         {question}
       </div>
 
-      <div className="self-start max-w-[90%] rounded-2xl bg-[#F5F3EF]
-                      text-[#1A1A2E] px-4 py-3 text-sm">
-        <div className="flex items-center gap-1.5 mb-2 text-[10px]
-                        uppercase tracking-wider text-[#A0A0B0]">
-          <Sparkles size={11} className="text-indigo-500" />
-          Assistant
+      {/* Answer bubble — left aligned, soft fill */}
+      <div className="self-start max-w-[90%] rounded-2xl rounded-bl-md
+                      bg-[#F8F6F0] text-[#1A1A2E]
+                      px-3.5 py-3">
+        {/* Header */}
+        <div className="flex items-center gap-1.5 mb-2
+                        text-[10px] uppercase tracking-wider text-[#A0A0B0]">
+          <span className="w-4 h-4 rounded-full grid place-items-center
+                           bg-[#1A1A2E] text-[#FFFCE1]">
+            <Command size={9} strokeWidth={2.4} />
+          </span>
+          <span>Assistant</span>
         </div>
 
-        <ul className="flex flex-col gap-1.5">
-          {bullets.map((line, i) => (
-            <li key={i} className="flex gap-2 leading-snug">
-              <span className="text-[#FFBE91] font-bold">•</span>
-              <span>{line.replace(/^•\s*/, "")}</span>
-            </li>
-          ))}
-        </ul>
+        {/* Bullets */}
+        {bullets.length > 0 && (
+          <ul className="flex flex-col gap-1.5 text-[12px] leading-snug">
+            {bullets.map((line, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-[#FFBE91] font-bold flex-shrink-0">•</span>
+                <span>{line.replace(/^•\s*/, "")}</span>
+              </li>
+            ))}
+          </ul>
+        )}
 
+        {/* Fallback if no bullets — show raw answer */}
+        {bullets.length === 0 && answer && (
+          <p className="text-[12px] leading-relaxed text-[#1A1A2E]">
+            {answer}
+          </p>
+        )}
+
+        {/* View details link */}
         {pagePath && (
           <button
             onClick={() => navigate(pagePath)}
-            className="mt-3 inline-flex items-center gap-1 text-xs
-                       font-medium text-indigo-600 hover:text-indigo-800
-                       transition-colors"
+            className="mt-2.5 inline-flex items-center gap-1 text-[11px]
+                       font-medium text-[#1A1A2E] hover:text-[#FF8B94]
+                       transition-colors
+                       focus:outline-none focus-visible:ring-2
+                       focus-visible:ring-[#FFBE91]/40 rounded
+                       px-1 -mx-1 py-0.5"
           >
             View details
-            <ArrowRight size={12} />
+            <ArrowRight size={11} strokeWidth={2.2} />
           </button>
         )}
       </div>
 
+      {/* Ask another */}
       <button
         onClick={onAskAnother}
-        className="self-start text-xs text-gray-500 hover:text-gray-800
-                   underline transition-colors"
+        className="self-start text-[11px] text-[#A0A0B0]
+                   hover:text-[#1A1A2E]
+                   transition-colors
+                   focus:outline-none focus-visible:ring-2
+                   focus-visible:ring-[#FFBE91]/40 rounded
+                   px-1 -mx-1 py-0.5"
       >
         Ask another
       </button>

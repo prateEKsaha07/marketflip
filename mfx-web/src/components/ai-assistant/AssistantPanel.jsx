@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Sparkles, X } from "lucide-react";
+import { Command, X } from "lucide-react";
 
 import { parseRequest, askQuestion } from "../../api/client";
 import AssistantInput from "./AssistantInput";
@@ -109,76 +109,71 @@ export default function AssistantPanel({ isOpen, onClose }) {
     <AnimatePresence>
       {isOpen && (
         <>
+          {/* Backdrop — simple, clean fade */}
           <motion.div
             key="backdrop"
-            className="fixed inset-0 z-[55] pointer-events-auto"
-            initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-            animate={{
-              opacity: [0, 1, 0.92, 1],
-              backdropFilter: [
-                "blur(0px)", "blur(14px)", "blur(10px)", "blur(12px)",
-              ],
-              backgroundColor: [
-                "rgba(255,252,225,0)",
-                "rgba(255,252,225,0.55)",
-                "rgba(255,252,225,0.45)",
-                "rgba(255,252,225,0.5)",
-              ],
-            }}
-            exit={{
-              opacity: 0,
-              backdropFilter: "blur(0px)",
-              backgroundColor: "rgba(255,252,225,0)",
-            }}
-            transition={{
-              duration: 0.6,
-              delay: 0.15,
-              times: [0, 0.35, 0.7, 1],
-              ease: "easeOut",
-            }}
+            className="fixed inset-0 z-[55] pointer-events-auto
+                       bg-[#1A1A2E]/15 backdrop-blur-[2px]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
             onClick={handleClose}
             aria-hidden="true"
           />
 
+          {/* Panel — anchored bottom-right, above the floating button */}
           <motion.div
             key="panel"
             role="dialog"
             aria-label="AI assistant"
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 20, scale: 0.98 }}
+            initial={
+              reduceMotion
+                ? { opacity: 1 }
+                : { opacity: 0, y: 16, scale: 0.98 }
+            }
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 20, scale: 0.98 }}
+            exit={
+              reduceMotion
+                ? { opacity: 0 }
+                : { opacity: 0, y: 16, scale: 0.98 }
+            }
             transition={{
-              duration: reduceMotion ? 0 : 0.22,
-              delay: 0.08,
+              duration: reduceMotion ? 0 : 0.28,
               ease: [0.16, 1, 0.3, 1],
             }}
-            className="fixed bottom-24 right-6 z-[58] w-[380px]
-                       max-w-[calc(100vw-48px)]
+            className="fixed bottom-24 right-5 sm:right-6 z-[58]
+                       w-[380px] max-w-[calc(100vw-40px)]
                        max-h-[min(640px,calc(100vh-140px))]
-                       bg-white rounded-2xl shadow-2xl shadow-gray-900/15
+                       bg-white rounded-2xl
+                       ring-1 ring-[#1A1A2E]/5
+                       shadow-[0_8px_32px_-8px_rgba(26,26,46,0.18),0_2px_8px_-2px_rgba(26,26,46,0.06)]
                        flex flex-col overflow-hidden"
           >
-            <header className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
-              <motion.span
-                animate={reduceMotion ? {} : { rotate: [0, 10, 0], scale: [1, 1.1, 1] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="text-indigo-500"
-              >
-                <Sparkles size={16} />
-              </motion.span>
-              <h3 className="flex-1 text-sm font-semibold text-gray-900">
+            {/* Header */}
+            <header className="flex items-center gap-2.5 px-4 py-3
+                               border-b border-[#EEECE6]">
+              <span className="w-7 h-7 rounded-full grid place-items-center
+                               bg-[#1A1A2E] text-[#FFFCE1]">
+                <Command size={13} strokeWidth={2.2} />
+              </span>
+              <h3 className="flex-1 text-[13px] font-semibold text-[#1A1A2E] tracking-tight">
                 Ask AI
               </h3>
               <button
                 onClick={handleClose}
                 aria-label="Close"
-                className="p-1 text-gray-400 hover:text-gray-700
-                           transition-transform hover:rotate-90 duration-200"
+                className="p-1.5 rounded-full text-[#A0A0B0]
+                           hover:text-[#1A1A2E] hover:bg-[#F8F6F0]
+                           transition-colors duration-150
+                           focus:outline-none focus-visible:ring-2
+                           focus-visible:ring-[#FFBE91] focus-visible:ring-offset-1"
               >
-                <X size={18} />
+                <X size={15} strokeWidth={2.2} />
               </button>
             </header>
 
+            {/* Body */}
             <div className="overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {state === "idle" || state === "parsing" || state === "asking" ? (
                 <AssistantInput

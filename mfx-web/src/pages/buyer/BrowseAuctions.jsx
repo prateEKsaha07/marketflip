@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
-import { Button } from '@/components/ui/button';
 import ModernNavbar from "../../components/ui/Navbar";
 import { 
   ArrowLeft, 
@@ -12,16 +11,14 @@ import {
   Package, 
   Clock, 
   MapPin, 
-  DollarSign,
+  IndianRupee,
   Loader2,
   AlertCircle,
   ChevronDown,
-  ChevronUp,
-  TrendingUp,
   Sparkles,
-  Eye,
   Flag,
-  Heart
+  Zap,
+  X
 } from 'lucide-react';
 import api from '../../api/client';
 import ReportModal from '../../components/ReportModal';
@@ -49,70 +46,50 @@ const BrowseAuctions = () => {
   const [sortBy, setSortBy] = useState('ending_soon');
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
-  
-  // ====== RECOMMENDATIONS STATE ======
+
   const [recommendations, setRecommendations] = useState([]);
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
 
   const sortOptions = [
     { value: 'ending_soon', label: 'Ending Soon' },
-    { value: 'newest', label: 'Newest First' },
-    { value: 'price_asc', label: 'Price: Low to High' },
-    { value: 'price_desc', label: 'Price: High to Low' },
+    { value: 'newest', label: 'Newest' },
+    { value: 'price_asc', label: 'Price ↑' },
+    { value: 'price_desc', label: 'Price ↓' },
     { value: 'most_bids', label: 'Most Bids' },
   ];
 
-  // Fetch auctions on filter/sort change
   useEffect(() => {
     fetchAuctions();
   }, [activeFilters, sortBy]);
 
-  // ====== FETCH RECOMMENDATIONS ======
+  /* ---------- Recommendations ---------- */
   useEffect(() => {
     const fetchRecommendations = async () => {
-      console.log('=== FETCHING RECOMMENDATIONS ===');
-      console.log('Auctions count:', auctions.length);
-      
-      if (auctions.length === 0) {
-        console.log('No auctions, skipping recommendations');
-        return;
-      }
-      
+      if (auctions.length === 0) return;
+
       setRecommendationsLoading(true);
       try {
         const firstAuction = auctions[0];
-        console.log('First auction:', firstAuction);
-        
         const category = firstAuction?.category || activeFilters.category;
         const pincode = firstAuction?.pincode || activeFilters.pincode;
-        console.log('Category:', category);
-        console.log('Pincode:', pincode);
-        
+
         let formatted = [];
-        
-        // Try 1: Same category
+
         if (category) {
-          console.log('Fetching auctions with category:', category);
           try {
             const params = new URLSearchParams();
             params.append('status', 'active');
             params.append('category', category);
             params.append('limit', '10');
             params.append('sort', 'newest');
-            
-            console.log('Making API call to /auctions with params:', params.toString());
+
             const response = await api.get(`/auctions?${params.toString()}`);
-            console.log('Category response received:', response.data);
-            console.log('Category response count:', response.data?.length || 0);
-            
             let similarAuctions = response.data || [];
-            
-            if (firstAuction && firstAuction.id) {
+
+            if (firstAuction?.id) {
               similarAuctions = similarAuctions.filter(a => a.id !== firstAuction.id);
             }
-            
-            console.log('Similar auctions (category) after filtering:', similarAuctions.length);
-            
+
             formatted = similarAuctions.slice(0, 5).map(auction => ({
               id: auction.id,
               name: auction.item_name,
@@ -126,32 +103,25 @@ const BrowseAuctions = () => {
               confidence: 0.7 + (Math.random() * 0.25),
               similarity_score: 4 + (Math.random() * 1)
             }));
-            
-            console.log('Formatted recommendations from category:', formatted.length);
-          } catch (categoryErr) {
-            console.error('Category fetch error:', categoryErr);
+          } catch (err) {
+            // silent
           }
         }
-        
-        // Try 2: Any active auctions (fallback)
+
         if (formatted.length === 0) {
-          console.log('Fetching any active auctions (fallback)');
           try {
             const params = new URLSearchParams();
             params.append('status', 'active');
             params.append('limit', '10');
             params.append('sort', 'newest');
-            
+
             const response = await api.get(`/auctions?${params.toString()}`);
-            console.log('Fallback response:', response.data);
             let similarAuctions = response.data || [];
-            
-            if (firstAuction && firstAuction.id) {
+
+            if (firstAuction?.id) {
               similarAuctions = similarAuctions.filter(a => a.id !== firstAuction.id);
             }
-            
-            console.log('Similar auctions (fallback):', similarAuctions.length);
-            
+
             formatted = similarAuctions.slice(0, 5).map(auction => ({
               id: auction.id,
               name: auction.item_name,
@@ -165,50 +135,14 @@ const BrowseAuctions = () => {
               confidence: 0.5 + (Math.random() * 0.2),
               similarity_score: 2 + (Math.random() * 1)
             }));
-            
-            console.log('Formatted recommendations from fallback:', formatted.length);
-          } catch (fallbackErr) {
-            console.error('Fallback fetch error:', fallbackErr);
+          } catch (err) {
+            // silent
           }
         }
-        
-        console.log('Final formatted recommendations:', formatted.length);
-        console.log('Recommendations data:', JSON.stringify(formatted, null, 2));
-        
-        if (formatted.length > 0) {
-          setRecommendations(formatted);
-          console.log('✅ Recommendations set successfully!');
-        } else {
-          console.log('❌ No recommendations found - will show nothing');
-          setRecommendations([]);
-        }
-        
+
+        setRecommendations(formatted);
       } catch (err) {
-        console.error('Failed to fetch recommendations:', err);
-        // Try to get any auctions as final fallback
-        try {
-          const response = await api.get('/auctions?status=active&limit=5&sort=newest');
-          const fallback = response.data || [];
-          if (fallback.length > 0) {
-            const formatted = fallback.slice(0, 5).map(auction => ({
-              id: auction.id,
-              name: auction.item_name,
-              item_name: auction.item_name,
-              type: 'auction',
-              category: auction.category || 'general',
-              pincode: auction.pincode,
-              price: auction.current_highest_bid || auction.starting_price,
-              image_urls: auction.image_urls || [],
-              description: auction.description,
-              confidence: 0.5,
-              similarity_score: 2
-            }));
-            setRecommendations(formatted);
-            console.log('✅ Final fallback recommendations set:', formatted.length);
-          }
-        } catch (finalErr) {
-          console.error('Final fallback failed:', finalErr);
-        }
+        setRecommendations([]);
       } finally {
         setRecommendationsLoading(false);
       }
@@ -218,7 +152,6 @@ const BrowseAuctions = () => {
     return () => clearTimeout(timer);
   }, [auctions, activeFilters.category, activeFilters.pincode]);
 
-  // Fetch auctions from API
   const fetchAuctions = async () => {
     setLoading(true);
     setError('');
@@ -228,12 +161,10 @@ const BrowseAuctions = () => {
       params.append('sort', sortBy);
       if (activeFilters.pincode) params.append('pincode', activeFilters.pincode);
       if (activeFilters.category) params.append('category', activeFilters.category);
-      
+
       const response = await api.get(`/auctions?${params.toString()}`);
-      console.log('Auctions response:', response.data);
       setAuctions(response.data || []);
     } catch (err) {
-      console.error('Fetch auctions error:', err);
       setError('Failed to load auctions');
     } finally {
       setLoading(false);
@@ -251,44 +182,32 @@ const BrowseAuctions = () => {
   };
 
   const clearFilters = () => {
-    setFilters({
-      pincode: '',
-      category: '',
-      status: 'active'
-    });
-    setActiveFilters({
-      pincode: '',
-      category: '',
-      status: 'active'
-    });
+    setFilters({ pincode: '', category: '', status: 'active' });
+    setActiveFilters({ pincode: '', category: '', status: 'active' });
     setSortBy('ending_soon');
     setShowFilters(false);
     setRecommendations([]);
   };
 
+  const hasActiveFilters = activeFilters.pincode || activeFilters.category;
+
   const getTimeLeft = (endTime) => {
-    if (!endTime) return 'Ended';
+    if (!endTime) return { text: 'Ended', urgent: false };
     const now = new Date();
     const end = new Date(endTime);
     const diff = end - now;
-    
-    if (diff < 0) return 'Ended';
-    
+
+    if (diff < 0) return { text: 'Ended', urgent: false };
+
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (days > 0) return `${days}d ${hours}h`;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
-  };
 
-  const isEndingSoon = (endTime) => {
-    if (!endTime) return false;
-    const now = new Date();
-    const end = new Date(endTime);
-    const diff = end - now;
-    return diff > 0 && diff < 60 * 60 * 1000 * 24;
+    const urgent = days === 0 && hours < 6;
+
+    if (days > 0) return { text: `${days}d ${hours}h`, urgent };
+    if (hours > 0) return { text: `${hours}h ${minutes}m`, urgent };
+    return { text: `${minutes}m`, urgent: true };
   };
 
   const handleReport = (auction, e) => {
@@ -299,36 +218,34 @@ const BrowseAuctions = () => {
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: { 
+    visible: {
       opacity: 1,
-      transition: { staggerChildren: 0.05 }
+      transition: { staggerChildren: 0.04 }
     }
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 12 },
-    visible: { 
-      opacity: 1, 
+    hidden: { opacity: 0, y: 8 },
+    visible: {
+      opacity: 1,
       y: 0,
-      transition: { duration: 0.3, ease: "easeOut" }
+      transition: { duration: 0.3, ease: 'easeOut' }
     }
   };
 
-  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 size={24} className="animate-spin text-[#1A1A2E]" />
-          <p className="text-xs text-[#A0A0B0]">Loading auctions...</p>
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 size={20} className="animate-spin text-[#1A1A2E]" />
+          <p className="text-[11px] text-[#A0A0B0]">Loading auctions…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
-      {/* Modern Reusable Navbar */}
+    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-3 sm:p-4 md:p-6">
       <ModernNavbar
         navItems={[
           { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
@@ -337,134 +254,190 @@ const BrowseAuctions = () => {
           { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
           { name: "History", path: "/buyer/history", icon: "History" },
         ]}
-        logo={{
-          src: "/Logo.png",
-          alt: "MarketFlip",
-          link: "/buyer/dashboard",
-        }}
+        logo={{ src: "/Logo.png", alt: "MarketFlip", link: "/buyer/dashboard" }}
         showProfile={true}
         showLogout={true}
         showNotifications={true}
-        logoutButton={{
-          label: "Logout",
-          icon: "LogOut",
-          onClick: () => {
-            // Your logout logic here
-          }
-        }}
-        profileButton={{
-          label: "Profile",
-          path: "/buyer/profile",
-          icon: "User"
-        }}
+        logoutButton={{ label: "Logout", icon: "LogOut", onClick: () => {} }}
+        profileButton={{ label: "Profile", path: "/buyer/profile", icon: "User" }}
       />
 
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <motion.div 
+        {/* Back button */}
+        <motion.button
+          initial={{ opacity: 0, x: -6 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3 }}
+          whileTap={{ scale: 0.94 }}
+          onClick={() => navigate('/buyer/auctions')}
+          className="flex items-center gap-1.5 mb-3 -ml-1 px-2 py-1.5 text-[11px] text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors rounded-lg hover:bg-[#F5F3EF]"
+        >
+          <ArrowLeft size={12} />
+          Back to auctions
+        </motion.button>
+
+        {/* Animated Hero */}
+        <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="flex flex-wrap justify-between items-center gap-3 mb-6"
+          transition={{ duration: 0.4 }}
+          className="relative overflow-hidden rounded-2xl mb-4 sm:mb-5 p-4 sm:p-5 bg-gradient-primary bg-[length:200%_200%] animate-gradient"
         >
-          <div className="flex items-center gap-3">
-            <Button 
-              onClick={() => navigate('/buyer/auctions')}
-              variant="ghost"
-              className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
-            >
-              <ArrowLeft size={14} className="mr-1.5" />
-              Dashboard
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold text-[#1A1A2E] flex items-center gap-2">
-                <Gavel size={20} className="text-[#FFBE91]" />
-                Browse Auctions
-              </h1>
-              <p className="text-xs text-[#A0A0B0] mt-0.5">
-                {auctions.length} active auctions found
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {/* Sort Dropdown */}
-            <div className="relative">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-3 py-1.5 text-xs bg-white/80 border border-[#EEECE6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/20 appearance-none pr-8"
+          <motion.div
+            animate={{ x: [0, 25, 0], y: [0, -18, 0] }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute -top-16 -right-12 w-48 h-48 rounded-full bg-lightCream/70 blur-3xl pointer-events-none"
+          />
+          <motion.div
+            animate={{ x: [0, -20, 0], y: [0, 20, 0] }}
+            transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute -bottom-20 -left-10 w-56 h-56 rounded-full bg-softBlue/50 blur-3xl pointer-events-none"
+          />
+
+          <div className="relative flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <motion.h1
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1, duration: 0.35 }}
+                className="text-base sm:text-[15px] font-bold text-[#1A1A2E] flex items-center gap-2"
               >
-                {sortOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A0A0B0] pointer-events-none" />
+                <Gavel size={14} className="flex-shrink-0" />
+                <span className="truncate">Browse Auctions</span>
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.35 }}
+                className="text-[10px] text-[#1A1A2E]/70 mt-0.5 truncate"
+              >
+                {auctions.length} live {auctions.length === 1 ? 'auction' : 'auctions'} found
+              </motion.p>
             </div>
-
-            {/* Save Search Button */}
-            <SaveSearchButton
-              searchParams={{
-                status: activeFilters.status || 'active',
-                pincode: activeFilters.pincode || '',
-                category: activeFilters.category || '',
-                sort: sortBy
-              }}
-              onSave={fetchAuctions}
-            />
-
-            <Button 
-              onClick={() => setShowFilters(!showFilters)}
-              variant="outline"
-              className="border-[#EEECE6] text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
-            >
-              <Filter size={13} className="mr-1.5" />
-              Filters
-              {(filters.pincode || filters.category) && (
-                <span className="w-1.5 h-1.5 rounded-full bg-[#1A1A2E] ml-1" />
-              )}
-            </Button>
-            <Button 
-              onClick={() => navigate('/buyer/dashboard')}
-              variant="ghost"
-              className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
-            >
-              Dashboard
-            </Button>
+            <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+              <SaveSearchButton
+                searchParams={{
+                  status: activeFilters.status || 'active',
+                  pincode: activeFilters.pincode || '',
+                  category: activeFilters.category || '',
+                  sort: sortBy
+                }}
+                onSave={fetchAuctions}
+              />
+            </div>
           </div>
         </motion.div>
 
-        {/* Filters Panel */}
+        {/* Controls row */}
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex flex-wrap items-center gap-2 mb-3"
+        >
+          {/* Sort */}
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="pl-2.5 pr-7 py-1.5 text-[11px] bg-white/70 backdrop-blur-xl border-0 rounded-full text-[#1A1A2E] focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/40 appearance-none cursor-pointer"
+            >
+              {sortOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A0A0B0] pointer-events-none" />
+          </div>
+
+          {/* Filters toggle */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded-full transition-all ${
+              showFilters || hasActiveFilters
+                ? 'bg-[#1A1A2E] text-white'
+                : 'bg-white/70 backdrop-blur-xl text-[#1A1A2E] hover:bg-white/90'
+            }`}
+          >
+            <Filter size={11} />
+            Filters
+            {hasActiveFilters && (
+              <span className={`w-1.5 h-1.5 rounded-full ${showFilters ? 'bg-white' : 'bg-[#FFBE91]'}`} />
+            )}
+          </button>
+
+          {/* Active filter chips */}
+          {activeFilters.pincode && (
+            <button
+              onClick={() => {
+                setFilters(prev => ({ ...prev, pincode: '' }));
+                setActiveFilters(prev => ({ ...prev, pincode: '' }));
+              }}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-[#FFBE91]/20 text-[#1A1A2E] rounded-full hover:bg-[#FFBE91]/30 transition-colors"
+            >
+              <MapPin size={10} />
+              {activeFilters.pincode}
+              <X size={10} />
+            </button>
+          )}
+
+          {activeFilters.category && (
+            <button
+              onClick={() => {
+                setFilters(prev => ({ ...prev, category: '' }));
+                setActiveFilters(prev => ({ ...prev, category: '' }));
+              }}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-[#CFEBFF]/60 text-[#1A1A2E] rounded-full hover:bg-[#CFEBFF]/80 transition-colors"
+            >
+              {activeFilters.category.replace('_', ' ')}
+              <X size={10} />
+            </button>
+          )}
+
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="text-[10px] text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors px-1"
+            >
+              Clear all
+            </button>
+          )}
+        </motion.div>
+
+        {/* Filters panel */}
         <AnimatePresence>
           {showFilters && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden mb-4"
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              className="overflow-hidden"
             >
-              <div className="bg-white/80 backdrop-blur-xl rounded-xl p-4 shadow-sm border border-[#EEECE6]">
-                <div className="flex flex-wrap gap-3 items-end">
+              <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-medium text-[#A0A0B0] mb-1">Pincode</label>
-                    <input
-                      type="text"
-                      name="pincode"
-                      value={filters.pincode}
-                      onChange={handleFilterChange}
-                      placeholder="110001"
-                      maxLength="6"
-                      className="w-28 px-3 py-1.5 text-xs bg-[#F8F6F0] border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all"
-                    />
+                    <label className="block text-[10px] font-medium text-[#A0A0B0] mb-1 ml-1">Pincode</label>
+                    <div className="relative">
+                      <MapPin size={11} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0B0] pointer-events-none" />
+                      <input
+                        type="text"
+                        name="pincode"
+                        value={filters.pincode}
+                        onChange={handleFilterChange}
+                        placeholder="110001"
+                        maxLength="6"
+                        className="w-full pl-8 pr-3 py-2 text-[12px] bg-[#F8F6F0]/60 border-0 rounded-xl text-[#1A1A2E] placeholder-[#A0A0B0] focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/40 focus:bg-white transition-all"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-[#A0A0B0] mb-1">Category</label>
+                    <label className="block text-[10px] font-medium text-[#A0A0B0] mb-1 ml-1">Category</label>
                     <select
                       name="category"
                       value={filters.category}
                       onChange={handleFilterChange}
-                      className="w-32 px-3 py-1.5 text-xs bg-[#F8F6F0] border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 transition-all appearance-none"
+                      className="w-full px-3 py-2 text-[12px] bg-[#F8F6F0]/60 border-0 rounded-xl text-[#1A1A2E] focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/40 focus:bg-white transition-all appearance-none"
                     >
-                      <option value="">All</option>
+                      <option value="">All categories</option>
                       <option value="electronics">Electronics</option>
                       <option value="furniture">Furniture</option>
                       <option value="clothing">Clothing</option>
@@ -474,162 +447,166 @@ const BrowseAuctions = () => {
                       <option value="other">Other</option>
                     </select>
                   </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={applyFilters}
-                      className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-4 py-1.5 h-auto"
-                    >
-                      Apply
-                    </Button>
-                    <Button 
-                      onClick={clearFilters}
-                      variant="ghost"
-                      className="text-[#A0A0B0] hover:text-[#1A1A2E] text-xs px-3 py-1.5 h-auto"
-                    >
-                      Clear
-                    </Button>
-                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 mt-3">
+                  <button
+                    onClick={applyFilters}
+                    className="flex-1 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-[12px] font-medium py-2 rounded-xl transition-colors"
+                  >
+                    Apply Filters
+                  </button>
+                  <button
+                    onClick={clearFilters}
+                    className="px-4 py-2 text-[12px] text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors rounded-xl hover:bg-[#F8F6F0]"
+                  >
+                    Clear
+                  </button>
                 </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Error Message */}
-        {error && (
-          <div className="bg-rose-50/80 backdrop-blur-sm rounded-lg p-3 mb-4 text-rose-700 text-xs flex items-center gap-2 border border-rose-100">
-            <AlertCircle size={14} />
-            {error}
-          </div>
-        )}
-        
-        {/* Auctions Grid */}
+        {/* Error */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              className="p-3 bg-rose-50 rounded-2xl flex items-start gap-2 overflow-hidden"
+            >
+              <AlertCircle size={14} className="text-rose-600 flex-shrink-0 mt-0.5" />
+              <p className="text-[11px] font-medium text-rose-600 flex-1">{error}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Auctions grid */}
         {auctions.length === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white/60 backdrop-blur-xl rounded-xl p-8 text-center shadow-sm border border-[#EEECE6]"
+            className="bg-white/70 backdrop-blur-xl rounded-2xl p-8 text-center"
           >
-            <div className="w-12 h-12 rounded-xl bg-[#F5F3EF] flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 rounded-2xl bg-[#F8F6F0] flex items-center justify-center mx-auto mb-3">
               <Gavel size={20} className="text-[#A0A0B0]" />
             </div>
-            <h3 className="text-sm font-medium text-[#1A1A2E]">No auctions found</h3>
-            <p className="text-xs text-[#A0A0B0] mt-1">Try adjusting your filters</p>
-            <Button 
-              onClick={clearFilters}
-              className="mt-3 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-4 py-1.5 h-auto"
-            >
-              Clear Filters
-            </Button>
+            <h3 className="text-[12px] font-medium text-[#1A1A2E]">No auctions found</h3>
+            <p className="text-[10px] text-[#A0A0B0] mt-0.5">Try adjusting your filters</p>
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="mt-3 inline-flex items-center gap-1.5 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-[11px] font-medium px-4 py-2 rounded-xl transition-colors"
+              >
+                Clear Filters
+              </button>
+            )}
           </motion.div>
         ) : (
           <>
-            <motion.div 
+            <motion.div
               variants={containerVariants}
               initial="hidden"
               animate="visible"
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+              className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-4"
             >
               {auctions.map((auction) => {
-                const firstImage = auction.image_urls && auction.image_urls.length > 0 
-                  ? auction.image_urls[0] 
+                const firstImage = auction.image_urls && auction.image_urls.length > 0
+                  ? auction.image_urls[0]
                   : null;
                 const timeLeft = getTimeLeft(auction.end_time);
-                const endingSoon = isEndingSoon(auction.end_time);
                 const isActive = auction.status === 'active';
                 const currentPrice = auction.current_highest_bid || auction.starting_price;
-                
+
                 return (
                   <motion.div
                     key={auction.id}
                     variants={itemVariants}
-                    whileHover={{ y: -4 }}
-                    className="group bg-white rounded-xl border border-[#EEECE6] overflow-hidden hover:shadow-lg transition-all cursor-pointer"
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => navigate(`/buyer/auctions/${auction.id}`)}
+                    className="group bg-white/70 backdrop-blur-xl rounded-2xl overflow-hidden cursor-pointer transition-all hover:bg-white/90"
                   >
                     {/* Image */}
-                    <div className="relative">
+                    <div className="relative aspect-square overflow-hidden">
                       {firstImage ? (
                         <img
                           src={firstImage}
                           alt={auction.item_name}
-                          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                       ) : (
-                        <div className="w-full h-48 bg-[#F8F6F0] flex items-center justify-center">
-                          <Package size={32} className="text-[#A0A0B0]" />
+                        <div className="w-full h-full bg-[#F8F6F0] flex items-center justify-center">
+                          <Package size={24} className="text-[#A0A0B0]" />
                         </div>
                       )}
-                      {isActive && endingSoon && (
-                        <div className="absolute top-2 right-2 px-2 py-1 bg-rose-500 text-white text-[10px] font-medium rounded-full">
-                          Ending Soon!
-                        </div>
-                      )}
+
+                      {/* Time badge */}
                       {isActive && (
-                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-[10px] font-medium rounded-full flex items-center gap-1">
-                          <Clock size={10} />
-                          {timeLeft}
+                        <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[9px] font-semibold backdrop-blur-md ${
+                          timeLeft.urgent
+                            ? 'bg-rose-500/90 text-white'
+                            : 'bg-black/50 text-white'
+                        }`}>
+                          {timeLeft.urgent ? (
+                            <Zap size={8} className="inline mr-0.5 -mt-0.5" />
+                          ) : (
+                            <Clock size={8} className="inline mr-0.5 -mt-0.5" />
+                          )}
+                          {timeLeft.text}
                         </div>
                       )}
-                      {/* Action Buttons - Report & Favorite */}
-                      <div className="absolute top-2 left-2 flex flex-col gap-1">
+
+                      {/* Bid count */}
+                      {auction.bid_count > 0 && (
+                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-medium bg-black/50 text-white backdrop-blur-md">
+                          {auction.bid_count} {auction.bid_count === 1 ? 'bid' : 'bids'}
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="absolute top-2 left-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => handleReport(auction, e)}
-                          className="p-1.5 rounded-lg bg-black/40 text-white/70 hover:bg-black/60 hover:text-white transition-colors"
+                          className="p-1.5 rounded-full bg-black/50 text-white/80 hover:bg-black/70 hover:text-white transition-colors backdrop-blur-sm"
                           title="Report"
                         >
-                          <Flag size={14} />
+                          <Flag size={11} />
                         </button>
                         <FavoriteButton
                           targetType="auction"
                           targetId={auction.id}
-                          size={16}
-                          className="bg-black/40 hover:bg-black/60"
+                          size={13}
+                          className="bg-black/50 hover:bg-black/70 backdrop-blur-sm"
                         />
                       </div>
                     </div>
 
-                    <div className="p-3">
-                      <h3 className="text-sm font-medium text-[#1A1A2E] truncate">
+                    {/* Info */}
+                    <div className="p-2.5 sm:p-3">
+                      <h3 className="text-[11px] sm:text-[12px] font-semibold text-[#1A1A2E] truncate leading-tight">
                         {auction.item_name}
                       </h3>
-                      {auction.description && (
-                        <p className="text-xs text-[#A0A0B0] line-clamp-1 mt-0.5">
-                          {auction.description}
-                        </p>
-                      )}
-                      
-                      <div className="flex items-center justify-between mt-2">
-                        <div>
-                          <p className="text-[10px] text-[#A0A0B0]">Current Bid</p>
-                          <p className="text-sm font-bold text-[#1A1A2E]">
-                            ₹{currentPrice.toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] text-[#A0A0B0]">Bids</p>
-                          <p className="text-xs font-medium text-[#1A1A2E]">
-                            {auction.bid_count || 0}
-                          </p>
-                        </div>
+
+                      <div className="flex items-center gap-0.5 mt-1">
+                        <IndianRupee size={10} className="text-[#FFBE91]" />
+                        <span className="text-[12px] sm:text-[13px] font-bold text-[#1A1A2E]">
+                          {currentPrice?.toLocaleString('en-IN')}
+                        </span>
                       </div>
 
-                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#EEECE6]">
-                        <div className="flex items-center gap-1 text-[10px] text-[#A0A0B0]">
-                          <MapPin size={10} />
-                          {auction.pincode}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-[#FFBE91] hover:text-[#FFA87A] text-xs px-2 py-0.5 h-auto group-hover:translate-x-0.5 transition-transform"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/buyer/auctions/${auction.id}`);
-                          }}
-                        >
-                          Bid Now →
-                        </Button>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <span className="text-[9px] text-[#A0A0B0] truncate">
+                          {auction.category?.replace('_', ' ') || 'General'}
+                        </span>
+                        {auction.pincode && (
+                          <span className="text-[9px] text-[#A0A0B0] flex items-center gap-0.5 flex-shrink-0">
+                            <MapPin size={8} />
+                            {auction.pincode}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -637,10 +614,10 @@ const BrowseAuctions = () => {
               })}
             </motion.div>
 
-            {/* ====== RECOMMENDATIONS SECTION ====== */}
+            {/* Recommendations */}
             {recommendations.length > 0 && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
                 className="mt-8"
@@ -664,9 +641,21 @@ const BrowseAuctions = () => {
             )}
           </>
         )}
+
+        {/* Footer */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="mt-5 text-center"
+        >
+          <p className="text-[9px] text-[#A0A0B0] flex items-center justify-center gap-1">
+            <Sparkles size={9} className="text-[#FFBE91]" />
+            Highest bid wins · Auctions auto-close at end time
+          </p>
+        </motion.div>
       </div>
 
-      {/* Report Modal */}
       <ReportModal
         isOpen={showReportModal}
         onClose={() => {
@@ -676,9 +665,7 @@ const BrowseAuctions = () => {
         targetType="auction"
         targetId={reportTarget?.id}
         targetName={reportTarget?.item_name}
-        onSuccess={() => {
-          fetchAuctions();
-        }}
+        onSuccess={() => fetchAuctions()}
       />
     </div>
   );

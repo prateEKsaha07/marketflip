@@ -1,4 +1,4 @@
-import { Loader2, Wand2, Sparkles, Mic } from "lucide-react";
+import { Command, Loader2, Wand2, Mic } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -50,22 +50,25 @@ export default function AssistantInput({
   return (
     <div className="p-4 flex flex-col gap-3">
       {/* Helper text */}
-      <div className="flex items-start gap-2 text-xs text-gray-500">
-        <Sparkles size={14} className="text-indigo-400 flex-shrink-0 mt-0.5" />
+      <div className="flex items-start gap-2 text-[11px] text-[#A0A0B0] leading-relaxed">
+        <span className="w-5 h-5 rounded-full grid place-items-center
+                         bg-[#1A1A2E] text-[#FFFCE1] flex-shrink-0 mt-0.5">
+          <Command size={10} strokeWidth={2.4} />
+        </span>
         {isShop ? (
           <p>
             Ask about your auctions or bids. Try{" "}
-            <span className="text-gray-700 font-medium">
+            <span className="text-[#4A4A5A] font-medium">
               "how's my auction going?"
             </span>
           </p>
         ) : (
           <p>
-            Ask a question about your requests or bids, or describe something
-            you want to buy. Be specific —{" "}
-            <span className="text-gray-700 font-medium">item</span>,{" "}
-            <span className="text-gray-700 font-medium">budget</span>,{" "}
-            <span className="text-gray-700 font-medium">pincode</span>.
+            Ask about your requests or bids — or describe something you want
+            to buy. Be specific:{" "}
+            <span className="text-[#4A4A5A] font-medium">item</span>,{" "}
+            <span className="text-[#4A4A5A] font-medium">budget</span>,{" "}
+            <span className="text-[#4A4A5A] font-medium">pincode</span>.
           </p>
         )}
       </div>
@@ -77,18 +80,21 @@ export default function AssistantInput({
         placeholder={placeholder}
         rows={5}
         disabled={isParsing}
-        className="w-full resize-none rounded-xl border border-gray-200
-                   p-3 text-sm text-gray-900 placeholder:text-gray-400
-                   focus:outline-none focus:ring-2 focus:ring-indigo-400
-                   focus:border-transparent transition
-                   disabled:bg-gray-50 disabled:cursor-not-allowed"
+        className="w-full resize-none rounded-xl bg-[#F8F6F0]/60 border-0
+                   p-3 text-[12px] leading-relaxed text-[#1A1A2E]
+                   placeholder:text-[#A0A0B0]
+                   focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/40
+                   focus:bg-white transition-all
+                   disabled:opacity-60 disabled:cursor-not-allowed
+                   [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       />
 
       {/* Example chips */}
       {!text && !isParsing && (
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs text-gray-500 font-medium">
-            Try an example:
+          <span className="text-[10px] text-[#A0A0B0] font-medium
+                           uppercase tracking-wide">
+            Try an example
           </span>
           <div className="flex flex-wrap gap-1.5">
             {examples.map((example, idx) => (
@@ -96,13 +102,15 @@ export default function AssistantInput({
                 key={idx}
                 type="button"
                 onClick={() => applyExample(example)}
-                whileHover={reduceMotion ? {} : { scale: 1.02 }}
-                whileTap={reduceMotion ? {} : { scale: 0.98 }}
-                className="text-xs px-2.5 py-1.5 rounded-full
-                           border border-gray-200 bg-gray-50
-                           text-gray-600 hover:border-indigo-300
-                           hover:bg-indigo-50 hover:text-indigo-700
-                           transition-colors text-left"
+                whileHover={reduceMotion ? {} : { y: -1 }}
+                whileTap={reduceMotion ? {} : { scale: 0.97 }}
+                transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                className="text-[10px] px-2.5 py-1.5 rounded-full
+                           bg-[#F8F6F0]/70 text-[#4A4A5A]
+                           hover:bg-[#F8F6F0] hover:text-[#1A1A2E]
+                           transition-colors text-left
+                           focus:outline-none focus-visible:ring-2
+                           focus-visible:ring-[#FFBE91]/40"
               >
                 {example}
               </motion.button>
@@ -121,55 +129,64 @@ export default function AssistantInput({
               : { opacity: 1, x: [0, -4, 4, -3, 3, 0] }
           }
           transition={{ duration: 0.4 }}
-          className="flex items-center gap-2 rounded-lg bg-red-50
-                     px-3 py-2 text-sm text-red-700"
+          className="flex items-center gap-2 rounded-lg bg-rose-50
+                     px-3 py-2 text-[11px] text-rose-700"
         >
-          <span className="flex-1">{error}</span>
+          <span className="flex-1 leading-relaxed">{error}</span>
           <button
             onClick={onRetry}
-            className="text-red-700 underline text-xs font-medium
-                       hover:text-red-800"
+            className="text-rose-700 underline text-[10px] font-medium
+                       hover:text-rose-800
+                       focus:outline-none focus-visible:ring-2
+                       focus-visible:ring-rose-300 rounded"
           >
             Retry
           </button>
         </motion.div>
       )}
 
-      {/* Submit row — mic + ask */}
-      <div className="flex items-center justify-end gap-2">
+      {/* Submit row */}
+      <div className="flex items-center justify-end gap-1.5 pt-1">
         <motion.button
           type="button"
           onClick={handleMicClick}
           disabled={isParsing}
-          whileHover={reduceMotion ? {} : { scale: 1.08 }}
-          whileTap={reduceMotion ? {} : { scale: 0.92 }}
+          whileHover={reduceMotion ? {} : { scale: 1.06 }}
+          whileTap={reduceMotion ? {} : { scale: 0.94 }}
+          transition={{ duration: 0.15 }}
           aria-label="Voice input (coming soon)"
-          className="p-2 rounded-lg text-gray-400 hover:text-indigo-500
-                     hover:bg-indigo-50 transition-colors
-                     disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2 rounded-full text-[#A0A0B0]
+                     hover:text-[#1A1A2E] hover:bg-[#F8F6F0]
+                     transition-colors
+                     disabled:opacity-50 disabled:cursor-not-allowed
+                     focus:outline-none focus-visible:ring-2
+                     focus-visible:ring-[#FFBE91]"
         >
-          <Mic size={16} />
+          <Mic size={14} strokeWidth={2.2} />
         </motion.button>
 
         <button
           onClick={onParse}
           disabled={!canParse}
-          className="inline-flex items-center gap-2 rounded-lg
-                     bg-indigo-500 px-4 py-2 text-sm font-medium text-white
-                     transition hover:bg-indigo-600 hover:-translate-y-px
-                     active:translate-y-0
-                     disabled:opacity-50 disabled:cursor-not-allowed
-                     disabled:hover:translate-y-0"
+          className="inline-flex items-center gap-1.5 rounded-full
+                     bg-[#1A1A2E] px-4 py-1.5 text-[11px] font-medium
+                     text-[#FFFCE1]
+                     transition-colors duration-150
+                     hover:bg-[#2A2A3E]
+                     disabled:opacity-40 disabled:cursor-not-allowed
+                     focus:outline-none focus-visible:ring-2
+                     focus-visible:ring-[#FFBE91] focus-visible:ring-offset-2
+                     focus-visible:ring-offset-white"
         >
           {isParsing ? (
             <>
-              <Loader2 size={16} className="animate-spin" />
+              <Loader2 size={12} strokeWidth={2.2} className="animate-spin" />
               <span>Thinking…</span>
             </>
           ) : (
             <>
               <span>Ask</span>
-              <Wand2 size={16} />
+              <Wand2 size={12} strokeWidth={2.2} />
             </>
           )}
         </button>

@@ -12,11 +12,7 @@ import {
   Clock, 
   CheckCircle, 
   History,
-  ChevronRight,
-  Store,
-  LogOut,
   Package,
-  TrendingUp,
   Users
 } from 'lucide-react';
 import api from '../../api/client';
@@ -32,43 +28,35 @@ const BuyerRequestDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  // Fetch stats on mount
   useEffect(() => {
     fetchStats();
   }, []);
 
-  // Fetch all request statistics
   const fetchStats = async () => {
     setLoading(true);
     try {
-      // Fetch open requests
-      const openResponse = await api.get('/requests?status=open');
+      const [openResponse, purchasedResponse, completedResponse, allResponse] = await Promise.all([
+        api.get('/requests?status=open'),
+        api.get('/requests?status=purchased'),
+        api.get('/requests?status=completed'),
+        api.get('/requests?status=all'),
+      ]);
+
       const openRequests = openResponse.data || [];
-      
-      // Fetch purchased requests (finalized)
-      const purchasedResponse = await api.get('/requests?status=purchased');
       const purchasedRequests = purchasedResponse.data || [];
-      
-      // Fetch completed requests
-      const completedResponse = await api.get('/requests?status=completed');
       const completedRequests = completedResponse.data || [];
-      
-      const finalized = purchasedRequests.length + completedRequests.length;
-      
-      // Fetch all requests for total
-      const allResponse = await api.get('/requests?status=all');
       const allRequests = allResponse.data || [];
-      
-      // Calculate total bids from all requests
+
+      const finalized = purchasedRequests.length + completedRequests.length;
       let totalBids = 0;
       allRequests.forEach(req => {
         totalBids += (req.bid_count || 0);
       });
-      
+
       setStats({
         total: allRequests.length,
         open: openRequests.length,
-        finalized: finalized,
+        finalized,
         total_bids: totalBids
       });
     } catch (err) {
@@ -78,99 +66,92 @@ const BuyerRequestDashboard = () => {
     }
   };
 
-  // Handle logout
   const handleLogout = async () => {
     await logout();
     navigate('/auth');
   };
 
-  // KPI Cards
   const statCards = [
     { 
       key: 'total', 
-      label: 'Total Requests', 
+      label: 'Total', 
       value: stats.total, 
-      icon: <FileText size={18} className="text-[#FFBE91]" />,
-      bg: 'bg-[#FFFCE1]',
-      border: 'border-[#FFDDB0]',
-      desc: 'All your requests'
+      icon: <FileText size={15} />,
+      accent: 'text-[#FFBE91]',
+      bg: 'bg-[#FFBE91]/10',
+      desc: 'Requests'
     },
     { 
       key: 'open', 
-      label: 'Open Requests', 
+      label: 'Open', 
       value: stats.open, 
-      icon: <Clock size={18} className="text-emerald-600" />,
-      bg: 'bg-emerald-50',
-      border: 'border-emerald-200',
+      icon: <Clock size={15} />,
+      accent: 'text-emerald-600',
+      bg: 'bg-emerald-500/10',
       desc: 'Awaiting bids'
     },
     { 
       key: 'finalized', 
       label: 'Finalized', 
       value: stats.finalized, 
-      icon: <CheckCircle size={18} className="text-blue-600" />,
-      bg: 'bg-blue-50',
-      border: 'border-blue-200',
-      desc: 'Selected & completed'
+      icon: <CheckCircle size={15} />,
+      accent: 'text-blue-600',
+      bg: 'bg-blue-500/10',
+      desc: 'Completed'
     },
     { 
       key: 'bids', 
-      label: 'Total Bids Received', 
+      label: 'Bids', 
       value: stats.total_bids, 
-      icon: <Users size={18} className="text-violet-600" />,
-      bg: 'bg-violet-50',
-      border: 'border-violet-200',
-      desc: 'Across all requests'
+      icon: <Users size={15} />,
+      accent: 'text-violet-600',
+      bg: 'bg-violet-500/10',
+      desc: 'Received'
     },
   ];
 
-  // Navigation items for the dashboard
   const navItems = [
     {
       id: 'post',
       label: 'Post Request',
       icon: <Plus size={16} />,
       path: '/buyer/post-request',
-      color: 'bg-gradient-to-r from-[#FFBE91] to-[#FFDDB0] hover:from-[#FFA87A] hover:to-[#FFDDB0] text-[#1A1A2E]',
+      primary: true,
       description: 'Create a new request'
     },
     {
       id: 'open',
-      label: 'My Open Requests',
+      label: 'Open Requests',
       icon: <Clock size={16} />,
       path: '/buyer/my-open-requests',
-      color: 'border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E]',
-      description: 'Active requests awaiting bids'
+      description: 'Awaiting bids'
     },
     {
       id: 'finalized',
-      label: 'Finalized Requests',
+      label: 'Finalized',
       icon: <CheckCircle size={16} />,
       path: '/buyer/purchases',
-      color: 'border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E]',
-      description: 'Selected, delivered & completed'
+      description: 'Selected & completed'
     },
     {
       id: 'history',
-      label: 'Request History',
+      label: 'History',
       icon: <History size={16} />,
       path: '/buyer/history',
-      color: 'border-[#EEECE6] hover:border-[#1A1A2E] text-[#1A1A2E]',
-      description: 'Complete audit log'
+      description: 'Full audit log'
     }
   ];
 
-  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { 
       opacity: 1,
-      transition: { staggerChildren: 0.06 }
+      transition: { staggerChildren: 0.05 }
     }
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 12 },
+    hidden: { opacity: 0, y: 10 },
     visible: { 
       opacity: 1, 
       y: 0,
@@ -178,14 +159,12 @@ const BuyerRequestDashboard = () => {
     }
   };
 
-  // Show loading state
   if (loading) {
     return <LoadingAnimation />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
-      {/* Modern Reusable Navbar - Buyer Request Dashboard */}
+    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-3 sm:p-4 md:p-6">
       <ModernNavbar
         navItems={[
           { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
@@ -214,96 +193,138 @@ const BuyerRequestDashboard = () => {
         }}
       />
 
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
         <motion.div 
-          initial={{ opacity: 0, y: -8 }}
+          initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="flex flex-wrap justify-between items-center gap-3 mb-6"
+          className="flex items-start gap-2 sm:gap-3 mb-4 sm:mb-6"
         >
-          <div className="flex items-center gap-3">
-            <Button 
-              onClick={() => navigate('/buyer/dashboard')}
-              variant="ghost"
-              className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
-            >
-              <ArrowLeft size={14} className="mr-1.5" />
-              Dashboard
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold text-[#1A1A2E] flex items-center gap-2">
-                <FileText size={20} className="text-[#FFBE91]" />
-                Request Dashboard
-              </h1>
-              <p className="text-xs text-[#A0A0B0] mt-0.5">
-                {stats.total} total requests · {stats.open} open · {stats.finalized} finalized
-              </p>
-            </div>
+          <Button 
+            onClick={() => navigate('/buyer/dashboard')}
+            variant="ghost"
+            className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-[11px] px-2 sm:px-3 py-1.5 h-auto flex-shrink-0 -ml-1 sm:ml-0"
+          >
+            <ArrowLeft size={13} className="mr-1 sm:mr-1.5" />
+            Back
+          </Button>
+          <div className="min-w-0 flex-1 pt-0.5">
+            <h1 className="text-base sm:text-lg font-semibold text-[#1A1A2E] flex items-center gap-1.5">
+              <FileText size={16} className="text-[#FFBE91] flex-shrink-0" />
+              <span className="truncate">Request Dashboard</span>
+            </h1>
+            <p className="text-[10px] sm:text-xs text-[#A0A0B0] mt-0.5">
+              {stats.total} total · {stats.open} open · {stats.finalized} finalized
+            </p>
           </div>
         </motion.div>
 
-        {/* Stats Grid - 4 KPIs */}
+        {/* Stats — compact pill-style on mobile, cards on desktop */}
         <motion.div 
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"
+          className="grid grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6"
         >
           {statCards.map((stat) => (
             <motion.div
               key={stat.key}
               variants={itemVariants}
-              className={`bg-white/80 backdrop-blur-xl rounded-xl p-4 border ${stat.border} shadow-sm hover:shadow-md transition-all`}
+              className="bg-white/70 backdrop-blur-xl rounded-xl p-2.5 sm:p-3.5 transition-all"
             >
-              <div className="flex items-center justify-between">
-                <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center`}>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-1.5 sm:gap-0">
+                <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg ${stat.bg} flex items-center justify-center ${stat.accent} flex-shrink-0`}>
                   {stat.icon}
                 </div>
-                <span className="text-xl font-bold text-[#1A1A2E]">{stat.value}</span>
+                <span className="text-lg sm:text-xl font-bold text-[#1A1A2E] leading-none">{stat.value}</span>
               </div>
-              <p className="text-xs font-medium text-[#1A1A2E] mt-1">{stat.label}</p>
-              <p className="text-[10px] text-[#A0A0B0]">{stat.desc}</p>
+              <p className="text-[10px] sm:text-[11px] font-medium text-[#1A1A2E] mt-1.5 sm:mt-1 truncate">
+                {stat.label}
+              </p>
+              <p className="text-[9px] text-[#A0A0B0] hidden sm:block">{stat.desc}</p>
             </motion.div>
           ))}
         </motion.div>
 
-        {/* Navigation Grid - 4 cards */}
+        {/* Primary CTA — Post Request */}
+        <motion.button
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.35 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/buyer/post-request')}
+          className="w-full mb-4 sm:mb-5 relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#FFBE91] to-[#FFDDB0] p-4 sm:p-5 flex items-center justify-between group shadow-sm hover:shadow-md transition-shadow"
+        >
+          <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-white/40 blur-2xl pointer-events-none" />
+          <div className="relative flex items-center gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/60 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+              <Plus size={18} className="text-[#1A1A2E]" />
+            </div>
+            <div className="text-left">
+              <p className="text-[13px] sm:text-sm font-semibold text-[#1A1A2E]">Post a new request</p>
+              <p className="text-[10px] sm:text-[11px] text-[#1A1A2E]/60">Get bids from shops</p>
+            </div>
+          </div>
+          <div className="relative text-[#1A1A2E]/50 group-hover:text-[#1A1A2E] group-hover:translate-x-0.5 transition-all">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </div>
+        </motion.button>
+
+        {/* Navigation Row — compact list, not cards */}
         <motion.div 
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6"
+          className="mb-5"
         >
-          {navItems.map((item) => (
-            <motion.div
-              key={item.id}
-              variants={itemVariants}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Button
+          <div className="flex items-center gap-1.5 mb-2.5 px-1">
+            <span className="text-[10px] font-semibold text-[#A0A0B0] uppercase tracking-[0.08em]">
+              Manage
+            </span>
+            <div className="flex-1 h-px bg-[#EEECE6]" />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {navItems.filter(i => !i.primary).map((item) => (
+              <motion.button
+                key={item.id}
+                variants={itemVariants}
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => navigate(item.path)}
-                variant="outline"
-                className={`w-full py-4 h-auto flex flex-col items-center justify-center gap-2 ${item.color} transition-all shadow-sm hover:shadow-md`}
+                className="bg-white/70 backdrop-blur-xl rounded-xl p-3 flex items-center gap-3 text-left transition-all hover:bg-white/90 group"
               >
-                <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#F8F6F0] flex items-center justify-center text-[#1A1A2E] flex-shrink-0 group-hover:bg-[#FFBE91]/20 transition-colors">
                   {item.icon}
-                  <span className="text-sm font-medium">{item.label}</span>
                 </div>
-                <span className="text-[10px] text-[#A0A0B0]">{item.description}</span>
-              </Button>
-            </motion.div>
-          ))}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] sm:text-[13px] font-medium text-[#1A1A2E] truncate">
+                    {item.label}
+                  </p>
+                  <p className="text-[10px] text-[#A0A0B0] truncate">
+                    {item.description}
+                  </p>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#A0A0B0] flex-shrink-0 group-hover:text-[#1A1A2E] group-hover:translate-x-0.5 transition-all">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </motion.button>
+            ))}
+          </div>
         </motion.div>
 
-        {/* Quick Stats / Info */}
+        {/* Footer Hint */}
         <motion.div 
-          variants={itemVariants}
-          className="bg-white/80 backdrop-blur-xl rounded-xl p-4 border border-[#EEECE6] shadow-sm text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="text-center"
         >
-          <p className="text-xs text-[#A0A0B0]">
-             Post a request to get bids from shops · Track your purchases in Finalized Requests
+          <p className="text-[10px] text-[#A0A0B0]">
+            Post a request to receive bids · Track purchases in Finalized
           </p>
         </motion.div>
       </div>

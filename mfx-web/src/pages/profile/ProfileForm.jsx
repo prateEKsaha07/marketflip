@@ -9,35 +9,27 @@ import {
   User, 
   Store, 
   Phone, 
-  MapPin, 
   Calendar, 
   Clock, 
-  Building,
-  Briefcase,
-  FileText,
-  Camera,
-  X,
-  Loader2,
-  CheckCircle,
-  AlertCircle,
-  Sparkles,
-  Save,
-  Tag,
-  Home,
-  ChevronDown,
-  ChevronUp,
-  Lock,
-  Mail,
-  Shield,
-  Award,
-  TrendingUp
+  Camera, 
+  X, 
+  Loader2, 
+  CheckCircle, 
+  AlertCircle, 
+  Sparkles, 
+  Save, 
+  Home, 
+  ChevronDown, 
+  ChevronUp, 
+  Lock, 
+  Shield
 } from 'lucide-react';
 import api from '../../api/client';
 
 const ProfileFormPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { uploadSingle, uploading, progress, error: uploadError } = useCloudinary();
+  const { uploadSingle, uploading, progress } = useCloudinary();
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -58,11 +50,7 @@ const ProfileFormPage = () => {
     gender: '',
     preferred_categories: [],
     shop_name: '',
-    business_hours: {
-      monday_friday: '',
-      saturday: '',
-      sunday: ''
-    },
+    business_hours: { monday_friday: '', saturday: '', sunday: '' },
     years_in_business: '',
     gst_number: '',
     identity_number: '',
@@ -77,7 +65,6 @@ const ProfileFormPage = () => {
   const [photoUploaded, setPhotoUploaded] = useState(false);
   const bioTextareaRef = useRef(null);
 
-  // Auto-resize bio textarea
   useEffect(() => {
     const textarea = bioTextareaRef.current;
     if (textarea) {
@@ -86,7 +73,6 @@ const ProfileFormPage = () => {
     }
   }, [formData.bio]);
 
-  // Time slot options for business hours
   const timeSlots = [
     'Closed',
     '9:00 AM - 6:00 PM',
@@ -125,11 +111,7 @@ const ProfileFormPage = () => {
         gender: data.gender || '',
         preferred_categories: data.preferred_categories || [],
         shop_name: data.shop_name || '',
-        business_hours: data.business_hours || {
-          monday_friday: '',
-          saturday: '',
-          sunday: ''
-        },
+        business_hours: data.business_hours || { monday_friday: '', saturday: '', sunday: '' },
         years_in_business: data.years_in_business || '',
         gst_number: data.gst_number || '',
         identity_number: data.identity_number || '',
@@ -171,16 +153,14 @@ const ProfileFormPage = () => {
       const current = prev.preferred_categories || [];
       if (current.includes(category)) {
         return { ...prev, preferred_categories: current.filter(c => c !== category) };
-      } else {
-        return { ...prev, preferred_categories: [...current, category] };
       }
+      return { ...prev, preferred_categories: [...current, category] };
     });
   };
 
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      console.log('Photo selected:', file.name, file.size);
       setPhotoFile(file);
       setPhotoPreview(URL.createObjectURL(file));
       setPhotoUploaded(false);
@@ -189,15 +169,9 @@ const ProfileFormPage = () => {
   };
 
   const uploadPhoto = async () => {
-    if (!photoFile) {
-      console.log('No photo file to upload');
-      return null;
-    }
-    
-    console.log('Uploading photo:', photoFile.name);
+    if (!photoFile) return null;
     try {
       const result = await uploadSingle(photoFile);
-      console.log('Upload result:', result);
       if (result && result.url) {
         setPhotoUploaded(true);
         setFormData(prev => ({ ...prev, profile_photo_url: result.url }));
@@ -224,10 +198,7 @@ const ProfileFormPage = () => {
     const val = e.target.value ? parseInt(e.target.value) : null;
     setFormData(prev => ({
       ...prev,
-      budget_range_preference: {
-        ...(prev.budget_range_preference || {}),
-        min: val
-      }
+      budget_range_preference: { ...(prev.budget_range_preference || {}), min: val }
     }));
   };
 
@@ -235,10 +206,7 @@ const ProfileFormPage = () => {
     const val = e.target.value ? parseInt(e.target.value) : null;
     setFormData(prev => ({
       ...prev,
-      budget_range_preference: {
-        ...(prev.budget_range_preference || {}),
-        max: val
-      }
+      budget_range_preference: { ...(prev.budget_range_preference || {}), max: val }
     }));
   };
 
@@ -247,11 +215,6 @@ const ProfileFormPage = () => {
     setSaving(true);
     setError('');
     setSuccess('');
-    
-    console.log('=== SUBMITTING PROFILE ===');
-    console.log('Photo file:', photoFile ? photoFile.name : 'None');
-    console.log('Photo uploaded:', photoUploaded);
-    console.log('Current profile_photo_url:', formData.profile_photo_url);
     
     if (!formData.full_name.trim()) {
       setError('Full name is required');
@@ -269,17 +232,8 @@ const ProfileFormPage = () => {
       let finalPhotoUrl = formData.profile_photo_url || '';
       
       if (photoFile && !photoUploaded) {
-        console.log('Uploading photo before saving profile...');
         const uploadedUrl = await uploadPhoto();
-        if (uploadedUrl) {
-          finalPhotoUrl = uploadedUrl;
-          console.log('Photo uploaded successfully:', finalPhotoUrl);
-        } else {
-          console.warn('Photo upload failed or returned no URL');
-        }
-      } else if (photoFile && photoUploaded) {
-        finalPhotoUrl = formData.profile_photo_url || '';
-        console.log('Photo already uploaded, using existing URL:', finalPhotoUrl);
+        if (uploadedUrl) finalPhotoUrl = uploadedUrl;
       }
       
       const submitData = {
@@ -305,15 +259,8 @@ const ProfileFormPage = () => {
         submitData.budget_range_preference = formData.budget_range_preference || null;
       }
       
-      if (submitData.date_of_birth === '') {
-        submitData.date_of_birth = null;
-      }
-      
-      if (submitData.gender === '') {
-        submitData.gender = null;
-      }
-      
-      console.log('Submitting profile data:', submitData);
+      if (submitData.date_of_birth === '') submitData.date_of_birth = null;
+      if (submitData.gender === '') submitData.gender = null;
       
       await api.patch(`/auth/profiles/${user?.user_id}`, submitData);
       setSuccess('Profile updated successfully!');
@@ -330,51 +277,53 @@ const ProfileFormPage = () => {
     }
   };
 
-  const categories = [
-    'electronics', 'furniture', 'clothing', 'books', 
-    'home_kitchen', 'vehicles', 'other'
-  ];
-
+  const categories = ['electronics', 'furniture', 'clothing', 'books', 'home_kitchen', 'vehicles', 'other'];
   const genderOptions = ['male', 'female', 'other', 'prefer_not_to_say'];
   const identityTypeOptions = ['pan', 'aadhaar', 'other'];
-
   const backPath = isShopOwner ? '/shop/profile' : '/buyer/profile';
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 size={24} className="animate-spin text-[#1A1A2E]" />
-          <p className="text-xs text-[#A0A0B0]">Loading profile...</p>
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 size={20} className="animate-spin text-[#1A1A2E]" />
+          <p className="text-[11px] text-[#A0A0B0]">Loading profile...</p>
         </div>
       </div>
     );
   }
 
+  /* ---------- Shared input styling ---------- */
+  const inputClass = "w-full px-3 py-2 text-[13px] sm:text-sm bg-white border border-[#EEECE6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/30 focus:border-[#FFBE91] transition-all";
+  const selectClass = `${inputClass} appearance-none`;
+  const labelClass = "block text-[11px] sm:text-xs font-medium text-[#A0A0B0] mb-1";
+  const sectionTitleClass = "text-[11px] sm:text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2";
+  const sectionWrapperClass = "bg-[#F8F6F0]/50 rounded-xl p-3 sm:p-4";
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-3 sm:p-4 md:p-6">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <motion.div 
-          initial={{ opacity: 0, y: -8 }}
+          initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="flex items-center gap-3 mb-6"
+          className="flex items-start gap-2 sm:gap-3 mb-4 sm:mb-6"
         >
           <Button 
             onClick={() => navigate(backPath)}
             variant="ghost"
-            className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-xs px-3 py-1.5 h-auto"
+            className="text-[#A0A0B0] hover:text-[#1A1A2E] hover:bg-[#F5F3EF] text-[11px] px-2 sm:px-3 py-1.5 h-auto flex-shrink-0 -ml-1 sm:ml-0"
           >
-            <ArrowLeft size={14} className="mr-1.5" />
+            <ArrowLeft size={13} className="mr-1 sm:mr-1.5" />
             Back
           </Button>
-          <div>
-            <h1 className="text-xl font-semibold text-[#1A1A2E] flex items-center gap-2">
-              <Sparkles size={18} className="text-[#FFBE91]" />
+          <div className="min-w-0 flex-1 pt-0.5">
+            <h1 className="text-base sm:text-lg font-semibold text-[#1A1A2E] flex items-center gap-1.5 truncate">
+              <Sparkles size={15} className="text-[#FFBE91] flex-shrink-0" />
               Edit Profile
             </h1>
-            <p className="text-xs text-[#A0A0B0] mt-0.5">
+            <p className="text-[10px] sm:text-xs text-[#A0A0B0] mt-0.5 truncate">
               Complete your profile to get better matches
             </p>
           </div>
@@ -382,23 +331,23 @@ const ProfileFormPage = () => {
 
         {/* Form */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="bg-white/80 backdrop-blur-xl rounded-xl border border-[#EEECE6] shadow-sm overflow-hidden"
+          className="bg-white/80 backdrop-blur-xl rounded-xl shadow-sm overflow-hidden"
         >
-          <div className="h-1 bg-gradient-to-r from-[#FFBE91] via-[#FFDDB0] to-[#CFEBFF]" />
+          <div className="h-0.5 bg-gradient-to-r from-[#FFBE91] via-[#FFDDB0] to-[#CFEBFF]" />
           
-          <div className="p-6">
+          <div className="p-3 sm:p-5 md:p-6">
             {/* Success/Error Messages */}
             {success && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-3"
+                className="mb-3 p-2.5 bg-emerald-50 rounded-lg flex items-start gap-2"
               >
-                <CheckCircle size={16} className="text-emerald-600" />
-                <p className="text-sm text-emerald-700">{success}</p>
+                <CheckCircle size={14} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+                <p className="text-[11px] sm:text-xs text-emerald-700 flex-1">{success}</p>
               </motion.div>
             )}
 
@@ -406,33 +355,27 @@ const ProfileFormPage = () => {
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-3"
+                className="mb-3 p-2.5 bg-rose-50 rounded-lg flex items-start gap-2"
               >
-                <AlertCircle size={16} className="text-rose-600" />
-                <p className="text-sm text-rose-700">{error}</p>
+                <AlertCircle size={14} className="text-rose-600 flex-shrink-0 mt-0.5" />
+                <p className="text-[11px] sm:text-xs text-rose-700 flex-1">{error}</p>
               </motion.div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               {/* Profile Photo */}
               <div>
-                <label className="block text-xs font-semibold text-[#1A1A2E] mb-2">
-                  Profile Photo
-                </label>
-                <div className="flex items-center gap-4">
-                  <div className="relative w-20 h-20 rounded-full overflow-hidden bg-[#F8F6F0] border-2 border-[#EEECE6] flex-shrink-0">
+                <label className={labelClass}>Profile Photo</label>
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-[#F8F6F0] flex-shrink-0">
                     {photoPreview ? (
-                      <img
-                        src={photoPreview}
-                        alt="Profile"
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={photoPreview} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         {isShopOwner ? (
-                          <Store size={28} className="text-[#A0A0B0]" />
+                          <Store size={22} className="text-[#A0A0B0]" />
                         ) : (
-                          <User size={28} className="text-[#A0A0B0]" />
+                          <User size={22} className="text-[#A0A0B0]" />
                         )}
                       </div>
                     )}
@@ -440,13 +383,13 @@ const ProfileFormPage = () => {
                       <button
                         type="button"
                         onClick={removePhoto}
-                        className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 hover:bg-rose-600 transition-colors"
+                        className="absolute top-0 right-0 bg-rose-500 text-white rounded-full p-1 hover:bg-rose-600 transition-colors"
                       >
-                        <X size={12} />
+                        <X size={11} />
                       </button>
                     )}
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
@@ -454,50 +397,48 @@ const ProfileFormPage = () => {
                       className="hidden"
                       id="profile-photo"
                     />
-                    <label
-                      htmlFor="profile-photo"
-                      className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium bg-[#F8F6F0] border border-[#EEECE6] rounded-lg cursor-pointer hover:bg-[#F5F3EF] transition-colors"
-                    >
-                      <Camera size={14} />
-                      Choose Photo
-                    </label>
-                    {photoFile && !photoUploaded && (
-                      <Button
-                        type="button"
-                        onClick={uploadPhoto}
-                        disabled={uploading}
-                        className="ml-2 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-xs px-3 py-1.5 h-auto"
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label
+                        htmlFor="profile-photo"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium bg-[#F8F6F0] rounded-lg cursor-pointer hover:bg-[#F5F3EF] transition-colors"
                       >
-                        {uploading ? <Loader2 size={12} className="animate-spin" /> : 'Upload Photo'}
-                      </Button>
-                    )}
-                    {photoUploaded && (
-                      <span className="ml-2 text-xs text-emerald-600 flex items-center gap-1">
-                        <CheckCircle size={12} />
-                        Photo uploaded
-                      </span>
-                    )}
+                        <Camera size={12} />
+                        Choose Photo
+                      </label>
+                      {photoFile && !photoUploaded && (
+                        <Button
+                          type="button"
+                          onClick={uploadPhoto}
+                          disabled={uploading}
+                          className="bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-[11px] px-3 py-1.5 h-auto"
+                        >
+                          {uploading ? <Loader2 size={11} className="animate-spin" /> : 'Upload'}
+                        </Button>
+                      )}
+                      {photoUploaded && (
+                        <span className="text-[10px] text-emerald-600 flex items-center gap-1">
+                          <CheckCircle size={10} />
+                          Uploaded
+                        </span>
+                      )}
+                    </div>
                     {uploading && (
-                      <div className="mt-1 text-[10px] text-[#A0A0B0]">
-                        Uploading... {progress}%
-                      </div>
+                      <div className="mt-1 text-[10px] text-[#A0A0B0]">Uploading… {progress}%</div>
                     )}
-                    <p className="text-[10px] text-[#A0A0B0] mt-1">
-                      JPG, PNG, WEBP · Max 5MB
-                    </p>
+                    <p className="text-[10px] text-[#A0A0B0] mt-1">JPG, PNG, WEBP · Max 5MB</p>
                   </div>
                 </div>
               </div>
 
               {/* Basic Info */}
-              <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
-                <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
-                  <User size={14} className="text-[#FFBE91]" />
+              <div className={sectionWrapperClass}>
+                <h3 className={sectionTitleClass}>
+                  <User size={13} className="text-[#FFBE91]" />
                   Basic Information
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                    <label className={labelClass}>
                       Full Name <span className="text-rose-400">*</span>
                     </label>
                     <input
@@ -506,14 +447,14 @@ const ProfileFormPage = () => {
                       value={formData.full_name}
                       onChange={handleChange}
                       placeholder="John Doe"
-                      className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                      className={inputClass}
                       required
                     />
                   </div>
                   
                   {isShopOwner && (
                     <div>
-                      <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                      <label className={labelClass}>
                         Shop Name <span className="text-rose-400">*</span>
                       </label>
                       <input
@@ -522,17 +463,15 @@ const ProfileFormPage = () => {
                         value={formData.shop_name}
                         onChange={handleChange}
                         placeholder="Tech Store"
-                        className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                        className={inputClass}
                         required
                       />
                     </div>
                   )}
                 </div>
 
-                <div className="mt-4">
-                  <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
-                    Bio
-                  </label>
+                <div className="mt-3 sm:mt-4">
+                  <label className={labelClass}>Bio</label>
                   <textarea
                     ref={bioTextareaRef}
                     name="bio"
@@ -540,21 +479,21 @@ const ProfileFormPage = () => {
                     onChange={handleChange}
                     placeholder={isShopOwner ? 'Tell buyers about your shop...' : 'Tell shops about yourself...'}
                     rows={1}
-                    className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all resize-none overflow-hidden"
-                    style={{ minHeight: '60px' }}
+                    className={`${inputClass} resize-none overflow-hidden`}
+                    style={{ minHeight: '56px' }}
                   />
                 </div>
               </div>
 
               {/* Contact Info */}
-              <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
-                <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
-                  <Phone size={14} className="text-[#FFBE91]" />
+              <div className={sectionWrapperClass}>
+                <h3 className={sectionTitleClass}>
+                  <Phone size={13} className="text-[#FFBE91]" />
                   Contact & Location
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                    <label className={labelClass}>
                       Phone <span className="text-rose-400">*</span>
                     </label>
                     <input
@@ -563,14 +502,12 @@ const ProfileFormPage = () => {
                       value={formData.phone}
                       onChange={handleChange}
                       placeholder="9876543210"
-                      className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                      className={inputClass}
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
-                      Pincode
-                    </label>
+                    <label className={labelClass}>Pincode</label>
                     <input
                       type="text"
                       name="pincode"
@@ -578,21 +515,19 @@ const ProfileFormPage = () => {
                       onChange={handleChange}
                       placeholder="110001"
                       maxLength="6"
-                      className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                      className={inputClass}
                     />
                   </div>
                 </div>
-                <div className="mt-4">
-                  <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
-                    Address
-                  </label>
+                <div className="mt-3 sm:mt-4">
+                  <label className={labelClass}>Address</label>
                   <input
                     type="text"
                     name="address"
                     value={formData.address}
                     onChange={handleChange}
                     placeholder="123 Main Street, City"
-                    className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                    className={inputClass}
                   />
                 </div>
               </div>
@@ -600,33 +535,29 @@ const ProfileFormPage = () => {
               {/* Buyer Specific */}
               {!isShopOwner && (
                 <>
-                  <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
-                    <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
-                      <Calendar size={14} className="text-[#FFBE91]" />
+                  <div className={sectionWrapperClass}>
+                    <h3 className={sectionTitleClass}>
+                      <Calendar size={13} className="text-[#FFBE91]" />
                       Personal Details
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
-                          Date of Birth
-                        </label>
+                        <label className={labelClass}>Date of Birth</label>
                         <input
                           type="date"
                           name="date_of_birth"
                           value={formData.date_of_birth}
                           onChange={handleChange}
-                          className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                          className={inputClass}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
-                          Gender
-                        </label>
+                        <label className={labelClass}>Gender</label>
                         <select
                           name="gender"
                           value={formData.gender}
                           onChange={handleChange}
-                          className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all appearance-none"
+                          className={selectClass}
                         >
                           <option value="">Select</option>
                           {genderOptions.map(g => (
@@ -636,45 +567,42 @@ const ProfileFormPage = () => {
                       </div>
                     </div>
 
-                    <div className="mt-4">
-                      <label className="block text-xs font-medium text-[#A0A0B0] mb-2">
+                    <div className="mt-3 sm:mt-4">
+                      <label className="block text-[11px] sm:text-xs font-medium text-[#A0A0B0] mb-2">
                         Preferred Categories
                       </label>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5 sm:gap-2">
                         {categories.map(cat => (
                           <button
                             type="button"
                             key={cat}
                             onClick={() => handlePreferredCategoriesChange(cat)}
-                            className={`px-3 py-1.5 text-xs rounded-full border-2 transition-all ${
+                            className={`px-2.5 py-1 text-[10px] sm:text-[11px] rounded-full transition-all ${
                               (formData.preferred_categories || []).includes(cat)
-                                ? 'border-[#FFBE91] bg-[#FFBE91]/10 text-[#1A1A2E]'
-                                : 'border-[#EEECE6] bg-white/50 text-[#A0A0B0] hover:border-[#FFDDB0]'
+                                ? 'bg-[#FFBE91] text-[#1A1A2E] font-medium'
+                                : 'bg-white text-[#A0A0B0] hover:bg-[#F5F3EF]'
                             }`}
                           >
                             {cat.replace('_', ' ').toUpperCase()}
                           </button>
                         ))}
                       </div>
-                      <p className="text-[10px] text-[#A0A0B0] mt-1">
-                        Select categories you're interested in
-                      </p>
                     </div>
                   </div>
 
                   {/* Identity & Trust */}
-                  <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
-                    <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
-                      <Shield size={14} className="text-[#FFBE91]" />
+                  <div className={sectionWrapperClass}>
+                    <h3 className={sectionTitleClass}>
+                      <Shield size={13} className="text-[#FFBE91]" />
                       Identity & Trust
                     </h3>
                     <p className="text-[10px] text-[#A0A0B0] mb-3">
-                      This helps build trust with shops. Identity number cannot be changed once set.
+                      Helps build trust with shops. Identity number cannot be changed once set.
                     </p>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                        <label className={labelClass}>
                           Identity Number
                           {profile?.identity_number && (
                             <span className="text-[10px] text-amber-600 ml-2">(Locked)</span>
@@ -687,25 +615,23 @@ const ProfileFormPage = () => {
                           onChange={handleChange}
                           placeholder="PAN/Aadhaar/Other ID"
                           disabled={!!profile?.identity_number}
-                          className={`w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all ${profile?.identity_number ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          className={`${inputClass} ${profile?.identity_number ? 'opacity-60 cursor-not-allowed' : ''}`}
                         />
                         {profile?.identity_number && (
                           <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
-                            <Lock size={10} />
+                            <Lock size={9} />
                             Cannot be changed once set
                           </p>
                         )}
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
-                          Identity Type
-                        </label>
+                        <label className={labelClass}>Identity Type</label>
                         <select
                           name="identity_type"
                           value={formData.identity_type || ''}
                           onChange={handleChange}
-                          className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all appearance-none"
+                          className={selectClass}
                         >
                           <option value="">Select type</option>
                           {identityTypeOptions.map(type => (
@@ -717,54 +643,46 @@ const ProfileFormPage = () => {
                   </div>
 
                   {/* Delivery Preferences */}
-                  <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
-                    <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
-                      <Home size={14} className="text-[#FFBE91]" />
+                  <div className={sectionWrapperClass}>
+                    <h3 className={sectionTitleClass}>
+                      <Home size={13} className="text-[#FFBE91]" />
                       Delivery Preferences
                     </h3>
                     
                     <div>
-                      <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
-                        Default Delivery Address
-                      </label>
+                      <label className={labelClass}>Default Delivery Address</label>
                       <input
                         type="text"
                         name="delivery_address"
                         value={formData.delivery_address || ''}
                         onChange={handleChange}
                         placeholder="Enter your default delivery address"
-                        className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                        className={inputClass}
                       />
                     </div>
                     
-                    <div className="mt-3">
-                      <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
-                        Budget Range Preference
-                      </label>
+                    <div className="mt-3 sm:mt-4">
+                      <label className={labelClass}>Budget Range Preference</label>
                       <p className="text-[10px] text-[#A0A0B0] mb-2">
-                        This helps us suggest better prices for your requests
+                        Helps us suggest better prices for your requests
                       </p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <input
-                            type="number"
-                            value={formData.budget_range_preference?.min || ''}
-                            onChange={handleBudgetMinChange}
-                            placeholder="Min budget"
-                            min="0"
-                            className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
-                          />
-                        </div>
-                        <div>
-                          <input
-                            type="number"
-                            value={formData.budget_range_preference?.max || ''}
-                            onChange={handleBudgetMaxChange}
-                            placeholder="Max budget"
-                            min="0"
-                            className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
-                          />
-                        </div>
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                        <input
+                          type="number"
+                          value={formData.budget_range_preference?.min || ''}
+                          onChange={handleBudgetMinChange}
+                          placeholder="Min"
+                          min="0"
+                          className={inputClass}
+                        />
+                        <input
+                          type="number"
+                          value={formData.budget_range_preference?.max || ''}
+                          onChange={handleBudgetMaxChange}
+                          placeholder="Max"
+                          min="0"
+                          className={inputClass}
+                        />
                       </div>
                     </div>
                   </div>
@@ -774,16 +692,14 @@ const ProfileFormPage = () => {
               {/* Shop Specific */}
               {isShopOwner && (
                 <>
-                  <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
-                    <h3 className="text-xs font-semibold text-[#1A1A2E] mb-3 flex items-center gap-2">
-                      <Store size={14} className="text-[#FFBE91]" />
+                  <div className={sectionWrapperClass}>
+                    <h3 className={sectionTitleClass}>
+                      <Store size={13} className="text-[#FFBE91]" />
                       Shop Details
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
-                          Years in Business
-                        </label>
+                        <label className={labelClass}>Years in Business</label>
                         <input
                           type="number"
                           name="years_in_business"
@@ -791,11 +707,11 @@ const ProfileFormPage = () => {
                           onChange={handleChange}
                           placeholder="5"
                           min="0"
-                          className="w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all"
+                          className={inputClass}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-[#A0A0B0] mb-1">
+                        <label className={labelClass}>
                           GST Number
                           {profile?.gst_number && (
                             <span className="text-[10px] text-amber-600 ml-2">(Locked)</span>
@@ -808,7 +724,7 @@ const ProfileFormPage = () => {
                           onChange={handleChange}
                           placeholder="22ABCDE1234F1Z5"
                           disabled={!!profile?.gst_number}
-                          className={`w-full px-3 py-2 text-sm bg-white border-2 border-[#EEECE6] rounded-lg focus:outline-none focus:ring-4 focus:ring-[#FFBE91]/20 focus:border-[#FFBE91] transition-all ${profile?.gst_number ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          className={`${inputClass} ${profile?.gst_number ? 'opacity-60 cursor-not-allowed' : ''}`}
                         />
                         <p className="text-[10px] text-[#A0A0B0] mt-1">
                           {profile?.gst_number ? 'GST number cannot be changed once set' : 'Optional, helps build trust with buyers'}
@@ -818,109 +734,48 @@ const ProfileFormPage = () => {
                   </div>
 
                   {/* Business Hours */}
-                  <div className="bg-[#F8F6F0]/50 rounded-lg p-4">
+                  <div className={sectionWrapperClass}>
                     <button
                       type="button"
                       onClick={() => setExpandedHours(!expandedHours)}
-                      className="flex items-center justify-between w-full text-xs font-semibold text-[#1A1A2E]"
+                      className="flex items-center justify-between w-full text-[11px] sm:text-xs font-semibold text-[#1A1A2E]"
                     >
                       <span className="flex items-center gap-2">
-                        <Clock size={14} className="text-[#FFBE91]" />
+                        <Clock size={13} className="text-[#FFBE91]" />
                         Business Hours
                       </span>
-                      {expandedHours ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      {expandedHours ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                     </button>
 
                     {expandedHours && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="space-y-3 mt-3"
+                        className="space-y-3 mt-3 overflow-hidden"
                       >
-                        {/* Monday - Friday */}
-                        <div>
-                          <label className="block text-[10px] font-medium text-[#A0A0B0] mb-1">
-                            Monday - Friday
-                          </label>
-                          <div className="flex flex-wrap gap-2">
-                            {timeSlots.map((slot) => (
-                              <button
-                                type="button"
-                                key={`mon-fri-${slot}`}
-                                onClick={() => handleBusinessHoursSelect('monday_friday', slot)}
-                                className={`px-3 py-1.5 text-xs rounded-full border-2 transition-all ${
-                                  formData.business_hours?.monday_friday === slot
-                                    ? 'border-[#FFBE91] bg-[#FFBE91]/10 text-[#1A1A2E]'
-                                    : 'border-[#EEECE6] bg-white/50 text-[#A0A0B0] hover:border-[#FFDDB0]'
-                                }`}
-                              >
-                                {slot}
-                              </button>
-                            ))}
+                        {['monday_friday', 'saturday', 'sunday'].map((day) => (
+                          <div key={day}>
+                            <label className="block text-[10px] font-medium text-[#A0A0B0] mb-1.5">
+                              {day === 'monday_friday' ? 'Monday – Friday' : day.charAt(0).toUpperCase() + day.slice(1)}
+                            </label>
+                            <div className="flex flex-wrap gap-1.5">
+                              {timeSlots.map((slot) => (
+                                <button
+                                  type="button"
+                                  key={`${day}-${slot}`}
+                                  onClick={() => handleBusinessHoursSelect(day, slot)}
+                                  className={`px-2.5 py-1 text-[10px] sm:text-[11px] rounded-full transition-all ${
+                                    formData.business_hours?.[day] === slot
+                                      ? 'bg-[#FFBE91] text-[#1A1A2E] font-medium'
+                                      : 'bg-white text-[#A0A0B0] hover:bg-[#F5F3EF]'
+                                  }`}
+                                >
+                                  {slot}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                          {formData.business_hours?.monday_friday && (
-                            <p className="text-[10px] text-emerald-600 mt-1">
-                              ✓ Selected: {formData.business_hours.monday_friday}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Saturday */}
-                        <div>
-                          <label className="block text-[10px] font-medium text-[#A0A0B0] mb-1">
-                            Saturday
-                          </label>
-                          <div className="flex flex-wrap gap-2">
-                            {timeSlots.map((slot) => (
-                              <button
-                                type="button"
-                                key={`sat-${slot}`}
-                                onClick={() => handleBusinessHoursSelect('saturday', slot)}
-                                className={`px-3 py-1.5 text-xs rounded-full border-2 transition-all ${
-                                  formData.business_hours?.saturday === slot
-                                    ? 'border-[#FFBE91] bg-[#FFBE91]/10 text-[#1A1A2E]'
-                                    : 'border-[#EEECE6] bg-white/50 text-[#A0A0B0] hover:border-[#FFDDB0]'
-                                }`}
-                              >
-                                {slot}
-                              </button>
-                            ))}
-                          </div>
-                          {formData.business_hours?.saturday && (
-                            <p className="text-[10px] text-emerald-600 mt-1">
-                              ✓ Selected: {formData.business_hours.saturday}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Sunday */}
-                        <div>
-                          <label className="block text-[10px] font-medium text-[#A0A0B0] mb-1">
-                            Sunday
-                          </label>
-                          <div className="flex flex-wrap gap-2">
-                            {timeSlots.map((slot) => (
-                              <button
-                                type="button"
-                                key={`sun-${slot}`}
-                                onClick={() => handleBusinessHoursSelect('sunday', slot)}
-                                className={`px-3 py-1.5 text-xs rounded-full border-2 transition-all ${
-                                  formData.business_hours?.sunday === slot
-                                    ? 'border-[#FFBE91] bg-[#FFBE91]/10 text-[#1A1A2E]'
-                                    : 'border-[#EEECE6] bg-white/50 text-[#A0A0B0] hover:border-[#FFDDB0]'
-                                }`}
-                              >
-                                {slot}
-                              </button>
-                            ))}
-                          </div>
-                          {formData.business_hours?.sunday && (
-                            <p className="text-[10px] text-emerald-600 mt-1">
-                              ✓ Selected: {formData.business_hours.sunday}
-                            </p>
-                          )}
-                        </div>
+                        ))}
                       </motion.div>
                     )}
                   </div>
@@ -931,16 +786,16 @@ const ProfileFormPage = () => {
               <Button
                 type="submit"
                 disabled={saving || uploading}
-                className="w-full bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white py-3 h-auto flex items-center justify-center gap-2 text-sm font-semibold rounded-lg"
+                className="w-full bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white py-2.5 sm:py-3 h-auto flex items-center justify-center gap-2 text-[13px] sm:text-sm font-semibold rounded-lg"
               >
                 {saving || uploading ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={14} className="animate-spin" />
                     {uploading ? 'Uploading Photo...' : 'Saving...'}
                   </>
                 ) : (
                   <>
-                    <Save size={16} />
+                    <Save size={14} />
                     Save Profile
                   </>
                 )}

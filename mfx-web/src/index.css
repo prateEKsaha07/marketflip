@@ -32,10 +32,22 @@
     border-color: hsl(var(--border));
   }
 
+  html {
+    /* Smooth in-page anchor scrolls */
+    scroll-behavior: smooth;
+    /* Prevent iOS Safari text size inflation on rotation */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Better tap highlight on mobile */
+    -webkit-tap-highlight-color: transparent;
+  }
+
   html,
   body {
     scrollbar-width: none;        /* Firefox */
     -ms-overflow-style: none;     /* IE/Edge legacy */
+    /* Prevent horizontal scroll from animated orbs */
+    overflow-x: hidden;
   }
 
   html::-webkit-scrollbar,
@@ -47,17 +59,195 @@
     background-color: #FFFCE1;
     color: #1A1A2E;
     font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+    /* Smooth text rendering */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Better touch scrolling momentum on iOS */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Respect reduced-motion preferences across the app */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Selection color matches palette */
+  ::selection {
+    background-color: #FFBE91;
+    color: #1A1A2E;
+  }
+
+  /* Better focus ring for keyboard nav (accessible) */
+  :focus-visible {
+    outline: 2px solid #FFBE91;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Remove default focus ring for mouse users */
+  :focus:not(:focus-visible) {
+    outline: none;
   }
 }
 
 @layer utilities {
+  /* ========== Gradient animations ========== */
   .animate-gradient {
     background-size: 200% 200%;
     animation: gradient 4s ease-in-out infinite;
   }
+
+  .animate-gradient-slow {
+    background-size: 200% 200%;
+    animation: gradient 8s ease-in-out infinite;
+  }
+
+  /* ========== Floating orbs ========== */
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-float-slow {
+    animation: float 9s ease-in-out infinite;
+  }
+
+  .animate-float-delayed {
+    animation: float 7s ease-in-out infinite;
+    animation-delay: 1.5s;
+  }
+
+  /* ========== Pulse variants ========== */
+  .animate-pulse-slow {
+    animation: pulseSlow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* ========== Shimmer (for skeletons / loading) ========== */
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.5) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
+
+  /* ========== Entrance animations ========== */
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out both;
+  }
+
+  .animate-fade-up {
+    animation: fadeUp 0.4s ease-out both;
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.35s ease-out both;
+  }
+
+  /* ========== Glow / shine on buttons or accents ========== */
+  .animate-glow {
+    animation: glow 2.5s ease-in-out infinite;
+  }
+
+  /* ========== Slow spin (for decorative rings) ========== */
+  .animate-spin-slow {
+    animation: spin 12s linear infinite;
+  }
+
+  /* ========== Tap-feedback helper (mobile) ========== */
+  .tap-highlight-none {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ========== Safe-area padding helpers (iPhone notch) ========== */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
 }
+
+/* ========== Keyframes ========== */
 
 @keyframes gradient {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(2deg); }
+}
+
+@keyframes pulseSlow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 190, 145, 0);
+  }
+  50% {
+    box-shadow: 0 0 20px 4px rgba(255, 190, 145, 0.35);
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ========== Component layer: shared patterns ========== */
+@layer components {
+  /* Card style used across the app */
+  .mfx-card {
+    @apply bg-white/70 backdrop-blur-xl rounded-2xl;
+  }
+
+  /* Pill button base */
+  .mfx-pill {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all;
+  }
+
+  /* Input base */
+  .mfx-input {
+    @apply w-full px-3 py-2 text-[11px] bg-[#F8F6F0]/60 border-0 rounded-xl text-[#1A1A2E] placeholder-[#A0A0B0] focus:outline-none focus:ring-2 focus:ring-[#FFBE91]/40 focus:bg-white transition-all;
+  }
+
+  /* Dashed divider */
+  .mfx-divider {
+    @apply border-t border-dashed border-[#EEECE6];
+  }
 }

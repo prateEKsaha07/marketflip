@@ -1,112 +1,107 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from "framer-motion";
 
+/**
+ * Modern ambient background.
+ * Layer 1 — Diagonal gradient wash (peach → cream → softBlue)
+ * Layer 2 — Fine grid (masked, drifts slowly)
+ * Layer 3 — Diagonal line field (drifts, gives motion)
+ * Layer 4 — Slow light sweep
+ * Layer 5 — Vignette (top light, bottom ground)
+ *
+ * Designed to be subtle — content always dominates.
+ */
 const AnimatedBackground = () => {
-  // Warm, aesthetic colors from your palette
-  const colors = [
-    'rgba(255, 190, 145, 0.15)',  // Peach
-    'rgba(255, 221, 176, 0.12)',  // Cream
-    'rgba(207, 235, 255, 0.10)',  // Soft Blue
-    'rgba(255, 252, 225, 0.08)',  // Light Cream
-  ];
+  const reduceMotion = useReducedMotion();
 
   return (
-    <div className="absolute inset-0 -z-10 overflow-hidden bg-[#FFFCE1]">
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#FFBE91]/5 via-[#FFFCE1]/30 to-[#CFEBFF]/10" />
-      
-      {/* Floating shapes */}
-      <motion.div
-        className="absolute top-10 left-10 w-64 h-64 rounded-full bg-[#FFBE91]/20 blur-3xl"
-        animate={{
-          x: [0, 80, -40, 0],
-          y: [0, -60, 40, 0],
-          scale: [1, 1.1, 0.9, 1],
-        }}
-        transition={{
-          duration: 20,
-          repeat: Infinity,
-          ease: "easeInOut",
+    <div
+      aria-hidden="true"
+      className="absolute inset-0 -z-10 overflow-hidden bg-[#FFFCE1]"
+    >
+      {/* Layer 1 — Diagonal gradient wash */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(135deg, rgba(255,190,145,0.22) 0%, rgba(255,252,225,0.9) 45%, rgba(207,235,255,0.22) 100%)",
         }}
       />
 
+      {/* Layer 2 — Fine grid, masked, gently drifting */}
       <motion.div
-        className="absolute bottom-20 right-10 w-80 h-80 rounded-full bg-[#CFEBFF]/20 blur-3xl"
-        animate={{
-          x: [0, -60, 30, 0],
-          y: [0, 50, -30, 0],
-          scale: [1, 0.9, 1.1, 1],
+        className="absolute inset-0 opacity-[0.055]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(26,26,46,0.9) 1px, transparent 1px), linear-gradient(90deg, rgba(26,26,46,0.9) 1px, transparent 1px)",
+          backgroundSize: "56px 56px",
+          maskImage:
+            "radial-gradient(ellipse at 50% 40%, black 25%, transparent 80%)",
+          WebkitMaskImage:
+            "radial-gradient(ellipse at 50% 40%, black 25%, transparent 80%)",
         }}
-        transition={{
-          duration: 25,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: 2,
-        }}
+        animate={
+          reduceMotion
+            ? {}
+            : { backgroundPosition: ["0px 0px", "56px 56px"] }
+        }
+        transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
       />
 
+      {/* Layer 3 — Diagonal line field, drifts slowly */}
       <motion.div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-[#FFDDB0]/15 blur-3xl"
-        animate={{
-          scale: [1, 1.2, 1],
-          opacity: [0.5, 0.8, 0.5],
+        className="absolute inset-0 opacity-[0.09]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(45deg, #1A1A2E 0px, #1A1A2E 1px, transparent 1px, transparent 34px)",
+          maskImage:
+            "linear-gradient(135deg, black 0%, transparent 45%, black 100%)",
+          WebkitMaskImage:
+            "linear-gradient(135deg, black 0%, transparent 45%, black 100%)",
         }}
-        transition={{
-          duration: 15,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
+        animate={
+          reduceMotion
+            ? {}
+            : { backgroundPosition: ["0px 0px", "34px 34px"] }
+        }
+        transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
       />
 
-      <motion.div
-        className="absolute top-40 right-40 w-48 h-48 rounded-full bg-[#FFBE91]/10 blur-2xl"
-        animate={{
-          x: [0, 40, -20, 0],
-          y: [0, -30, 20, 0],
-        }}
-        transition={{
-          duration: 18,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: 3,
-        }}
-      />
-
-      <motion.div
-        className="absolute bottom-40 left-20 w-56 h-56 rounded-full bg-[#CFEBFF]/10 blur-2xl"
-        animate={{
-          x: [0, -50, 30, 0],
-          y: [0, 40, -20, 0],
-        }}
-        transition={{
-          duration: 22,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: 1,
-        }}
-      />
-
-      {/* Floating orbs */}
-      {[...Array(6)].map((_, i) => (
+      {/* Layer 4 — Slow light sweep, peachy */}
+      {!reduceMotion && (
         <motion.div
-          key={i}
-          className="absolute w-3 h-3 rounded-full"
+          className="absolute -inset-y-1/2 w-[55%] rotate-[18deg]"
           style={{
-            background: [colors[i % colors.length]],
-            left: `${10 + Math.random() * 80}%`,
-            top: `${10 + Math.random() * 80}%`,
+            background:
+              "linear-gradient(90deg, transparent, rgba(255,190,145,0.14), rgba(207,235,255,0.12), transparent)",
+            filter: "blur(60px)",
           }}
-          animate={{
-            y: [0, -30, 0],
-            opacity: [0, 1, 0],
-          }}
+          animate={{ x: ["-110%", "320%"] }}
           transition={{
-            duration: 4 + Math.random() * 3,
+            duration: 18,
             repeat: Infinity,
             ease: "easeInOut",
-            delay: i * 0.8,
+            repeatDelay: 6,
           }}
         />
-      ))}
+      )}
+
+      {/* Layer 5a — Top light */}
+      <div
+        className="absolute inset-x-0 top-0 h-[60%] pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.55) 0%, transparent 60%)",
+        }}
+      />
+
+      {/* Layer 5b — Bottom ground */}
+      <div
+        className="absolute inset-x-0 bottom-0 h-[50%] pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse at 50% 100%, rgba(26,26,46,0.06) 0%, transparent 55%)",
+        }}
+      />
     </div>
   );
 };

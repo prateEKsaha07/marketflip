@@ -26,13 +26,12 @@ import {
   Shield,
   User,
   Key,
-  Lock,
   Eye,
   EyeOff,
   Check,
-  X,
   History,
-  Star
+  Star,
+  IndianRupee
 } from 'lucide-react';
 import api, { checkUserReviewed } from '../../api/client';
 import ReviewModal from '../../components/review/ReviewModal';
@@ -54,29 +53,23 @@ const MyPurchases = () => {
   const [updating, setUpdating] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
   const [showOtpCode, setShowOtpCode] = useState(false);
-  
-  // Review states
+
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedReviewTarget, setSelectedReviewTarget] = useState(null);
   const [reviewCheckStatus, setReviewCheckStatus] = useState({});
   const [reviewStats, setReviewStats] = useState({});
 
-  // Fetch all purchases on mount
   useEffect(() => {
     fetchAllPurchases();
   }, []);
 
-  // Fetch all purchases from API
   const fetchAllPurchases = async () => {
     setLoading(true);
     setError('');
     try {
-      console.log('=== FETCHING ALL PURCHASES ===');
-      
       const purchasedResponse = await api.get('/requests?status=purchased');
       const purchasedData = purchasedResponse.data || [];
-      console.log('Purchased data:', purchasedData);
-      
+
       let completedData = [];
       try {
         const completedResponse = await api.get('/requests?status=completed');
@@ -85,64 +78,54 @@ const MyPurchases = () => {
         const allResponse = await api.get('/requests?status=all');
         completedData = allResponse.data.filter(r => r.status === 'completed') || [];
       }
-      
-      // Separate requests based on delivery_method
+
       const selected = [];
       const verification = [];
-      
+
       for (const req of purchasedData) {
         const isDeliveryConfirmed = req.delivery_confirmed_by_shop === true;
         const isPickup = req.delivery_method === 'pickup';
         const isPending = req.delivery_confirmed_by_shop === null && req.delivery_method === 'home_delivery';
         const isDenied = req.delivery_confirmed_by_shop === false;
-        
+
         if (isPickup || isDeliveryConfirmed) {
           verification.push(req);
-        } 
-        else if (isPending || isDenied || !req.delivery_method) {
+        } else if (isPending || isDenied || !req.delivery_method) {
           selected.push(req);
         } else {
           selected.push(req);
         }
       }
-      
-      console.log('Selected (pending):', selected.length);
-      console.log('Verification (ready):', verification.length);
-      console.log('Completed:', completedData.length);
-      
+
       const selectedWithDetails = await processRequests(selected);
       const verificationWithDetails = await processRequests(verification);
       const completedWithDetails = await processRequests(completedData);
-      
+
       setSelectedBids(selectedWithDetails);
       setVerificationRequests(verificationWithDetails);
       setCompletedRequests(completedWithDetails);
-      
-      // Check review status for completed items
+
       for (const req of completedWithDetails) {
         if (req.selectedBid?.shop_id) {
           await checkReviewStatusForCompleted(req.id, req.selectedBid.shop_id);
         }
       }
-      
     } catch (err) {
-      console.error('Fetch purchases error:', err);
       setError('Failed to fetch purchases: ' + (err.response?.data?.detail || err.message));
     } finally {
       setLoading(false);
     }
   };
 
-  // Process requests with bid details
   const processRequests = async (requests) => {
     if (!requests || requests.length === 0) return [];
-    
+
     return await Promise.all(
       requests.map(async (req) => {
         try {
           const bidsResponse = await api.get(`/requests/${req.id}/bids`);
           const selectedBid = bidsResponse.data.find(b => b.status === 'selected');
-          
+
           let shopDetails = null;
           if (selectedBid && selectedBid.shop_id) {
             try {
@@ -152,7 +135,7 @@ const MyPurchases = () => {
               shopDetails = selectedBid.profiles || null;
             }
           }
-          
+
           return {
             ...req,
             selectedBid: {
@@ -161,185 +144,143 @@ const MyPurchases = () => {
             }
           };
         } catch (err) {
-          console.error(`Failed to fetch bids for ${req.id}:`, err);
           return { ...req, selectedBid: null };
         }
       })
     );
   };
 
-  // ===== Review Functions =====
+  /* ---------- Review helpers ---------- */
   const checkReviewStatusForCompleted = async (requestId, reviewedId) => {
     try {
       const response = await checkUserReviewed('request', requestId);
-      setReviewCheckStatus(prev => ({
-        ...prev,
-        [requestId]: response.data
-      }));
-      
+      setReviewCheckStatus(prev => ({ ...prev, [requestId]: response.data }));
+
       if (reviewedId) {
         const statsResponse = await api.get(`/reviews/stats/${reviewedId}`);
-        setReviewStats(prev => ({
-          ...prev,
-          [reviewedId]: statsResponse.data
-        }));
+        setReviewStats(prev => ({ ...prev, [reviewedId]: statsResponse.data }));
       }
     } catch (err) {
-      console.error('Failed to check review status:', err);
+      // silent
     }
   };
 
   const handleReviewSuccess = (requestId) => {
-    setReviewCheckStatus(prev => ({
-      ...prev,
-      [requestId]: { has_reviewed: true }
-    }));
-    
+    setReviewCheckStatus(prev => ({ ...prev, [requestId]: { has_reviewed: true } }));
+
     const purchase = completedRequests.find(r => r.id === requestId);
     if (purchase?.selectedBid?.shop_id) {
       api.get(`/reviews/stats/${purchase.selectedBid.shop_id}`)
-        .then(res => {
-          setReviewStats(prev => ({
-            ...prev,
-            [purchase.selectedBid.shop_id]: res.data
-          }));
-        })
-        .catch(console.error);
+        .then(res => setReviewStats(prev => ({ ...prev, [purchase.selectedBid.shop_id]: res.data })))
+        .catch(() => {});
     }
   };
 
-  // ============================================
-  // Two-Way Settlement Handlers
-  // ============================================
-  
+  /* ---------- Settlement handlers ---------- */
   const handleSwitchToPickup = async (requestId) => {
     if (!window.confirm('Switch this order to pickup? The shop cannot deliver to your address.')) return;
-    
+
     setActionLoading(prev => ({ ...prev, [requestId]: 'pickup' }));
     try {
-      const response = await api.patch(`/requests/${requestId}/switch-to-pickup`);
-      console.log('Switch to pickup response:', response.data);
-      
+      await api.patch(`/requests/${requestId}/switch-to-pickup`);
       await fetchAllPurchases();
-      if (selectedPurchase && selectedPurchase.id === requestId) {
-        setSelectedPurchase(null);
-      }
-      alert('Switched to pickup! An OTP code has been generated. Share it with the shop to complete the transaction.');
+      if (selectedPurchase && selectedPurchase.id === requestId) setSelectedPurchase(null);
+      alert('Switched to pickup. Share the OTP code with the shop to complete.');
     } catch (err) {
-      console.error('Switch to pickup error:', err);
-      const errorMsg = err.response?.data?.detail || 'Failed to switch to pickup';
-      alert('Failed to switch to pickup: ' + errorMsg);
+      alert('Failed to switch: ' + (err.response?.data?.detail || 'Unknown error'));
     } finally {
       setActionLoading(prev => ({ ...prev, [requestId]: false }));
     }
   };
 
   const handleCancelOrder = async (requestId) => {
-    if (!window.confirm('Are you sure you want to cancel this order?')) return;
-    
+    if (!window.confirm('Cancel this order?')) return;
+
     setActionLoading(prev => ({ ...prev, [requestId]: 'cancel' }));
     try {
-      await api.patch(`/requests/${requestId}`, {
-        status: 'deleted'
-      });
+      await api.patch(`/requests/${requestId}`, { status: 'deleted' });
       await fetchAllPurchases();
-      if (selectedPurchase && selectedPurchase.id === requestId) {
-        setSelectedPurchase(null);
-      }
-      alert('Order cancelled successfully.');
+      if (selectedPurchase && selectedPurchase.id === requestId) setSelectedPurchase(null);
+      alert('Order cancelled.');
     } catch (err) {
-      console.error('Cancel order error:', err);
-      alert('Failed to cancel order: ' + (err.response?.data?.detail || 'Unknown error'));
+      alert('Failed to cancel: ' + (err.response?.data?.detail || 'Unknown error'));
     } finally {
       setActionLoading(prev => ({ ...prev, [requestId]: false }));
     }
   };
 
-  // ============================================
-  // Delivery Status Display
-  // ============================================
-  
+  /* ---------- Delivery status display ---------- */
   const getDeliveryStatusDisplay = (request) => {
     if (!request.delivery_method) {
       return {
-        icon: <AlertCircle size={14} className="text-amber-600" />,
+        icon: <AlertCircle size={11} />,
         text: 'Select delivery method',
         color: 'text-amber-600',
-        bg: 'bg-amber-50/50 border-amber-100',
-        showActions: false,
-        canVerify: false
+        bg: 'bg-amber-50',
+        showActions: false
       };
     }
-    
+
     if (request.delivery_method === 'pickup') {
       if (request.verification_code) {
         return {
-          icon: <Key size={14} className="text-violet-600" />,
-          text: 'Pickup - OTP Ready',
+          icon: <Key size={11} />,
+          text: 'Pickup · OTP Ready',
           color: 'text-violet-600',
-          bg: 'bg-violet-50/50 border-violet-100',
-          subtext: 'Share the OTP code with the shop to complete the transaction',
+          bg: 'bg-violet-50',
+          subtext: 'Share the OTP code with the shop',
           showActions: false,
-          canVerify: false,
           hasVerificationCode: true
         };
       }
       return {
-        icon: <Home size={14} className="text-blue-600" />,
+        icon: <Home size={11} />,
         text: 'Pickup',
         color: 'text-blue-600',
-        bg: 'bg-blue-50/50 border-blue-100',
+        bg: 'bg-blue-50',
         subtext: 'You selected pickup from shop',
-        showActions: false,
-        canVerify: false
+        showActions: false
       };
     }
-    
+
     if (request.delivery_method === 'home_delivery') {
       if (request.delivery_confirmed_by_shop === true) {
         return {
-          icon: <ThumbsUp size={14} className="text-emerald-600" />,
+          icon: <ThumbsUp size={11} />,
           text: 'Delivery Confirmed',
           color: 'text-emerald-600',
-          bg: 'bg-emerald-50/50 border-emerald-100',
-          subtext: `Shop confirmed delivery on ${request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleString() : 'recently'}`,
+          bg: 'bg-emerald-50',
+          subtext: `Confirmed ${request.delivery_response_at ? new Date(request.delivery_response_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'recently'}`,
           showActions: false,
-          canVerify: false,
           hasVerificationCode: !!request.verification_code
         };
       }
-      
+
       if (request.delivery_confirmed_by_shop === false) {
         return {
-          icon: <ThumbsDown size={14} className="text-rose-600" />,
+          icon: <ThumbsDown size={11} />,
           text: 'Delivery Denied',
           color: 'text-rose-600',
-          bg: 'bg-rose-50/50 border-rose-100',
-          subtext: 'Shop cannot deliver to your address.',
-          showActions: true,
-          canVerify: false,
-          actionType: 'denied'
+          bg: 'bg-rose-50',
+          subtext: 'Shop cannot deliver to your address',
+          showActions: true
         };
       }
-      
+
       return {
-        icon: <Clock size={14} className="text-amber-600" />,
+        icon: <Clock size={11} />,
         text: 'Awaiting Shop Response',
         color: 'text-amber-600',
-        bg: 'bg-amber-50/50 border-amber-100',
-        subtext: 'Shop is deciding whether they can deliver to your address.',
-        showActions: false,
-        canVerify: false
+        bg: 'bg-amber-50',
+        subtext: 'Shop is deciding whether they can deliver',
+        showActions: false
       };
     }
-    
+
     return null;
   };
 
-  // ============================================
-  // Existing Handlers
-  // ============================================
-
+  /* ---------- Delivery selection ---------- */
   const handleDeliverySelection = (method) => {
     setDeliveryMethod(method);
     if (method === 'delivery') {
@@ -347,50 +288,34 @@ const MyPurchases = () => {
       if (address) {
         setDeliveryAddress(address);
         setShowConfirmButton(true);
-        alert('Home Delivery selected! The shop will confirm or deny delivery.');
       } else {
         setDeliveryMethod(null);
-        alert('Delivery address is required for home delivery.');
+        alert('Delivery address is required.');
       }
     } else {
       setDeliveryAddress('Pickup from shop');
       setShowConfirmButton(true);
-      alert('Pickup selected! An OTP code will be generated. Share it with the shop to complete the transaction.');
     }
   };
 
   const handleConfirmDelivery = async () => {
     if (!window.confirm('Confirm delivery method?')) return;
-    
+
     setUpdating(true);
     try {
-      console.log('Confirming delivery for:', selectedPurchase.id);
-      
       const isPickup = deliveryMethod === 'pickup';
-      
-      const response = await api.patch(`/requests/${selectedPurchase.id}/delivery`, {
+      await api.patch(`/requests/${selectedPurchase.id}/delivery`, {
         delivery_method: isPickup ? 'pickup' : 'home_delivery',
         delivery_address: deliveryAddress
       });
-      
-      console.log('Delivery confirmation response:', response.data);
-      
-      if (isPickup) {
-        alert('Pickup confirmed! An OTP code has been generated. Share it with the shop to complete the transaction.');
-      } else {
-        alert('Home Delivery selected! Waiting for shop to confirm delivery.');
-      }
-      
+
       setSelectedPurchase(null);
       setDeliveryMethod(null);
       setDeliveryAddress('');
       setShowConfirmButton(false);
-      
       await fetchAllPurchases();
-      
     } catch (err) {
-      console.error('Confirm delivery error:', err);
-      alert('Failed to confirm delivery: ' + (err.response?.data?.detail || 'Unknown error'));
+      alert('Failed to confirm: ' + (err.response?.data?.detail || 'Unknown error'));
     } finally {
       setUpdating(false);
     }
@@ -421,179 +346,101 @@ const MyPurchases = () => {
   const currentList = getCurrentList();
 
   const tabs = [
-    { id: 'selected', label: 'Selected', icon: <Package size={14} />, count: selectedBids.length },
-    { id: 'verification', label: 'Verify', icon: <Clock size={14} />, count: verificationRequests.length },
-    { id: 'completed', label: 'Completed', icon: <CheckCircle size={14} />, count: completedRequests.length },
+    { id: 'selected', label: 'Selected', icon: Package, count: selectedBids.length },
+    { id: 'verification', label: 'Verify', icon: Clock, count: verificationRequests.length },
+    { id: 'completed', label: 'Completed', icon: CheckCircle, count: completedRequests.length },
   ];
-
-  const tabVariants = {
-    inactive: { opacity: 0.6, scale: 0.95 },
-    active: { opacity: 1, scale: 1 }
-  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: { staggerChildren: 0.05 }
-    }
+    visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 20, scale: 0.95 },
-    visible: { 
-      opacity: 1, 
-      y: 0, 
-      scale: 1,
-      transition: { type: "spring", stiffness: 300, damping: 25 }
-    },
-    exit: { 
-      opacity: 0, 
-      scale: 0.9,
-      transition: { duration: 0.2 }
-    }
+    hidden: { opacity: 0, y: 8 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } },
+    exit: { opacity: 0, scale: 0.98, transition: { duration: 0.2 } }
   };
 
-  const getStatusConfig = (tab) => {
-    switch(tab) {
-      case 'selected': return { 
-        bg: 'bg-emerald-50', 
-        border: 'border-emerald-200', 
-        icon: <Package size={14} className="text-emerald-600" />,
-        label: 'Selected',
-        color: 'emerald'
-      };
-      case 'verification': return { 
-        bg: 'bg-amber-50', 
-        border: 'border-amber-200', 
-        icon: <Clock size={14} className="text-amber-600" />,
-        label: 'Verify',
-        color: 'amber'
-      };
-      case 'completed': return { 
-        bg: 'bg-blue-50', 
-        border: 'border-blue-200', 
-        icon: <CheckCircle size={14} className="text-blue-600" />,
-        label: 'Completed',
-        color: 'blue'
-      };
-      default: return { 
-        bg: 'bg-gray-50', 
-        border: 'border-gray-200', 
-        icon: <Package size={14} className="text-gray-600" />,
-        label: 'Unknown',
-        color: 'gray'
-      };
-    }
-  };
-
-  // ====== Helper to render OTP Code Display ======
+  /* ---------- OTP code block ---------- */
   const renderOtpCodeDisplay = (purchase, isCompleted = false) => {
     if (!purchase.verification_code) return null;
-    
+
     return (
-      <div className={`mt-3 p-3 ${isCompleted ? 'bg-blue-50/80' : 'bg-violet-50/80'} rounded-xl border ${isCompleted ? 'border-blue-200' : 'border-violet-200'}`}>
-        <div className="flex items-center gap-2 mb-1.5">
-          <Key size={14} className={isCompleted ? 'text-blue-600' : 'text-violet-600'} />
-          <span className={`text-xs font-medium ${isCompleted ? 'text-blue-700' : 'text-violet-700'}`}>
-            {isCompleted ? 'Verification Code (Record)' : 'Verification Code'}
+      <div className={`mt-3 p-3 rounded-xl ${isCompleted ? 'bg-blue-50' : 'bg-violet-50'}`}>
+        <div className="flex items-center gap-2 mb-2">
+          <Key size={12} className={isCompleted ? 'text-blue-600' : 'text-violet-600'} />
+          <span className={`text-[10px] font-semibold uppercase tracking-wide ${isCompleted ? 'text-blue-700' : 'text-violet-700'}`}>
+            {isCompleted ? 'Verification Code · Archived' : 'Verification Code'}
           </span>
-          {isCompleted && (
-            <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full flex items-center gap-1">
-              <History size={10} />
-              Archived
-            </span>
-          )}
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <p className="text-xl font-bold tracking-[0.5em] text-[#1A1A2E] font-mono bg-white p-2 rounded-lg text-center">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 bg-white rounded-lg py-2 px-3 text-center">
+            <p className="text-base font-bold tracking-[0.4em] text-[#1A1A2E] font-mono">
               {showOtpCode ? purchase.verification_code : '••••'}
             </p>
           </div>
           <button
             onClick={() => setShowOtpCode(!showOtpCode)}
-            className="p-2 bg-white rounded-lg hover:bg-[#F8F6F0] transition-colors border border-[#EEECE6]"
+            className="p-2 bg-white rounded-lg hover:bg-[#F5F3EF] transition-colors"
           >
-            {showOtpCode ? <EyeOff size={16} className="text-[#4A4A5A]" /> : <Eye size={16} className="text-[#4A4A5A]" />}
+            {showOtpCode ? <EyeOff size={14} className="text-[#4A4A5A]" /> : <Eye size={14} className="text-[#4A4A5A]" />}
           </button>
           <button
             onClick={() => {
               navigator.clipboard.writeText(purchase.verification_code);
-              alert('Verification code copied to clipboard!');
+              alert('Code copied');
             }}
-            className="p-2 bg-white rounded-lg hover:bg-[#F8F6F0] transition-colors border border-[#EEECE6]"
+            className="p-2 bg-white rounded-lg hover:bg-[#F5F3EF] transition-colors"
           >
-            <Check size={16} className="text-violet-600" />
+            <Check size={14} className="text-violet-600" />
           </button>
         </div>
         {!isCompleted && (
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-[10px] text-amber-600">
-              Attempts remaining: {5 - (purchase.verification_attempts || 0)}
+          <div className="flex items-center gap-3 mt-2 text-[9px]">
+            <span className="text-amber-600">
+              {5 - (purchase.verification_attempts || 0)} attempts remaining
             </span>
             {(purchase.verification_attempts || 0) > 0 && (
-              <span className="text-[10px] text-amber-600">
-                ({purchase.verification_attempts} used)
-              </span>
+              <span className="text-amber-600">{purchase.verification_attempts} used</span>
             )}
           </div>
         )}
         {(purchase.verification_attempts || 0) >= 5 && !isCompleted && (
-          <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-200">
-            <p className="text-[10px] text-amber-700 flex items-center gap-1">
-              <AlertCircle size={12} />
-              Maximum attempts reached. Please contact support to complete the transaction.
-            </p>
-          </div>
+          <p className="text-[9px] text-amber-700 mt-2 flex items-center gap-1">
+            <AlertCircle size={10} />
+            Max attempts reached. Contact support.
+          </p>
         )}
         {isCompleted && purchase.completed_via_override && (
-          <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-200">
-            <p className="text-[10px] text-amber-700 flex items-center gap-1">
-              <AlertCircle size={12} />
-              Completed via manual override
-            </p>
-          </div>
+          <p className="text-[9px] text-amber-700 mt-2 flex items-center gap-1">
+            <AlertCircle size={10} />
+            Completed via manual override
+          </p>
         )}
         {!isCompleted && (
-          <p className="text-[10px] text-violet-600 mt-2 flex items-center gap-1">
-            <Key size={12} />
-            Share this code with the shop. The transaction will auto-complete when they enter it.
+          <p className="text-[9px] text-violet-600 mt-2">
+            Share with shop to complete the transaction
           </p>
         )}
       </div>
     );
   };
 
-  // Show loading state
+  /* ---------- Loading ---------- */
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FFFCE1]">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center gap-4"
-        >
-          <motion.div 
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            className="w-10 h-10 border-4 border-[#FFBE91] border-t-transparent rounded-full"
-          />
-          <motion.p 
-            animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-            className="text-[#FFBE91] font-medium"
-          >
-            Loading your purchases...
-          </motion.p>
-        </motion.div>
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F6F0]">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 size={20} className="animate-spin text-[#1A1A2E]" />
+          <p className="text-[11px] text-[#A0A0B0]">Loading purchases…</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-4 md:p-6">
-      {/* Modern Reusable Navbar */}
+    <div className="min-h-screen bg-gradient-to-br from-[#F8F6F0] via-white to-[#F8F6F0] p-3 sm:p-4 md:p-6">
       <ModernNavbar
         navItems={[
           { name: "Dashboard", path: "/buyer/dashboard", icon: "LayoutDashboard" },
@@ -602,740 +449,750 @@ const MyPurchases = () => {
           { name: "Chats", path: "/buyer/chat", icon: "MessageCircle" },
           { name: "History", path: "/buyer/history", icon: "History" },
         ]}
-        logo={{
-          src: "/Logo.png",
-          alt: "MarketFlip",
-          link: "/buyer/dashboard",
-        }}
+        logo={{ src: "/Logo.png", alt: "MarketFlip", link: "/buyer/dashboard" }}
         showProfile={true}
         showLogout={true}
         showNotifications={true}
-        logoutButton={{
-          label: "Logout",
-          icon: "LogOut",
-          onClick: () => {
-            // Your logout logic here
-          }
-        }}
-        profileButton={{
-          label: "Profile",
-          path: "/buyer/profile",
-          icon: "User"
-        }}
+        logoutButton={{ label: "Logout", icon: "LogOut", onClick: () => {} }}
+        profileButton={{ label: "Profile", path: "/buyer/profile", icon: "User" }}
       />
 
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-          className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-6"
-        >
-          <div>
-            <motion.h1 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              className="text-2xl md:text-3xl font-bold text-[#1A1A2E] flex items-center gap-2"
-            >
-              My Purchases
-              <span className="text-[#FFBE91]">✦</span>
-            </motion.h1>
-            <p className="text-xs text-[#4A4A5A]">
-              {selectedBids.length} pending · {verificationRequests.length} ready to verify · {completedRequests.length} completed
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              onClick={() => navigate('/buyer/requests')}
-              variant="outline"
-              className="border-[#FFDDB0] text-[#1A1A2E] hover:bg-[#FFDDB0]/30 text-sm px-4 py-2"
-            >
-              <ArrowLeft size={16} className="mr-1.5" />
-              Dashboard
-            </Button>
-            <Button 
-              onClick={fetchAllPurchases}
-              className="bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E] text-sm px-4 py-2"
-            >
-              <RefreshCw size={16} className="mr-1.5" />
-              Refresh
-            </Button>
-          </div>
-        </motion.div>
-
         <AnimatePresence mode="wait">
-          {error && (
+          {selectedPurchase ? (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="bg-rose-50 border border-rose-200 text-rose-600 px-4 py-3 rounded-xl mb-4 text-sm"
-            >
-              {error}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Tabs */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="flex flex-wrap gap-1 mb-6 bg-white/60 backdrop-blur-sm p-1 rounded-xl border border-[#FFDDB0]/50"
-        >
-          {tabs.map((tab) => (
-            <motion.button
-              key={tab.id}
-              variants={tabVariants}
-              animate={activeTab === tab.id ? 'active' : 'inactive'}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setActiveTab(tab.id)}
-              className={`
-                flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all text-sm font-medium
-                ${activeTab === tab.id 
-                  ? 'bg-[#FFBE91] text-[#1A1A2E] shadow-md' 
-                  : 'text-[#4A4A5A] hover:text-[#1A1A2E] hover:bg-[#FFDDB0]/30'
-                }
-              `}
-            >
-              {tab.icon}
-              {tab.label}
-              <span className={`
-                ml-1 px-2 py-0.5 rounded-full text-[10px]
-                ${activeTab === tab.id 
-                  ? 'bg-[#1A1A2E]/10 text-[#1A1A2E]' 
-                  : 'bg-[#FFDDB0]/30 text-[#4A4A5A]'
-                }
-              `}>
-                {tab.count}
-              </span>
-            </motion.button>
-          ))}
-        </motion.div>
-
-        {/* List View */}
-        <AnimatePresence mode="wait">
-          {!selectedPurchase && currentList.length === 0 && !error && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white/60 backdrop-blur-sm rounded-2xl border border-[#FFDDB0]/50 p-8 md:p-12 text-center"
-            >
-              <div className="text-4xl mb-3">
-                {activeTab === 'selected' && <Package size={48} className="mx-auto text-[#4A4A5A]" />}
-                {activeTab === 'verification' && <Clock size={48} className="mx-auto text-[#4A4A5A]" />}
-                {activeTab === 'completed' && <CheckCircle size={48} className="mx-auto text-[#4A4A5A]" />}
-              </div>
-              <p className="text-[#4A4A5A] text-base">
-                {activeTab === 'selected' && 'No pending orders.'}
-                {activeTab === 'verification' && 'No orders ready to verify.'}
-                {activeTab === 'completed' && 'No completed transactions.'}
-              </p>
-              <Button 
-                onClick={() => navigate('/buyer/dashboard')}
-                className="mt-3 bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E] text-sm"
-              >
-                Go to Dashboard
-              </Button>
-            </motion.div>
-          )}
-
-          {/* List Items */}
-          {!selectedPurchase && currentList.length > 0 && (
-            <motion.div 
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              className="space-y-3"
-            >
-              {currentList.map((purchase) => {
-                const statusConfig = getStatusConfig(activeTab);
-                const deliveryDisplay = getDeliveryStatusDisplay(purchase);
-                const isLoading = actionLoading[purchase.id];
-                const isVerification = activeTab === 'verification';
-                const isCompleted = activeTab === 'completed';
-                const hasOtpCode = purchase.verification_code && purchase.delivery_confirmed_by_shop === true;
-                
-                return (
-                  <motion.div
-                    key={purchase.id}
-                    variants={itemVariants}
-                    whileHover={{ x: 4 }}
-                    onClick={() => handleSelectPurchase(purchase)}
-                    className={`
-                      group bg-white/80 backdrop-blur-sm rounded-xl border ${statusConfig.border}
-                      hover:shadow-lg transition-all cursor-pointer p-4
-                    `}
-                  >
-                    <div className="flex flex-wrap justify-between items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-semibold text-[#1A1A2E]">
-                            {purchase.item_name}
-                          </h3>
-                          <span className={`
-                            inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium
-                            ${activeTab === 'completed' ? 'bg-blue-100 text-blue-700' : 
-                              activeTab === 'verification' ? 'bg-amber-100 text-amber-700' : 
-                              'bg-emerald-100 text-emerald-700'}
-                          `}>
-                            {statusConfig.icon}
-                            {statusConfig.label}
-                          </span>
-                          {hasOtpCode && (isVerification || isCompleted) && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-100 text-violet-700 rounded-full text-[10px] font-medium">
-                              <Key size={10} />
-                              {isCompleted ? 'OTP Archived' : 'OTP Ready'}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[#4A4A5A] text-xs mt-0.5 line-clamp-1">
-                          {purchase.description || 'No description'}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-[#4A4A5A]">
-                          <span>₹{purchase.budget_min.toLocaleString()} - ₹{purchase.budget_max.toLocaleString()}</span>
-                          <span className="flex items-center gap-1">
-                            <MapPin size={10} />
-                            {purchase.pincode}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Calendar size={10} />
-                            {new Date(purchase.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                        
-                        {/* Delivery Status */}
-                        {deliveryDisplay && (
-                          <div className={`mt-2 p-2 rounded-lg border ${deliveryDisplay.bg || 'bg-gray-50/50 border-gray-100'}`}>
-                            <div className="flex items-center gap-2">
-                              {deliveryDisplay.icon}
-                              <span className={`text-xs font-medium ${deliveryDisplay.color}`}>
-                                {deliveryDisplay.text}
-                              </span>
-                              {isVerification && deliveryDisplay.hasVerificationCode && (
-                                <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                                  <Key size={10} />
-                                  OTP Ready
-                                </span>
-                              )}
-                            </div>
-                            {deliveryDisplay.subtext && (
-                              <p className="text-[10px] text-[#4A4A5A] mt-0.5">
-                                {deliveryDisplay.subtext}
-                              </p>
-                            )}
-                            
-                            {/* Action buttons for denied delivery */}
-                            {deliveryDisplay.showActions && (
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                <Button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSwitchToPickup(purchase.id);
-                                  }}
-                                  disabled={!!isLoading}
-                                  size="sm"
-                                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 h-auto"
-                                >
-                                  {isLoading === 'pickup' ? (
-                                    <Loader2 size={12} className="animate-spin mr-1" />
-                                  ) : (
-                                    <Home size={12} className="mr-1" />
-                                  )}
-                                  Switch to Pickup
-                                </Button>
-                                <Button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCancelOrder(purchase.id);
-                                  }}
-                                  disabled={!!isLoading}
-                                  variant="outline"
-                                  size="sm"
-                                  className="border-rose-200 text-rose-600 hover:bg-rose-50 text-xs px-3 py-1 h-auto"
-                                >
-                                  {isLoading === 'cancel' ? (
-                                    <Loader2 size={12} className="animate-spin mr-1" />
-                                  ) : (
-                                    <XCircle size={12} className="mr-1" />
-                                  )}
-                                  Cancel Order
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {purchase.selectedBid && (
-                          <div className="mt-2 p-2 bg-white/60 rounded-lg border border-[#FFDDB0]/30">
-                            <p className="text-xs">
-                              <span className="font-medium text-[#1A1A2E]">Shop:</span> 
-                              <span className="text-[#4A4A5A] ml-1">
-                                {purchase.selectedBid.shop_details?.shop_name || purchase.selectedBid.shop_name || 'Unknown'}
-                              </span>
-                              <span className="mx-2 text-[#D0D0D0]">|</span>
-                              <span className="font-medium text-[#1A1A2E]">Price:</span>
-                              <span className="text-emerald-600 font-medium ml-1">₹{purchase.selectedBid.price}</span>
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Review Button - Only for Completed Tab */}
-                        {isCompleted && (
-                          <div className="mt-3 flex items-center justify-between">
-                            <div>
-                              {purchase.selectedBid?.shop_id && reviewStats[purchase.selectedBid.shop_id] && (
-                                <ReviewBadge 
-                                  averageRating={reviewStats[purchase.selectedBid.shop_id].average_rating}
-                                  totalReviews={reviewStats[purchase.selectedBid.shop_id].total_reviews}
-                                  size="sm"
-                                />
-                              )}
-                            </div>
-                            <div className="flex gap-2">
-                              {!reviewCheckStatus[purchase.id]?.has_reviewed && (
-                                <Button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const shopName = purchase.selectedBid?.shop_details?.shop_name || 
-                                                   purchase.selectedBid?.shop_name || 
-                                                   'the shop';
-                                    setSelectedReviewTarget({
-                                      targetType: 'request',
-                                      targetId: purchase.id,
-                                      reviewedId: purchase.selectedBid?.shop_id,
-                                      reviewedName: shopName
-                                    });
-                                    setShowReviewModal(true);
-                                  }}
-                                  size="sm"
-                                  className="bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 text-xs px-3 py-1 h-auto"
-                                >
-                                  <Star size={12} className="mr-1 fill-yellow-400 text-yellow-400" />
-                                  Leave Review
-                                </Button>
-                              )}
-                              {reviewCheckStatus[purchase.id]?.has_reviewed && (
-                                <span className="text-xs text-green-600 flex items-center gap-1 bg-green-50 px-2 py-1 rounded">
-                                  <CheckCircle size={12} />
-                                  Reviewed
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-shrink-0 text-[#4A4A5A] group-hover:text-[#FFBE91] transition-colors">
-                        <ChevronRight size={18} />
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Detail View */}
-        <AnimatePresence mode="wait">
-          {selectedPurchase && (
-            <motion.div
+              key="detail"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
             >
-              <motion.button
-                whileHover={{ x: -3 }}
-                whileTap={{ scale: 0.95 }}
+              <button
                 onClick={handleBack}
-                className="flex items-center gap-1.5 text-[#4A4A5A] hover:text-[#FFBE91] transition-colors mb-4 text-sm"
+                className="flex items-center gap-1.5 mb-3 -ml-1 px-2 py-1.5 text-[11px] text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors rounded-lg hover:bg-[#F5F3EF]"
               >
-                <ArrowLeft size={16} />
-                Back to list
-              </motion.button>
+                <ArrowLeft size={12} />
+                Back to purchases
+              </button>
 
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-[#FFDDB0]/50 p-5 md:p-6 shadow-lg">
-                <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
-                  <div>
-                    <h2 className="text-xl font-bold text-[#1A1A2E]">{selectedPurchase.item_name}</h2>
-                    <p className="text-xs text-[#4A4A5A] mt-0.5">
-                      {selectedPurchase.description || 'No description'}
-                    </p>
+              {/* Detail Hero */}
+              <div className="relative overflow-hidden rounded-2xl mb-4 p-4 sm:p-5 bg-gradient-primary bg-[length:200%_200%] animate-gradient">
+                <motion.div
+                  animate={{ x: [0, 20, 0], y: [0, -14, 0] }}
+                  transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute -top-16 -right-12 w-48 h-48 rounded-full bg-lightCream/70 blur-3xl pointer-events-none"
+                />
+                <div className="relative">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                      activeTab === 'completed' ? 'bg-white/60 text-blue-700' :
+                      activeTab === 'verification' ? 'bg-white/60 text-amber-700' :
+                      'bg-white/60 text-emerald-700'
+                    }`}>
+                      {activeTab === 'selected' && <Package size={9} />}
+                      {activeTab === 'verification' && <Clock size={9} />}
+                      {activeTab === 'completed' && <CheckCircle size={9} />}
+                      {activeTab === 'selected' && 'Pending'}
+                      {activeTab === 'verification' && 'Ready to Verify'}
+                      {activeTab === 'completed' && 'Completed'}
+                    </span>
+                    {selectedPurchase.verification_code && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/60 text-violet-700">
+                        <Key size={9} />
+                        OTP Ready
+                      </span>
+                    )}
                   </div>
-                  <span className={`
-                    inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
-                    ${activeTab === 'completed' ? 'bg-blue-100 text-blue-700' : 
-                      activeTab === 'verification' ? 'bg-amber-100 text-amber-700' : 
-                      'bg-emerald-100 text-emerald-700'}
-                  `}>
-                    {activeTab === 'selected' && <Package size={12} />}
-                    {activeTab === 'verification' && <Clock size={12} />}
-                    {activeTab === 'completed' && <CheckCircle size={12} />}
-                    {activeTab === 'selected' && 'Pending'}
-                    {activeTab === 'verification' && 'Ready to Verify'}
-                    {activeTab === 'completed' && 'Completed'}
-                  </span>
+                  <h2 className="text-base sm:text-[15px] font-bold text-[#1A1A2E] truncate">
+                    {selectedPurchase.item_name}
+                  </h2>
+                  {selectedPurchase.description && (
+                    <p className="text-[10px] text-[#1A1A2E]/70 mt-0.5 line-clamp-2">
+                      {selectedPurchase.description}
+                    </p>
+                  )}
                 </div>
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-[#4A4A5A]">Budget</p>
-                    <p className="font-medium text-[#1A1A2E]">
-                      ₹{selectedPurchase.budget_min.toLocaleString()} - ₹{selectedPurchase.budget_max.toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[#4A4A5A]">Pincode</p>
-                    <p className="font-medium text-[#1A1A2E] flex items-center gap-1">
-                      <MapPin size={14} className="text-[#4A4A5A]" />
-                      {selectedPurchase.pincode}
-                    </p>
+              {/* Detail body */}
+              <div className="space-y-3">
+                <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <MetaBlock
+                      icon={<IndianRupee size={10} />}
+                      label="Budget"
+                      value={`₹${selectedPurchase.budget_min?.toLocaleString('en-IN')} – ₹${selectedPurchase.budget_max?.toLocaleString('en-IN')}`}
+                    />
+                    <MetaBlock
+                      icon={<MapPin size={10} />}
+                      label="Pincode"
+                      value={selectedPurchase.pincode}
+                    />
+                    <MetaBlock
+                      icon={<Calendar size={10} />}
+                      label="Posted"
+                      value={new Date(selectedPurchase.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    />
+                    {selectedPurchase.delivery_method && (
+                      <MetaBlock
+                        icon={selectedPurchase.delivery_method === 'home_delivery' ? <Home size={10} /> : <MapPin size={10} />}
+                        label="Delivery"
+                        value={selectedPurchase.delivery_method === 'home_delivery' ? 'Home' : 'Pickup'}
+                      />
+                    )}
                   </div>
                 </div>
 
                 {selectedPurchase.selectedBid && (
-                  <div className="mt-4 p-4 bg-[#FFFCE1]/50 rounded-xl border border-[#FFDDB0]/30">
-                    <h4 className="font-semibold text-[#1A1A2E] text-sm flex items-center gap-2 mb-2">
-                      <Store size={16} className="text-[#FFBE91]" />
-                      Shop Details
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                      <p><span className="text-[#4A4A5A]">Shop:</span> <span className="font-medium text-[#1A1A2E]">{selectedPurchase.selectedBid.shop_details?.shop_name || selectedPurchase.selectedBid.shop_name || 'Unknown'}</span></p>
-                      <p><span className="text-[#4A4A5A]">Phone:</span> <span className="font-medium text-[#1A1A2E]">{selectedPurchase.selectedBid.shop_details?.phone || selectedPurchase.selectedBid.shop_phone || 'N/A'}</span></p>
-                      <p className="sm:col-span-2"><span className="text-[#4A4A5A]">Address:</span> <span className="font-medium text-[#1A1A2E]">{selectedPurchase.selectedBid.shop_details?.address || selectedPurchase.selectedBid.shop_address || 'N/A'}</span></p>
-                      <p><span className="text-[#4A4A5A]">Price:</span> <span className="font-medium text-emerald-600">₹{selectedPurchase.selectedBid.price}</span></p>
-                      <p><span className="text-[#4A4A5A]">Selected:</span> <span className="font-medium text-[#1A1A2E]">{new Date(selectedPurchase.selectedBid.selected_at || selectedPurchase.purchased_at).toLocaleDateString()}</span></p>
+                  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-xl bg-[#FFBE91]/20 flex items-center justify-center">
+                        <Store size={12} className="text-[#1A1A2E]" />
+                      </div>
+                      <h3 className="text-[12px] font-semibold text-[#1A1A2E]">Shop details</h3>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                      <MetaBlock
+                        icon={<Store size={10} />}
+                        label="Shop"
+                        value={selectedPurchase.selectedBid.shop_details?.shop_name || selectedPurchase.selectedBid.shop_name || 'Unknown'}
+                      />
+                      <MetaBlock
+                        icon={<Phone size={10} />}
+                        label="Phone"
+                        value={selectedPurchase.selectedBid.shop_details?.phone || selectedPurchase.selectedBid.shop_phone || 'N/A'}
+                      />
+                      <MetaBlock
+                        icon={<MapPin size={10} />}
+                        label="Address"
+                        value={selectedPurchase.selectedBid.shop_details?.address || selectedPurchase.selectedBid.shop_address || 'N/A'}
+                        span={2}
+                      />
+                      <MetaBlock
+                        icon={<IndianRupee size={10} />}
+                        label="Price"
+                        value={`₹${selectedPurchase.selectedBid.price?.toLocaleString('en-IN')}`}
+                        accent="text-emerald-600"
+                      />
+                      <MetaBlock
+                        icon={<Calendar size={10} />}
+                        label="Selected"
+                        value={new Date(selectedPurchase.selectedBid.selected_at || selectedPurchase.purchased_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                      />
                     </div>
                   </div>
                 )}
 
-                {/* ====== OTP Verification Code Display (Verify Tab) ====== */}
-                {activeTab === 'verification' && 
-                 selectedPurchase.verification_code && 
+                {activeTab === 'verification' &&
+                 selectedPurchase.verification_code &&
                  selectedPurchase.delivery_confirmed_by_shop === true &&
                  selectedPurchase.status !== 'completed' && (
-                  <div className="mt-4">
+                  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-4">
                     {renderOtpCodeDisplay(selectedPurchase, false)}
                   </div>
                 )}
 
-                {/* ====== OTP Verification Code Display (Completed Tab - for record) ====== */}
-                {activeTab === 'completed' && 
-                 selectedPurchase.verification_code && (
-                  <div className="mt-4">
+                {activeTab === 'completed' && selectedPurchase.verification_code && (
+                  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-4">
                     {renderOtpCodeDisplay(selectedPurchase, true)}
                   </div>
                 )}
 
-                {/* Delivery Status in Detail */}
                 {selectedPurchase.delivery_method && (
-                  <div className="mt-4 p-4 bg-white/60 rounded-xl border border-[#FFDDB0]/30">
-                    <h4 className="font-semibold text-[#1A1A2E] text-sm flex items-center gap-2 mb-2">
-                      <Truck size={16} className="text-[#FFBE91]" />
-                      Delivery Status
-                    </h4>
+                  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-xl bg-[#CFEBFF]/50 flex items-center justify-center">
+                        <Truck size={12} className="text-[#1A1A2E]" />
+                      </div>
+                      <h3 className="text-[12px] font-semibold text-[#1A1A2E]">Delivery status</h3>
+                    </div>
+
                     <div className="space-y-2">
-                      <p className="text-sm">
-                        <span className="text-[#4A4A5A]">Method:</span>
-                        <span className="font-medium text-[#1A1A2E] ml-1">
-                          {selectedPurchase.delivery_method === 'home_delivery' ? (
-                            <span className="flex items-center gap-1"><Home size={14} /> Home Delivery</span>
-                          ) : (
-                            <span className="flex items-center gap-1"><MapPin size={14} /> Pickup</span>
-                          )}
-                        </span>
-                      </p>
-                      
                       {selectedPurchase.delivery_method === 'home_delivery' && (
                         <>
                           {selectedPurchase.delivery_confirmed_by_shop === true && (
-                            <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-100">
-                              <p className="text-xs text-emerald-700 flex items-center gap-1">
-                                <ThumbsUp size={14} />
+                            <div className="p-3 bg-emerald-50 rounded-xl">
+                              <p className="text-[11px] text-emerald-700 flex items-center gap-1.5 font-medium">
+                                <ThumbsUp size={11} />
                                 Shop confirmed delivery
                               </p>
                               {selectedPurchase.delivery_response_at && (
                                 <p className="text-[10px] text-emerald-600 mt-0.5">
-                                  Confirmed on: {new Date(selectedPurchase.delivery_response_at).toLocaleString()}
-                                </p>
-                              )}
-                              {selectedPurchase.verification_code && (
-                                <p className="text-[10px] text-violet-600 mt-1 flex items-center gap-1">
-                                  <Key size={12} />
-                                  OTP code generated. Share it with the shop to complete the transaction.
+                                  Confirmed {new Date(selectedPurchase.delivery_response_at).toLocaleString('en-IN')}
                                 </p>
                               )}
                             </div>
                           )}
-                          
+
                           {selectedPurchase.delivery_confirmed_by_shop === false && (
-                            <div className="p-2 bg-rose-50 rounded-lg border border-rose-100">
-                              <p className="text-xs text-rose-700 flex items-center gap-1">
-                                <ThumbsDown size={14} />
+                            <div className="p-3 bg-rose-50 rounded-xl">
+                              <p className="text-[11px] text-rose-700 flex items-center gap-1.5 font-medium">
+                                <ThumbsDown size={11} />
                                 Shop denied delivery
                               </p>
                               <p className="text-[10px] text-rose-600 mt-0.5">
-                                Please choose pickup or cancel this order.
+                                Choose pickup or cancel this order.
                               </p>
                               <div className="flex flex-wrap gap-2 mt-2">
-                                <Button
+                                <button
                                   onClick={() => handleSwitchToPickup(selectedPurchase.id)}
                                   disabled={!!actionLoading[selectedPurchase.id]}
-                                  size="sm"
-                                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 h-auto"
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-medium rounded-lg transition-colors disabled:opacity-50"
                                 >
                                   {actionLoading[selectedPurchase.id] === 'pickup' ? (
-                                    <Loader2 size={12} className="animate-spin mr-1" />
+                                    <Loader2 size={10} className="animate-spin" />
                                   ) : (
-                                    <Home size={12} className="mr-1" />
+                                    <Home size={10} />
                                   )}
                                   Switch to Pickup
-                                </Button>
-                                <Button
+                                </button>
+                                <button
                                   onClick={() => handleCancelOrder(selectedPurchase.id)}
                                   disabled={!!actionLoading[selectedPurchase.id]}
-                                  variant="outline"
-                                  size="sm"
-                                  className="border-rose-200 text-rose-600 hover:bg-rose-50 text-xs px-3 py-1 h-auto"
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-medium rounded-lg transition-colors disabled:opacity-50"
                                 >
                                   {actionLoading[selectedPurchase.id] === 'cancel' ? (
-                                    <Loader2 size={12} className="animate-spin mr-1" />
+                                    <Loader2 size={10} className="animate-spin" />
                                   ) : (
-                                    <XCircle size={12} className="mr-1" />
+                                    <XCircle size={10} />
                                   )}
-                                  Cancel Order
-                                </Button>
+                                  Cancel
+                                </button>
                               </div>
                             </div>
                           )}
-                          
+
                           {selectedPurchase.delivery_confirmed_by_shop === null && (
-                            <div className="p-2 bg-amber-50 rounded-lg border border-amber-100">
-                              <p className="text-xs text-amber-700 flex items-center gap-1">
-                                <Clock size={14} />
+                            <div className="p-3 bg-amber-50 rounded-xl">
+                              <p className="text-[11px] text-amber-700 flex items-center gap-1.5 font-medium">
+                                <Clock size={11} />
                                 Awaiting shop response
                               </p>
                               <p className="text-[10px] text-amber-600 mt-0.5">
-                                The shop is deciding whether they can deliver to your address.
+                                Shop is deciding whether they can deliver.
                               </p>
                             </div>
                           )}
                         </>
                       )}
-                      
+
                       {selectedPurchase.delivery_method === 'pickup' && (
-                        <div className="p-2 bg-blue-50 rounded-lg border border-blue-100">
-                          <p className="text-xs text-blue-700 flex items-center gap-1">
-                            <MapPin size={14} />
+                        <div className="p-3 bg-blue-50 rounded-xl">
+                          <p className="text-[11px] text-blue-700 flex items-center gap-1.5 font-medium">
+                            <MapPin size={11} />
                             Pickup selected
                           </p>
                           <p className="text-[10px] text-blue-600 mt-0.5">
-                            You will pick up the item from the shop.
+                            Collect the item from the shop.
                           </p>
-                          {selectedPurchase.verification_code && (
-                            <p className="text-[10px] text-violet-600 mt-1 flex items-center gap-1">
-                              <Key size={12} />
-                              OTP code generated. Share it with the shop to complete the transaction.
-                            </p>
-                          )}
                         </div>
                       )}
                     </div>
                   </div>
                 )}
 
-                {/* Delivery Options - Selected Tab */}
                 {activeTab === 'selected' && !selectedPurchase.delivery_method && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-4 p-4 bg-amber-50/80 rounded-xl border-2 border-amber-200"
-                  >
-                    <h4 className="font-semibold text-amber-800 text-sm flex items-center gap-2 mb-3">
-                      <Truck size={16} />
-                      Select Delivery Method
-                    </h4>
-                    
+                  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-xl bg-[#FFBE91]/20 flex items-center justify-center">
+                        <Truck size={12} className="text-[#1A1A2E]" />
+                      </div>
+                      <h3 className="text-[12px] font-semibold text-[#1A1A2E]">Choose delivery</h3>
+                    </div>
+
                     {!deliveryMethod ? (
-                      <div className="flex flex-wrap gap-3">
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.95 }}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
                           onClick={() => handleDeliverySelection('delivery')}
-                          className="flex-1 min-w-[120px] p-3 bg-white rounded-xl border-2 border-emerald-200 hover:border-emerald-400 transition-all text-center"
+                          className="flex items-start gap-3 p-3 rounded-xl bg-[#F8F6F0]/60 hover:bg-[#F8F6F0] transition-colors text-left"
                         >
-                          <div className="text-2xl mb-1"><Home size={28} className="mx-auto text-emerald-600" /></div>
-                          <div className="text-sm font-medium text-[#1A1A2E]">Home Delivery</div>
-                          <div className="text-[10px] text-[#4A4A5A]">Shop delivers to you</div>
-                          <div className="text-[10px] text-amber-600 mt-1 flex items-center justify-center gap-1"><Clock size={10} /> Needs shop confirmation</div>
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.95 }}
+                          <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                            <Home size={12} className="text-emerald-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-medium text-[#1A1A2E]">Home Delivery</p>
+                            <p className="text-[10px] text-[#A0A0B0]">Shop delivers to you</p>
+                            <p className="text-[9px] text-amber-600 mt-1">Needs shop confirmation</p>
+                          </div>
+                        </button>
+                        <button
                           onClick={() => handleDeliverySelection('pickup')}
-                          className="flex-1 min-w-[120px] p-3 bg-white rounded-xl border-2 border-blue-200 hover:border-blue-400 transition-all text-center"
+                          className="flex items-start gap-3 p-3 rounded-xl bg-[#F8F6F0]/60 hover:bg-[#F8F6F0] transition-colors text-left"
                         >
-                          <div className="text-2xl mb-1"><MapPin size={28} className="mx-auto text-blue-600" /></div>
-                          <div className="text-sm font-medium text-[#1A1A2E]">Pickup</div>
-                          <div className="text-[10px] text-[#4A4A5A]">Collect from shop</div>
-                          <div className="text-[10px] text-violet-600 mt-1 flex items-center justify-center gap-1"><Key size={10} /> OTP auto-completes</div>
-                        </motion.button>
+                          <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                            <MapPin size={12} className="text-blue-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-medium text-[#1A1A2E]">Pickup</p>
+                            <p className="text-[10px] text-[#A0A0B0]">Collect from shop</p>
+                            <p className="text-[9px] text-violet-600 mt-1">OTP auto-completes</p>
+                          </div>
+                        </button>
                       </div>
                     ) : (
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="p-4 bg-white rounded-xl border-2 border-emerald-200 text-center"
-                      >
-                        <p className="text-sm font-medium text-[#1A1A2E]">
-                          <CheckCircle size={16} className="inline mr-1 text-emerald-600" />
-                          You selected <strong>{deliveryMethod === 'delivery' ? 'Home Delivery' : 'Pickup'}</strong>
+                      <div className="p-3 bg-emerald-50 rounded-xl">
+                        <p className="text-[11px] text-emerald-700 flex items-center gap-1.5 font-medium">
+                          <CheckCircle size={11} />
+                          Selected: {deliveryMethod === 'delivery' ? 'Home Delivery' : 'Pickup'}
                         </p>
                         {deliveryMethod === 'delivery' && (
-                          <p className="text-xs text-[#4A4A5A] mt-1 flex items-center justify-center gap-1"><MapPin size={12} /> {deliveryAddress}</p>
+                          <p className="text-[10px] text-emerald-600 mt-1">{deliveryAddress}</p>
                         )}
-                        <p className="text-xs text-amber-600 mt-1.5 flex items-center justify-center gap-1">
-                          {deliveryMethod === 'delivery' 
-                            ? <><Clock size={12} /> Waiting for shop to confirm delivery</>
-                            : <><Key size={12} /> OTP will auto-complete the transaction</>}
+                        <p className="text-[10px] text-amber-600 mt-1">
+                          {deliveryMethod === 'delivery'
+                            ? 'Waiting for shop to confirm delivery'
+                            : 'OTP will auto-complete the transaction'}
                         </p>
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.95 }}
+                        <button
                           onClick={handleConfirmDelivery}
                           disabled={updating}
-                          className="mt-3 px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                          className="mt-3 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-medium disabled:opacity-50 transition-colors"
                         >
-                          {updating ? 'Confirming...' : 'Confirm Delivery'}
-                        </motion.button>
-                      </motion.div>
+                          {updating ? 'Confirming…' : 'Confirm Delivery'}
+                        </button>
+                      </div>
                     )}
-                  </motion.div>
+                  </div>
                 )}
 
-                {/* Verification Tab - Transaction Status */}
                 {activeTab === 'verification' && selectedPurchase.delivery_method && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-4 p-4 bg-amber-50/80 rounded-xl border-2 border-amber-200"
-                  >
-                    <h4 className="font-semibold text-amber-800 text-sm flex items-center gap-2 mb-2">
-                      <Shield size={16} />
-                      Transaction Status
-                    </h4>
-                    
-                    <div className="bg-white rounded-xl p-3 text-sm space-y-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${selectedPurchase.delivery_confirmed_by_shop === true ? 'bg-emerald-500' : selectedPurchase.delivery_confirmed_by_shop === false ? 'bg-rose-500' : 'bg-amber-500'}`} />
-                        <span className="text-[#4A4A5A]">Shop:</span>
-                        <span className="font-medium">
-                          {selectedPurchase.delivery_method === 'pickup' ? (
-                            <span className="text-emerald-600 flex items-center gap-1"><CheckCircle size={14} /> Pickup confirmed</span>
-                          ) : selectedPurchase.delivery_confirmed_by_shop === true ? (
-                            <span className="text-emerald-600 flex items-center gap-1"><ThumbsUp size={14} /> Delivery confirmed</span>
-                          ) : selectedPurchase.delivery_confirmed_by_shop === false ? (
-                            <span className="text-rose-600 flex items-center gap-1"><ThumbsDown size={14} /> Delivery denied</span>
-                          ) : (
-                            <span className="text-amber-600 flex items-center gap-1"><Clock size={14} /> Awaiting confirmation</span>
-                          )}
-                        </span>
+                  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-xl bg-[#CFEBFF]/50 flex items-center justify-center">
+                        <Shield size={12} className="text-[#1A1A2E]" />
                       </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Truck size={14} className="text-[#4A4A5A]" />
-                        <span className="text-[#4A4A5A]">Method:</span>
-                        <span className="font-medium text-[#1A1A2E]">
-                          {selectedPurchase.delivery_method === 'home_delivery' ? (
-                            <span className="flex items-center gap-1"><Home size={14} /> Home Delivery</span>
-                          ) : (
-                            <span className="flex items-center gap-1"><MapPin size={14} /> Pickup</span>
-                          )}
-                        </span>
-                      </div>
-                      
-                      {/* OTP Status */}
+                      <h3 className="text-[12px] font-semibold text-[#1A1A2E]">Transaction status</h3>
+                    </div>
+                    <div className="space-y-2 text-[11px]">
+                      <StatusLine
+                        label="Shop"
+                        value={
+                          selectedPurchase.delivery_method === 'pickup'
+                            ? 'Pickup confirmed'
+                            : selectedPurchase.delivery_confirmed_by_shop === true
+                              ? 'Delivery confirmed'
+                              : selectedPurchase.delivery_confirmed_by_shop === false
+                                ? 'Delivery denied'
+                                : 'Awaiting confirmation'
+                        }
+                        color={
+                          selectedPurchase.delivery_method === 'pickup' || selectedPurchase.delivery_confirmed_by_shop === true
+                            ? 'text-emerald-600'
+                            : selectedPurchase.delivery_confirmed_by_shop === false
+                              ? 'text-rose-600'
+                              : 'text-amber-600'
+                        }
+                      />
+                      <StatusLine
+                        label="Method"
+                        value={selectedPurchase.delivery_method === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
+                        color="text-[#1A1A2E]"
+                      />
                       {selectedPurchase.verification_code && selectedPurchase.delivery_confirmed_by_shop === true && (
-                        <div className="flex items-center gap-2">
-                          <Key size={14} className="text-violet-600" />
-                          <span className="text-[#4A4A5A]">Verification:</span>
-                          <span className="font-medium text-violet-600 flex items-center gap-1">
-                            <CheckCircle size={14} />
-                            OTP Ready - Share code with shop
-                          </span>
-                        </div>
+                        <StatusLine
+                          label="Verification"
+                          value="OTP Ready — share code with shop"
+                          color="text-violet-600"
+                        />
                       )}
-                      
-                      <div className="mt-2 pt-2 border-t border-[#FFDDB0]/30">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${selectedPurchase.delivery_confirmed_by_shop === true ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                          <span className="text-[#4A4A5A]">Status:</span>
-                          <span className="font-medium text-emerald-600 flex items-center gap-1">
-                            <Clock size={14} />
-                            Awaiting shop OTP entry
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-[#4A4A5A] mt-1">
+                      <div className="pt-2 border-t border-dashed border-[#EEECE6]">
+                        <p className="text-[10px] text-[#A0A0B0]">
                           The transaction will auto-complete when the shop enters the correct OTP code.
                         </p>
                       </div>
                     </div>
-                    
-                    {selectedPurchase.verification_code && selectedPurchase.delivery_confirmed_by_shop === true && (
-                      <p className="text-[10px] text-violet-600 mt-2 text-center flex items-center justify-center gap-1">
-                        <Key size={12} />
-                        Share the OTP code with the shop to complete the transaction
-                      </p>
-                    )}
-                    {!selectedPurchase.verification_code && selectedPurchase.delivery_method === 'home_delivery' && selectedPurchase.delivery_confirmed_by_shop === null && (
-                      <p className="text-[10px] text-[#4A4A5A] mt-1.5 text-center">
-                        The shop will confirm or deny delivery. You'll be notified when they respond.
-                      </p>
-                    )}
-                    {selectedPurchase.delivery_method === 'pickup' && !selectedPurchase.verification_code && selectedPurchase.delivery_confirmed_by_shop === true && (
-                      <p className="text-[10px] text-amber-600 mt-1.5 text-center">
-                        OTP code pending. Please wait a moment.
-                      </p>
-                    )}
-                  </motion.div>
+                  </div>
                 )}
 
-                {/* Completed Tab */}
                 {activeTab === 'completed' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-4 p-4 bg-blue-50/80 rounded-xl border-2 border-blue-200"
-                  >
-                    <h4 className="font-semibold text-blue-800 text-sm flex items-center gap-2 mb-2">
-                      <CheckCircle size={16} />
-                      Transaction Complete
-                    </h4>
-                    <div className="bg-white rounded-xl p-3 text-sm space-y-1">
-                      <p className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-600" /> <span className="text-[#4A4A5A]">Status:</span> <span className="font-medium text-emerald-600">COMPLETED</span></p>
-                      <p><span className="text-[#4A4A5A]">Delivery:</span> <span className="font-medium text-[#1A1A2E]">{selectedPurchase.delivery_method === 'home_delivery' ? <span className="flex items-center gap-1"><Home size={14} /> Home Delivery</span> : <span className="flex items-center gap-1"><MapPin size={14} /> Pickup</span>}</span></p>
+                  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-xl bg-blue-100 flex items-center justify-center">
+                        <CheckCircle size={12} className="text-blue-600" />
+                      </div>
+                      <h3 className="text-[12px] font-semibold text-[#1A1A2E]">Transaction complete</h3>
+                    </div>
+                    <div className="space-y-2 text-[11px]">
+                      <StatusLine label="Status" value="COMPLETED" color="text-emerald-600" />
+                      <StatusLine
+                        label="Delivery"
+                        value={selectedPurchase.delivery_method === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
+                        color="text-[#1A1A2E]"
+                      />
                       {selectedPurchase.delivery_method === 'home_delivery' && selectedPurchase.delivery_address && (
-                        <p><span className="text-[#4A4A5A]">Address:</span> <span className="font-medium text-[#1A1A2E]">{selectedPurchase.delivery_address}</span></p>
+                        <StatusLine
+                          label="Address"
+                          value={selectedPurchase.delivery_address}
+                          color="text-[#1A1A2E]"
+                        />
                       )}
-                      <p><span className="text-[#4A4A5A]">Completed:</span> <span className="font-medium text-[#1A1A2E]">{new Date(selectedPurchase.completed_at).toLocaleDateString()}</span></p>
+                      {selectedPurchase.completed_at && (
+                        <StatusLine
+                          label="Completed"
+                          value={new Date(selectedPurchase.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          color="text-[#1A1A2E]"
+                        />
+                      )}
                       {selectedPurchase.completed_via_override && (
-                        <p className="text-amber-600 text-xs flex items-center gap-1"><AlertCircle size={12} /> Completed via manual override</p>
+                        <p className="text-[10px] text-amber-600 flex items-center gap-1 pt-1">
+                          <AlertCircle size={10} />
+                          Completed via manual override
+                        </p>
                       )}
                     </div>
-                  </motion.div>
+                  </div>
+                )}
+
+                {activeTab === 'completed' && selectedPurchase.selectedBid?.shop_id && (
+                  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      {reviewStats[selectedPurchase.selectedBid.shop_id] && (
+                        <ReviewBadge
+                          averageRating={reviewStats[selectedPurchase.selectedBid.shop_id].average_rating}
+                          totalReviews={reviewStats[selectedPurchase.selectedBid.shop_id].total_reviews}
+                          size="sm"
+                        />
+                      )}
+                    </div>
+                    <div>
+                      {!reviewCheckStatus[selectedPurchase.id]?.has_reviewed ? (
+                        <button
+                          onClick={() => {
+                            const shopName = selectedPurchase.selectedBid?.shop_details?.shop_name ||
+                                           selectedPurchase.selectedBid?.shop_name ||
+                                           'the shop';
+                            setSelectedReviewTarget({
+                              targetType: 'request',
+                              targetId: selectedPurchase.id,
+                              reviewedId: selectedPurchase.selectedBid?.shop_id,
+                              reviewedName: shopName
+                            });
+                            setShowReviewModal(true);
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E] text-[11px] font-medium rounded-lg transition-colors"
+                        >
+                          <Star size={11} className="fill-[#1A1A2E]" />
+                          Leave Review
+                        </button>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium">
+                          <CheckCircle size={11} />
+                          Reviewed
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="list"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <button
+                onClick={() => navigate('/buyer/requests')}
+                className="flex items-center gap-1.5 mb-3 -ml-1 px-2 py-1.5 text-[11px] text-[#A0A0B0] hover:text-[#1A1A2E] transition-colors rounded-lg hover:bg-[#F5F3EF]"
+              >
+                <ArrowLeft size={12} />
+                Back to requests
+              </button>
+
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="relative overflow-hidden rounded-2xl mb-4 sm:mb-5 p-4 sm:p-5 bg-gradient-primary bg-[length:200%_200%] animate-gradient"
+              >
+                <motion.div
+                  animate={{ x: [0, 25, 0], y: [0, -18, 0] }}
+                  transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute -top-16 -right-12 w-48 h-48 rounded-full bg-lightCream/70 blur-3xl pointer-events-none"
+                />
+                <motion.div
+                  animate={{ x: [0, -20, 0], y: [0, 20, 0] }}
+                  transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute -bottom-20 -left-10 w-56 h-56 rounded-full bg-softBlue/50 blur-3xl pointer-events-none"
+                />
+                <div className="relative flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <motion.h1
+                      initial={{ opacity: 0, x: -6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1, duration: 0.35 }}
+                      className="text-base sm:text-[15px] font-bold text-[#1A1A2E] truncate"
+                    >
+                      My Purchases
+                    </motion.h1>
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.2, duration: 0.35 }}
+                      className="text-[10px] text-[#1A1A2E]/70 mt-0.5"
+                    >
+                      {selectedBids.length} pending · {verificationRequests.length} to verify · {completedRequests.length} completed
+                    </motion.p>
+                  </div>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={fetchAllPurchases}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/40 backdrop-blur-sm rounded-full flex-shrink-0 mt-0.5 hover:bg-white/60 transition-colors"
+                  >
+                    <RefreshCw size={11} className="text-[#1A1A2E]" />
+                    <span className="text-[10px] font-medium text-[#1A1A2E]">Refresh</span>
+                  </motion.button>
+                </div>
+              </motion.div>
+
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    className="p-3 bg-rose-50 rounded-2xl flex items-start gap-2 overflow-hidden"
+                  >
+                    <AlertCircle size={14} className="text-rose-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-[11px] font-medium text-rose-600 flex-1">{error}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="flex gap-1 p-1 bg-white/70 backdrop-blur-xl rounded-2xl mb-4 overflow-x-auto"
+              >
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const active = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-medium transition-all min-w-fit ${
+                        active
+                          ? 'bg-[#1A1A2E] text-white'
+                          : 'text-[#A0A0B0] hover:text-[#4A4A5A] hover:bg-[#F8F6F0]'
+                      }`}
+                    >
+                      <Icon size={11} />
+                      <span>{tab.label}</span>
+                      <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${
+                        active ? 'bg-white/20 text-white' : 'bg-[#F8F6F0] text-[#A0A0B0]'
+                      }`}>
+                        {tab.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </motion.div>
+
+              <AnimatePresence mode="wait">
+                {currentList.length === 0 && !error && (
+                  <motion.div
+                    key={`empty-${activeTab}`}
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    className="bg-white/70 backdrop-blur-xl rounded-2xl p-8 text-center"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-[#F8F6F0] flex items-center justify-center mx-auto mb-3">
+                      {activeTab === 'selected' && <Package size={20} className="text-[#A0A0B0]" />}
+                      {activeTab === 'verification' && <Clock size={20} className="text-[#A0A0B0]" />}
+                      {activeTab === 'completed' && <CheckCircle size={20} className="text-[#A0A0B0]" />}
+                    </div>
+                    <h3 className="text-[12px] font-medium text-[#1A1A2E]">
+                      {activeTab === 'selected' && 'No pending orders'}
+                      {activeTab === 'verification' && 'Nothing to verify'}
+                      {activeTab === 'completed' && 'No completed transactions'}
+                    </h3>
+                    <p className="text-[10px] text-[#A0A0B0] mt-0.5">
+                      {activeTab === 'selected' && 'Selected bids will appear here'}
+                      {activeTab === 'verification' && 'Orders ready for OTP will appear here'}
+                      {activeTab === 'completed' && 'Finished transactions will show here'}
+                    </p>
+                    <button
+                      onClick={() => navigate('/buyer/dashboard')}
+                      className="mt-3 inline-flex items-center gap-1.5 bg-[#1A1A2E] hover:bg-[#2A2A3E] text-white text-[11px] font-medium px-4 py-2 rounded-xl transition-colors"
+                    >
+                      Go to Dashboard
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {currentList.length > 0 && (
+                <motion.div
+                  key={`list-${activeTab}`}
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="space-y-2.5"
+                >
+                  {currentList.map((purchase) => {
+                    const deliveryDisplay = getDeliveryStatusDisplay(purchase);
+                    const isLoading = actionLoading[purchase.id];
+                    const isVerification = activeTab === 'verification';
+                    const isCompleted = activeTab === 'completed';
+                    const hasOtpCode = purchase.verification_code && purchase.delivery_confirmed_by_shop === true;
+
+                    return (
+                      <motion.div
+                        key={purchase.id}
+                        variants={itemVariants}
+                        whileHover={{ y: -1 }}
+                        whileTap={{ scale: 0.995 }}
+                        onClick={() => handleSelectPurchase(purchase)}
+                        className="bg-white/70 backdrop-blur-xl rounded-2xl p-3 sm:p-4 transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <h3 className="text-[12px] sm:text-[13px] font-semibold text-[#1A1A2E] truncate">
+                                {purchase.item_name}
+                              </h3>
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium ${
+                                isCompleted ? 'bg-blue-100 text-blue-700' :
+                                isVerification ? 'bg-amber-100 text-amber-700' :
+                                'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                {isCompleted && <CheckCircle size={8} />}
+                                {isVerification && <Clock size={8} />}
+                                {!isVerification && !isCompleted && <Package size={8} />}
+                                {isCompleted ? 'Completed' : isVerification ? 'Ready' : 'Pending'}
+                              </span>
+                              {hasOtpCode && (isVerification || isCompleted) && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-violet-100 text-violet-700">
+                                  <Key size={8} />
+                                  {isCompleted ? 'Archived' : 'OTP'}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[10px] text-[#A0A0B0]">
+                              <span className="flex items-center gap-1 font-medium text-[#1A1A2E]">
+                                <IndianRupee size={9} />
+                                {purchase.budget_min?.toLocaleString('en-IN')} – {purchase.budget_max?.toLocaleString('en-IN')}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <MapPin size={9} />
+                                {purchase.pincode}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Calendar size={9} />
+                                {new Date(purchase.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                              </span>
+                            </div>
+
+                            {deliveryDisplay && (
+                              <div className={`mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] ${deliveryDisplay.bg} ${deliveryDisplay.color}`}>
+                                {deliveryDisplay.icon}
+                                <span className="font-medium">{deliveryDisplay.text}</span>
+                                {deliveryDisplay.hasVerificationCode && (
+                                  <Key size={9} className="ml-0.5" />
+                                )}
+                              </div>
+                            )}
+
+                            {purchase.selectedBid && (
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-2 text-[10px]">
+                                <span className="flex items-center gap-1 text-[#4A4A5A]">
+                                  <Store size={9} />
+                                  {purchase.selectedBid.shop_details?.shop_name || purchase.selectedBid.shop_name || 'Unknown'}
+                                </span>
+                                <span className="flex items-center gap-1 text-emerald-600 font-medium">
+                                  <IndianRupee size={9} />
+                                  {purchase.selectedBid.price?.toLocaleString('en-IN')}
+                                </span>
+                              </div>
+                            )}
+
+                            {deliveryDisplay?.showActions && (
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSwitchToPickup(purchase.id);
+                                  }}
+                                  disabled={!!isLoading}
+                                  className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-medium rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                  {isLoading === 'pickup' ? <Loader2 size={9} className="animate-spin" /> : <Home size={9} />}
+                                  Switch to Pickup
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCancelOrder(purchase.id);
+                                  }}
+                                  disabled={!!isLoading}
+                                  className="flex items-center gap-1 px-2.5 py-1 bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-medium rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                  {isLoading === 'cancel' ? <Loader2 size={9} className="animate-spin" /> : <XCircle size={9} />}
+                                  Cancel
+                                </button>
+                              </div>
+                            )}
+
+                            {isCompleted && purchase.selectedBid?.shop_id && (
+                              <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-dashed border-[#EEECE6]">
+                                <div className="min-w-0">
+                                  {reviewStats[purchase.selectedBid.shop_id] && (
+                                    <ReviewBadge
+                                      averageRating={reviewStats[purchase.selectedBid.shop_id].average_rating}
+                                      totalReviews={reviewStats[purchase.selectedBid.shop_id].total_reviews}
+                                      size="sm"
+                                    />
+                                  )}
+                                </div>
+                                <div className="flex-shrink-0">
+                                  {!reviewCheckStatus[purchase.id]?.has_reviewed ? (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const shopName = purchase.selectedBid?.shop_details?.shop_name ||
+                                                       purchase.selectedBid?.shop_name ||
+                                                       'the shop';
+                                        setSelectedReviewTarget({
+                                          targetType: 'request',
+                                          targetId: purchase.id,
+                                          reviewedId: purchase.selectedBid?.shop_id,
+                                          reviewedName: shopName
+                                        });
+                                        setShowReviewModal(true);
+                                      }}
+                                      className="flex items-center gap-1 px-2 py-1 bg-[#FFBE91] hover:bg-[#FFA87A] text-[#1A1A2E] text-[10px] font-medium rounded-lg transition-colors"
+                                    >
+                                      <Star size={9} className="fill-[#1A1A2E]" />
+                                      Review
+                                    </button>
+                                  ) : (
+                                    <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+                                      <CheckCircle size={9} />
+                                      Reviewed
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <ChevronRight size={14} className="text-[#A0A0B0] group-hover:translate-x-0.5 group-hover:text-[#1A1A2E] transition-all flex-shrink-0 mt-1" />
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </motion.div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Review Modal */}
       <ReviewModal
         isOpen={showReviewModal}
         onClose={() => {
@@ -1347,13 +1204,29 @@ const MyPurchases = () => {
         reviewedId={selectedReviewTarget?.reviewedId}
         reviewedName={selectedReviewTarget?.reviewedName}
         onSuccess={() => {
-          if (selectedReviewTarget) {
-            handleReviewSuccess(selectedReviewTarget.targetId);
-          }
+          if (selectedReviewTarget) handleReviewSuccess(selectedReviewTarget.targetId);
         }}
       />
     </div>
   );
 };
+
+/* ---------- Small building blocks ---------- */
+const MetaBlock = ({ icon, label, value, span = 1, accent = '' }) => (
+  <div className={span === 2 ? 'sm:col-span-2' : ''}>
+    <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-wide text-[#A0A0B0]">
+      {icon}
+      {label}
+    </span>
+    <p className={`text-[11px] mt-0.5 break-words ${accent || 'text-[#1A1A2E]'}`}>{value}</p>
+  </div>
+);
+
+const StatusLine = ({ label, value, color = 'text-[#1A1A2E]' }) => (
+  <div className="flex items-center gap-2">
+    <span className="text-[#A0A0B0] text-[10px] uppercase tracking-wide min-w-[70px]">{label}</span>
+    <span className={`text-[11px] font-medium ${color}`}>{value}</span>
+  </div>
+);
 
 export default MyPurchases;
