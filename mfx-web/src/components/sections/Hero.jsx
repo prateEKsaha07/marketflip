@@ -10,9 +10,138 @@ import {
   Command,
   ArrowUpRight,
   Check,
+  ArrowRight,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
+/* ============ Live Stats Strip ============ */
+const LiveStatsStrip = ({ reduceMotion }) => {
+  const [stats, setStats] = useState({
+    requests: 247,
+    shops: 89,
+    deals: 12.4,
+  });
+
+  // Flash state per metric (to briefly highlight when value changes)
+  const [flash, setFlash] = useState({
+    requests: false,
+    shops: false,
+    deals: false,
+  });
+
+  useEffect(() => {
+    if (reduceMotion) return;
+
+    // Requests: +1 to +4 every 9–14s
+    const requestsTimer = setInterval(() => {
+      setStats((s) => ({ ...s, requests: s.requests + Math.floor(Math.random() * 4) + 1 }));
+      setFlash((f) => ({ ...f, requests: true }));
+      setTimeout(() => setFlash((f) => ({ ...f, requests: false })), 800);
+    }, 11000);
+
+    // Shops: +1 every 13–18s
+    const shopsTimer = setInterval(() => {
+      setStats((s) => ({ ...s, shops: s.shops + 1 }));
+      setFlash((f) => ({ ...f, shops: true }));
+      setTimeout(() => setFlash((f) => ({ ...f, shops: false })), 800);
+    }, 15000);
+
+    // Deals: +0.1 to +0.4 every 8–12s
+    const dealsTimer = setInterval(() => {
+      setStats((s) => ({
+        ...s,
+        deals: Math.round((s.deals + Math.random() * 0.3 + 0.1) * 10) / 10,
+      }));
+      setFlash((f) => ({ ...f, deals: true }));
+      setTimeout(() => setFlash((f) => ({ ...f, deals: false })), 800);
+    }, 10000);
+
+    return () => {
+      clearInterval(requestsTimer);
+      clearInterval(shopsTimer);
+      clearInterval(dealsTimer);
+    };
+  }, [reduceMotion]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.7, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className="inline-flex flex-wrap items-center justify-center md:justify-start
+                 gap-x-3 gap-y-1.5
+                 px-3.5 py-2 rounded-full
+                 bg-white/60 backdrop-blur-sm
+                 ring-1 ring-[#1A1A2E]/5
+                 shadow-[0_2px_8px_-2px_rgba(26,26,46,0.06)]"
+    >
+      <StatItem
+        icon={
+          <motion.span
+            className="w-1.5 h-1.5 rounded-full bg-emerald-500"
+            animate={reduceMotion ? {} : { opacity: [1, 0.4, 1] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        }
+        value={stats.requests}
+        suffix="requests posted today"
+        flash={flash.requests}
+      />
+
+      <Divider />
+
+      <StatItem
+        value={stats.shops}
+        suffix="shops bidding"
+        flash={flash.shops}
+      />
+
+      <Divider />
+
+      <StatItem
+        prefix="₹"
+        value={stats.deals.toFixed(1)}
+        suffix="L in deals"
+        flash={flash.deals}
+      />
+    </motion.div>
+  );
+};
+
+/* ============ Stat Item ============ */
+const StatItem = ({ icon, prefix, value, suffix, flash }) => {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] leading-none">
+      {icon}
+      <span className="inline-flex items-baseline gap-0.5">
+        {prefix && (
+          <span className="text-[#1A1A2E] font-semibold">{prefix}</span>
+        )}
+        <motion.span
+          key={value}
+          initial={{ y: -4, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          className={`font-semibold tabular-nums transition-colors duration-500 ${
+            flash ? 'text-emerald-600' : 'text-[#1A1A2E]'
+          }`}
+        >
+          {value}
+        </motion.span>
+      </span>
+      <span className="text-[#A0A0B0] font-normal">{suffix}</span>
+    </span>
+  );
+};
+
+/* ============ Divider ============ */
+const Divider = () => (
+  <span className="w-1 h-1 rounded-full bg-[#1A1A2E]/20" aria-hidden="true" />
+);
+
+/* ============ Hero ============ */
 const Hero = () => {
+  const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
   const [tickerIndex, setTickerIndex] = useState(0);
   const [bidAmount, setBidAmount] = useState(8200);
@@ -69,120 +198,216 @@ const Hero = () => {
   }, [aiText, aiCycle, reduceMotion]);
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center
-                        px-4 sm:px-6 pt-24 sm:pt-20 pb-16 overflow-hidden">
+    <section className="relative min-h-screen flex items-center
+                        px-4 sm:px-6 pt-28 sm:pt-24 pb-20 overflow-hidden">
       <div className="max-w-6xl mx-auto w-full">
-        <div className="grid md:grid-cols-2 gap-10 md:gap-14 items-center">
-          {/* ============ Left — content ============ */}
+        <div className="grid md:grid-cols-12 gap-10 md:gap-8 items-center">
+          {/* ============ Left — content (7/12) ============ */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-4 text-center md:text-left"
+            className="md:col-span-7 space-y-5 sm:space-y-6
+                       text-center md:text-left"
           >
+            {/* Eyebrow */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.4 }}
+              className="inline-flex items-center gap-2
+                         px-3 py-1.5 rounded-full
+                         bg-[#FFBE91]/10
+                         border border-[#FFBE91]/20"
+            >
+              <Zap size={11} className="text-[#FFBE91]" />
+              <span className="text-[10px] font-semibold text-[#1A1A2E]
+                               tracking-wide uppercase">
+                Buyers set the price
+              </span>
+            </motion.div>
+
             {/* Heading */}
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              className="text-[28px] sm:text-3xl md:text-4xl lg:text-5xl
-                         font-bold leading-[1.15] tracking-tight"
+              className="font-bold tracking-tight leading-[1.05]"
             >
-              <span className="text-[#1A1A2E]">Market</span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r
-                               from-[#FFBE91] via-[#FFDDB0] to-[#CFEBFF]">
-                Flip
-              </span>
-              <br />
-              <span className="text-[#1A1A2E] text-sm sm:text-base
-                               md:text-lg lg:text-xl font-medium
-                               mt-2 block">
-                Where buyers set the price.
+              <span className="block text-[38px] sm:text-5xl
+                               md:text-[54px] lg:text-[62px]
+                               text-[#1A1A2E]">
+                Market
+                <span className="text-transparent bg-clip-text
+                                 bg-gradient-to-r
+                                 from-[#FFBE91] via-[#FFDDB0] to-[#CFEBFF]">
+                  Flip
+                </span>
               </span>
             </motion.h1>
+
+            {/* Tagline */}
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="text-base sm:text-lg md:text-xl
+                         font-medium text-[#1A1A2E]/70
+                         max-w-md mx-auto md:mx-0"
+            >
+              Where buyers set the price.
+            </motion.p>
 
             {/* Description */}
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              className="text-xs sm:text-sm text-[#4A4A5A]
+              transition={{ delay: 0.3, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="text-[13px] sm:text-sm text-[#4A4A5A]
                          max-w-lg mx-auto md:mx-0 leading-relaxed"
             >
               Post a <StreamWord word="Request" delay={0.5} /> start an{' '}
               <StreamWord word="Auction" delay={1.3} /> or just tell the{' '}
               <StreamWord word="AI" delay={2.1} /> what you need. Shops
-              compete, you pick the best deal, and every handoff is verified.
+              compete, you pick the best deal, and every handoff is
+              verified.
             </motion.p>
 
-            {/* Trust badges */}
+            {/* CTA buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="flex flex-wrap items-center justify-center md:justify-start
+                         gap-3 pt-1"
+            >
+              <motion.button
+                onClick={() => navigate('/auth')}
+                whileHover={reduceMotion ? {} : { scale: 1.02 }}
+                whileTap={reduceMotion ? {} : { scale: 0.97 }}
+                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                className="group inline-flex items-center gap-2
+                           bg-[#1A1A2E] hover:bg-[#2A2A3E]
+                           text-[#FFFCE1]
+                           text-[13px] font-semibold
+                           px-5 py-3 rounded-full
+                           shadow-[0_8px_24px_-8px_rgba(26,26,46,0.5)]
+                           hover:shadow-[0_12px_32px_-8px_rgba(26,26,46,0.6)]
+                           transition-all"
+              >
+                Get Started
+                <ArrowRight
+                  size={14}
+                  className="transition-transform duration-200
+                             group-hover:translate-x-0.5"
+                  strokeWidth={2.2}
+                />
+              </motion.button>
+
+              <motion.button
+                onClick={() => {
+                  const el = document.getElementById('how-it-works');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+                whileHover={reduceMotion ? {} : { scale: 1.02 }}
+                whileTap={reduceMotion ? {} : { scale: 0.97 }}
+                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                className="inline-flex items-center gap-2
+                           bg-transparent hover:bg-[#1A1A2E]/5
+                           text-[#1A1A2E]
+                           text-[13px] font-medium
+                           px-5 py-3 rounded-full
+                           border border-[#1A1A2E]/15
+                           transition-all"
+              >
+                See How It Works
+              </motion.button>
+            </motion.div>
+
+            {/* ============ NEW: Live stats strip ============ */}
+            <div className="pt-2 flex justify-center md:justify-start">
+              <LiveStatsStrip reduceMotion={reduceMotion} />
+            </div>
+
+            {/* Trust row */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.45, duration: 0.5 }}
-              className="flex items-center justify-center md:justify-start
-                         gap-4 pt-3"
+              transition={{ delay: 0.75, duration: 0.5 }}
+              className="flex flex-wrap items-center justify-center
+                         md:justify-start gap-5 pt-3"
             >
-              <div className="flex items-center -space-x-2">
+              <div className="flex items-center -space-x-2.5">
                 {[
-                  { icon: <FileText size={11} />, color: 'from-[#FFBE91] to-[#FFDDB0]' },
-                  { icon: <Gavel size={11} />, color: 'from-[#FFDDB0] to-[#CFEBFF]' },
-                  { icon: <ShoppingCart size={11} />, color: 'from-[#CFEBFF] to-[#FFBE91]' },
-                  { icon: <Shield size={11} />, color: 'from-[#FFBE91] to-[#CFEBFF]' },
+                  { icon: <FileText size={13} />, color: 'from-[#FFBE91] to-[#FFDDB0]' },
+                  { icon: <Gavel size={13} />, color: 'from-[#FFDDB0] to-[#CFEBFF]' },
+                  { icon: <ShoppingCart size={13} />, color: 'from-[#CFEBFF] to-[#FFBE91]' },
+                  { icon: <Shield size={13} />, color: 'from-[#FFBE91] to-[#CFEBFF]' },
+                  { icon: <Star size={13} />, color: 'from-[#CFEBFF] to-[#FFDDB0]' },
                 ].map((item, i) => (
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, scale: 0.6 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{
-                      delay: 0.5 + i * 0.06,
+                      delay: 0.8 + i * 0.06,
                       duration: 0.35,
                       ease: [0.16, 1, 0.3, 1],
                     }}
-                    className={`w-7 h-7 rounded-full border-2 border-white
+                    className={`w-9 h-9 rounded-full
+                                border-[2.5px] border-white
                                 bg-gradient-to-br ${item.color}
                                 flex items-center justify-center
-                                text-[#1A1A2E] shadow-sm`}
+                                text-[#1A1A2E]
+                                shadow-[0_2px_6px_-2px_rgba(26,26,46,0.15)]`}
                   >
                     {item.icon}
                   </motion.div>
                 ))}
               </div>
-              <div>
-                <p className="text-[11px] font-medium text-[#1A1A2E]">
+
+              <div className="border-l border-[#1A1A2E]/10 pl-5">
+                <p className="text-[13px] font-semibold text-[#1A1A2E]
+                              leading-tight">
                   Trusted by 100+
                 </p>
-                <p className="text-[9px] text-[#A0A0B0]">
-                  Buyers and shops
+                <p className="text-[11px] text-[#A0A0B0] leading-tight mt-0.5">
+                  buyers and shops across India
                 </p>
               </div>
             </motion.div>
           </motion.div>
 
-          {/* ============ Right — dynamic preview ============ */}
+          {/* ============ Right — dynamic preview (5/12) ============ */}
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="relative flex justify-center md:justify-end"
+            transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="md:col-span-5 relative flex justify-center md:justify-end"
           >
-            <div className="relative w-full max-w-[300px] sm:max-w-sm md:max-w-md">
-              {/* Ambient glow */}
+            <div
+              aria-hidden="true"
+              className="hidden md:block absolute -left-8 top-8 bottom-8 w-px
+                         bg-gradient-to-b from-transparent
+                         via-[#1A1A2E]/10 to-transparent"
+            />
+
+            <div className="relative w-full max-w-[320px] sm:max-w-sm md:max-w-md">
               <div
                 aria-hidden="true"
-                className="absolute -inset-6 sm:-inset-8 rounded-3xl blur-3xl"
+                className="absolute -inset-10 rounded-3xl blur-3xl"
                 style={{
                   background:
-                    "radial-gradient(circle at 30% 30%, rgba(255,190,145,0.25), transparent 60%), radial-gradient(circle at 70% 70%, rgba(207,235,255,0.25), transparent 60%)",
+                    "radial-gradient(circle at 30% 30%, rgba(255,190,145,0.28), transparent 60%), radial-gradient(circle at 70% 70%, rgba(207,235,255,0.28), transparent 60%)",
                 }}
               />
 
               <div className="relative flex flex-col gap-2.5 sm:gap-3">
-                {/* ===== Ticker: Request Live ===== */}
+                {/* Ticker */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.35, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{ delay: 0.4, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                   className="relative bg-white rounded-xl sm:rounded-2xl
                              p-3 sm:p-3.5 overflow-hidden
                              ring-1 ring-[#1A1A2E]/5
@@ -231,11 +456,11 @@ const Hero = () => {
                   </div>
                 </motion.div>
 
-                {/* ===== Auction with rising bid ===== */}
+                {/* Auction */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{ delay: 0.55, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                   className="relative bg-white rounded-xl sm:rounded-2xl
                              p-3 sm:p-3.5 ml-4 sm:ml-6 overflow-hidden
                              ring-1 ring-[#1A1A2E]/5
@@ -292,11 +517,11 @@ const Hero = () => {
                   </div>
                 </motion.div>
 
-                {/* ===== AI with live typing ===== */}
+                {/* AI */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.65, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{ delay: 0.7, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                   className="relative bg-[#1A1A2E] rounded-xl sm:rounded-2xl
                              p-3 sm:p-3.5 mr-3 sm:mr-4 overflow-hidden
                              ring-1 ring-white/10
@@ -321,7 +546,6 @@ const Hero = () => {
                           <Shield size={9} className="text-[#FFBE91]" />
                         </motion.span>
                       </div>
-
                       <div className="h-4 overflow-hidden">
                         <p className="text-[9px] sm:text-[10px] text-[#FFFCE1]/70
                                       leading-tight truncate">
@@ -339,11 +563,11 @@ const Hero = () => {
                   </div>
                 </motion.div>
 
-                {/* ===== Handoff verified ===== */}
+                {/* Handoff verified */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.8, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{ delay: 0.85, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                   className="relative bg-white rounded-xl sm:rounded-2xl
                              p-3 sm:p-3.5 ml-8 sm:ml-12
                              ring-1 ring-[#1A1A2E]/5
@@ -400,12 +624,11 @@ const Hero = () => {
                 </motion.div>
               </div>
 
-              {/* Floating accent dots */}
               <motion.span
                 className="absolute -top-2 right-6 sm:right-8 w-1.5 h-1.5
                            rounded-full bg-[#FFBE91]"
                 animate={{ y: [0, -6, 0], opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
               />
               <motion.span
                 className="absolute -bottom-2 left-8 sm:left-12 w-1.5 h-1.5
@@ -414,7 +637,7 @@ const Hero = () => {
                 transition={{
                   duration: 3.5,
                   repeat: Infinity,
-                  ease: "easeInOut",
+                  ease: 'easeInOut',
                   delay: 0.6,
                 }}
               />
