@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { 
+import {
   User,
   Code,
   Sparkles,
@@ -26,8 +26,8 @@ const AboutDev = () => {
 
   const itemVariants = {
     hidden: { opacity: 0, y: 15, scale: 0.95 },
-    show: { 
-      opacity: 1, 
+    show: {
+      opacity: 1,
       y: 0,
       scale: 1,
       transition: {
@@ -42,7 +42,7 @@ const AboutDev = () => {
   return (
     <section className="relative py-16 md:py-20 px-4 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-[#FFFCE1] via-white/80 to-[#FFFCE1]" />
-      
+
       <div className="relative z-10 max-w-4xl mx-auto">
         <motion.div
           variants={containerVariants}
@@ -52,21 +52,21 @@ const AboutDev = () => {
           className="text-center"
         >
           {/* Badge */}
-          <motion.div 
+          <motion.div
             variants={itemVariants}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 mb-4 bg-[#FFBE91]/10 rounded-full border border-[#FFBE91]/20"
           >
             <User size={12} className="text-[#FFBE91]" />
             <span className="text-[10px] font-medium text-[#FFBE91] tracking-wide uppercase">About</span>
           </motion.div>
-          
+
           <motion.h2 variants={itemVariants} className="text-3xl md:text-4xl font-bold leading-tight">
             <span className="text-[#1A1A2E]">Meet the </span>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFBE91] via-[#FFDDB0] to-[#CFEBFF]">
               Developer
             </span>
           </motion.h2>
-          
+
           {/* Avatar */}
           <motion.div
             variants={itemVariants}
@@ -87,13 +87,13 @@ const AboutDev = () => {
 
           {/* Bio */}
           <motion.p variants={itemVariants} className="mt-4 max-w-2xl mx-auto text-sm text-[#4A4A5A] leading-relaxed">
-            Building MarketFlip with a vision to revolutionize local commerce. 
-            Passionate about creating solutions that make everyday life simpler, 
+            Building MarketFlip with a vision to revolutionize local commerce.
+            Passionate about creating solutions that make everyday life simpler,
             fairer, and more connected.
           </motion.p>
 
           {/* Tech Stack */}
-          <motion.div 
+          <motion.div
             variants={itemVariants}
             className="mt-5 flex flex-wrap gap-1.5 justify-center"
           >
@@ -108,7 +108,7 @@ const AboutDev = () => {
           </motion.div>
 
           {/* Social Links - Text based */}
-          <motion.div 
+          <motion.div
             variants={itemVariants}
             className="mt-6 flex flex-wrap gap-3 justify-center">
             {
@@ -127,14 +127,15 @@ const AboutDev = () => {
                   whileTap={{ scale: 0.95 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                   className="px-4 py-1.5 text-[10px] font-medium text-[#1A1A2E] bg-white/80 backdrop-blur-sm border border-[#EEECE6] rounded-full hover:bg-[#FFBE91]/10 hover:border-[#FFBE91] transition-all">
-              {social.name}
-            </motion.a>
-          )
-        )
-      }
-    </motion.div>
+                  {social.name}
+                </motion.a>
+              )
+              )
+            }
+          </motion.div>
+
           {/* Stats */}
-          <motion.div 
+          <motion.div
             variants={itemVariants}
             className="mt-6 flex items-center justify-center gap-6 text-xs text-[#4A4A5A]"
           >
@@ -155,7 +156,7 @@ const AboutDev = () => {
           </motion.div>
 
           {/* Location & Email */}
-          <motion.div 
+          <motion.div
             variants={itemVariants}
             className="mt-5 flex flex-wrap items-center justify-center gap-4 text-xs text-[#A0A0B0]"
           >
@@ -167,6 +168,58 @@ const AboutDev = () => {
             <div className="flex items-center gap-1.5">
               <Mail size={13} />
               <span>prateeksaha963@gmail.com</span>
+            </div>
+          </motion.div>
+
+          {/* Portfolio CTA */}
+          <motion.div
+            variants={itemVariants}
+            className="mt-8"
+          >
+            <div className="relative max-w-2xl mx-auto rounded-2xl border border-[#EEECE6] bg-white/80 backdrop-blur-sm shadow-sm p-5 sm:p-6 text-left">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 inline-flex shrink-0 items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-[#FFBE91] to-[#CFEBFF]">
+                  <Sparkles size={16} className="text-[#1A1A2E]" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#FFBE91]">
+                    Portfolio
+                  </p>
+                  <h4 className="mt-1 text-base font-bold text-[#1A1A2E]">
+                    See more of my work
+                  </h4>
+                  <p className="mt-1.5 text-xs text-[#4A4A5A] leading-relaxed">
+                    End-to-end systems across backend engineering, data science, and
+                    applied AI, from reverse marketplaces to RAG-powered study
+                    companions and vehicle-detection pipelines trained on Indian road
+                    data.
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {['Python', 'FastAPI', 'React', 'PostgreSQL', 'YOLOv8', 'RAG'].map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-2 py-0.5 bg-[#F8F6F0] text-[#1A1A2E] text-[10px] rounded-full border border-[#EEECE6]"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+
+                  <motion.a
+                    href="https://prateeksaha-dev.vercel.app/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    whileHover={{ y: -2, scale: 1.02 }}
+                    whileTap={{ scale: 0.97 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                    className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-[#1A1A2E] bg-[#FFBE91] hover:bg-[#FFDDB0] rounded-full transition-colors"
+                  >
+                    Visit full portfolio
+                    <ArrowUpRight size={13} />
+                  </motion.a>
+                </div>
+              </div>
             </div>
           </motion.div>
         </motion.div>

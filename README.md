@@ -1,14 +1,54 @@
 # MarketFlip
 
-MarketFlip is a reverse marketplace for local commerce. Buyers publish what they need and receive competitive offers from nearby shop owners. The platform also supports shop-created auctions with live bidding.
+> **PROJECT STATUS: PAUSED**
 
-## Current Status
+---
+
+## Notice: Development is on Hold
+
+Alright, here's the situation.
+
+MarketFlip's development is temporarily paused. Not dead, not abandoned, just taking a nap.
+
+**Why?** Because I'm a broke developer and Supabase's free tier only allows **two projects at once**. I needed that second slot for a new project I'm building, which, funny enough, is basically a **way upgraded version of MarketFlip**. So MarketFlip got politely asked to step aside and hold my coffee while I work on its cooler sibling.
+
+**Couldn't I just pay for Supabase Premium?** No. My bank account laughed at me. So here we are.
+
+**What this means for you (the curious visitor):**
+
+| Can I... | Status |
+| --- | --- |
+| Visit the Vercel landing page | Yes, go wild |
+| See how it works | Yes |
+| Read the code or inspect the deployed frontend as reference | Absolutely |
+| Log in | No. Auth ran on Supabase, which is currently napping |
+| Yell at me to fix it faster | Sure, but it won't speed things up |
+
+I'll be looking into **alternative services** for auth and/or data as soon as I can scrape together the time and/or money. Until then, MarketFlip is **on pause**. Think of it as a museum exhibit. Beautiful, functional-looking, but please don't touch the login button.
+
+Thanks for your patience.
+
+---
+
+## What is MarketFlip?
+
+MarketFlip is a **reverse marketplace** for local commerce. Instead of shops listing products and hoping buyers show up, **buyers publish what they need**, and nearby shop owners send in **competitive offers**. Think of it as "Uber, but for haggling with your local shopkeeper."
+
+The platform also supports **shop-created auctions with live bidding**, because why not add a little adrenaline to buying a blender.
+
+---
+
+## Current Status (as it was before the pause)
 
 - Buyer and shop-owner workflows are available.
 - Request, bid, delivery, and auction APIs are implemented in FastAPI.
 - Supabase PostgreSQL and Supabase Auth provide persistence and authentication.
 - Cloudinary handles request image uploads.
 - Frontend and backend are deployed on Vercel and Render.
+
+> **Note:** The information below describes the project as it was **before the pause**. Code is intact; just the live auth is offline.
+
+---
 
 ## Features
 
@@ -40,6 +80,8 @@ MarketFlip is a reverse marketplace for local commerce. Buyers publish what they
 - Auction closing with sniping prevention and a scheduled Supabase Edge Function.
 - FastAPI startup checks for Supabase and Cloudinary configuration.
 
+---
+
 ## Technology Stack
 
 | Layer | Technologies |
@@ -49,6 +91,8 @@ MarketFlip is a reverse marketplace for local commerce. Buyers publish what they
 | Data and auth | Supabase Auth, PostgreSQL, Row Level Security |
 | Media | Cloudinary |
 | Hosting | Vercel (frontend), Render (backend) |
+
+---
 
 ## Repository Structure
 
@@ -70,9 +114,23 @@ marketflip/
 │       ├── pages/buyer/      Buyer dashboards and workflows
 │       ├── pages/shop/       Shop-owner dashboards and workflows
 │       └── hooks/            Client-side upload and utility hooks
-├── mfx-docs/                 Product and technical documentation
+├── mfx-docs/                 Product and technical documentation (see below)
 └── supabase/                 Database project configuration
 ```
+
+---
+
+## Documentation
+
+Detailed product specs, architecture notes, database schemas, and version roadmaps live in the **`mfx-docs/`** folder in this repo. That's your best source of truth.
+
+There's also a Notion workspace below, but heads up, it's **not actively maintained**:
+
+**[View MarketFlip HQ Master Workspace (Read-Only)](https://emphasized-citrus-c5e.notion.site/MarketFlip-HQ-3cebcc73368d80b48018e8fd77c12461?source=copy_link)**
+
+> TL;DR: If the Notion and `mfx-docs/` disagree, trust `mfx-docs/`.
+
+---
 
 ## Local Development
 
@@ -87,7 +145,8 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-The API is available at `http://localhost:8000`. Interactive documentation is available at `http://localhost:8000/docs`.
+- API: `http://localhost:8000`
+- Interactive docs: `http://localhost:8000/docs`
 
 ### Frontend
 
@@ -97,7 +156,7 @@ npm install
 npm run dev
 ```
 
-The development client is available at `http://localhost:5173`.
+- Dev client: `http://localhost:5173`
 
 Available frontend checks:
 
@@ -106,17 +165,34 @@ npm run lint
 npm run build
 ```
 
+---
+
 ## Production Endpoints
 
-- Frontend: <https://marketflip-mauve.vercel.app>
-- Backend: <https://marketflip.onrender.com>
-- API documentation: <https://marketflip.onrender.com/docs>
+- **Frontend:** <https://marketflip-mauve.vercel.app>
+- **Backend:** <https://marketflip.onrender.com>
+- **API docs:** <https://marketflip.onrender.com/docs>
 
-## Project Documentation & Roadmap
-complete architecture specs, database schemas, and version roadmaps are live in Notion: 
-**[View MarketFlip HQ Master Workspace (Read-Only)](https://emphasized-citrus-c5e.notion.site/MarketFlip-HQ-3cebcc73368d80b48018e8fd77c12461?source=copy_link)**
-*not being maintained check mfx-docs for more info*
+> **Login is disabled** on the deployed frontend while Supabase is paused. You can still browse the landing page, poke around the UI, and inspect the code. Just don't expect the login button to do anything dramatic.
+
+---
+
+## Roadmap (When It Wakes Up)
+
+Once I sort out an alternative auth/data service, or win the lottery, MarketFlip will resume development. Priorities:
+
+1. Migrate or replace Supabase Auth so logins work again.
+2. Resume feature work per the roadmap in `mfx-docs/`.
+3. Possibly merge learnings from the newer "upgraded sibling" project back into MarketFlip.
+
+Until then: on hold.
+
+---
 
 ## License
 
-Copyright © 2026 Prateek Saha. Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
+Copyright © 2026 Prateek Saha. Licensed under the **Apache License, Version 2.0**. See [LICENSE](LICENSE) for details.
+
+---
+
+*Built with caffeine, stubbornness, and an unreasonable love for marketplaces.*
